@@ -1,0 +1,35 @@
+# CODEOWNERS for Webox
+#
+# Lines later in this file take precedence over earlier ones.
+# Owner mentioned will be automatically requested for review.
+# See https://docs.github.com/articles/about-code-owners
+
+# Catch-all — owner reviews everything by default
+*                                       @maintainer
+
+# Critical security surface — extra scrutiny
+/secrets/                               @maintainer
+/internal/log/redact.go                 @maintainer
+/internal/log/redact_test.go            @maintainer
+/docs/SECURITY.md                       @maintainer
+/SECURITY.md                            @maintainer
+/.github/workflows/                     @maintainer
+
+# Architecture decisions — explicit review
+/docs/adr/                              @maintainer
+/docs/DESIGN.md                         @maintainer
+/docs/PRD.md                            @maintainer
+/docs/AUDIT.md                          @maintainer
+
+# Provider abstraction — be careful, breaking changes propagate
+/providers/                             @maintainer
+/docs/providers/                        @maintainer
+
+# Cursor agent guardrails — change with care
+/.cursor/                               @maintainer
+/AGENTS.md                              @maintainer
+
+# Sprint planning — only owner approves
+/docs/sprints/                          @maintainer
+/docs/RISKS.md                          @maintainer
+/docs/ROADMAP.md                        @maintainer

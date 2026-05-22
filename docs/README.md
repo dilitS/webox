@@ -32,11 +32,15 @@ Każdy plik odpowiada na inne pytanie.
 | Jakie są zagrożenia i polityki bezpieczeństwa? | [SECURITY.md](./SECURITY.md) |
 | Jak to testujemy i co przechodzi przez CI? | [TESTING.md](./TESTING.md) |
 | Co jest w MVP, co później, a czego nie robimy? | [ROADMAP.md](./ROADMAP.md) |
+| Jakie ryzyka realnie nam zagrażają i jaki jest plan B? | [RISKS.md](./RISKS.md) |
+| Jak planujemy sprinty rolling-wave (DoR, DoD, kadencja)? | [sprints/README.md](./sprints/README.md) |
+| Co konkretnie robimy w aktualnym sprincie? | [sprints/sprint-00-bootstrap.md](./sprints/sprint-00-bootstrap.md), [sprints/sprint-01-foundations.md](./sprints/sprint-01-foundations.md) |
 | Jak wnosić kod, tłumaczenia i nowych providerów? | [CONTRIBUTING.md](./CONTRIBUTING.md) |
 | Dlaczego wybraliśmy konkretne decyzje architektoniczne? | [adr/](./adr/) |
 | Jak działa referencyjny provider MVP? | [providers/smallhost.md](./providers/smallhost.md) |
 | Co wiemy o providerach post-MVP? | [providers/cpanel.md](./providers/cpanel.md), [providers/directadmin.md](./providers/directadmin.md), [providers/cyberpanel.md](./providers/cyberpanel.md) |
 | Jakie luki znaleziono przed implementacją i jak je zamknięto? | [AUDIT.md](./AUDIT.md) |
+| Jak wyglądały retrospektywy i czego się nauczyliśmy? | [retros/](./retros/) |
 | Jak oryginalny monolit został rozłożony na obecne docs? | [MIGRATION_NOTES.md](./MIGRATION_NOTES.md) |
 
 ## Status projektu

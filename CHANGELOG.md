@@ -16,6 +16,28 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `docs/sprints/` — rolling-wave sprint planning system:
+  - `README.md` — methodology (DoR, DoD, cadence, anti-patterns, capacity rules).
+  - `sprint-00-bootstrap.md` — full task breakdown (10 tasks) for repo
+    bootstrap, CI pipeline, `goreleaser` dry-run, and GitHub policy files.
+  - `sprint-01-foundations.md` — full task breakdown (8+2 tasks) for
+    `config/` (atomic write + flock + migrations), `secrets/` (keyring
+    probe detection, AES-GCM fallback with `memguard`), `redactor`, and
+    `webox doctor` minimum with explicit TDD targets and coverage gates.
+- `docs/RISKS.md` — risk register with 13 enumerated risks, likelihood ×
+  impact scoring, mitigation strategies, and concrete contingency
+  (plan B) paths. Active monitoring threshold ≥ 9, escalation ≥ 16.
+- `SECURITY.md` (repo root) — GitHub-visible security policy with private
+  reporting channel and link to `docs/SECURITY.md` threat model.
+- `.github/pull_request_template.md` — DoD checklist with sprint/task
+  linkage, security checklist for crypto/SSH changes, and 7-day cooldown
+  reminder for handmade crypto code (per `RISKS.md` R-003).
+- `.github/ISSUE_TEMPLATE/{bug,feature,config}.yml` — structured issue
+  forms with pre-submit redaction reminders and roadmap awareness.
+- `.github/CODEOWNERS` — protect critical surface (`secrets/`, `docs/adr/`,
+  `.github/workflows/`, sprint planning) behind owner review.
+- `.github/dependabot.yml` — weekly Go module + GitHub Actions updates,
+  Conventional Commits prefixes.
 - `docs/AUDIT.md` — comprehensive pre-implementation audit with 39 findings
   (P0–P3) and 5 open decisions blocking the start of `v0.1` implementation.
 - `AGENTS.md` — operator handbook for AI coding agents (stack, guardrails,
@@ -44,6 +66,9 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   (`webox.log`, `pending_cleanups.json`, `secrets.enc`), and editor noise.
 
 ### Changed
+- `docs/ROADMAP.md` — replaced single-line estimate with P50/P70/P90 table
+  (solo: ~22 weeks P50, ~32 weeks P90), added sprint → release mapping
+  table, and a re-baseline checkpoint after Sprint 03.
 - `docs/DESIGN.md` §10 — clarified MVP uses **LIFO stack** with
   `pending_cleanups.json`; DAG is `v0.3+` stretch (IMP-1).
 - `docs/AUDIT.md` §8 — folded the 19 second-pass `IMP-*` findings into the

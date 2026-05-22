@@ -1,12 +1,14 @@
 # Webox — Roadmap
 
-> Status: Draft · Ostatnia aktualizacja: 2026-05-22 · Właściciel: @maintainer
+> Status: Stable scope, evolving estimates · Ostatnia aktualizacja: 2026-05-22 · Właściciel: @maintainer
 >
-> Pokrewne dokumenty: [PRD.md](./PRD.md) (priorytety ficzerów), [DESIGN.md](./DESIGN.md), [adr/](./adr/).
+> Pokrewne dokumenty: [PRD.md](./PRD.md) (priorytety ficzerów), [DESIGN.md](./DESIGN.md), [adr/](./adr/), [sprints/](./sprints/) (rolling-wave taktyka), [RISKS.md](./RISKS.md).
 
 ## TL;DR
 
 MVP (v0.1) ogranicza się **wyłącznie do small.pl/Devil** i tylko do wybranego wycinka P0 z [PRD §6](./PRD.md#6-ficzery--z-priorytetami). v0.2 dorzuca **jednego, świadomie wybranego** drugiego providera (kandydaci: cPanel, DirectAdmin — wybór po review notatek badawczych), public contributor surface po angielsku, live log stream, GHA monitor i pełny Command Palette. v0.3+ — multi-provider, in-app updater, scaffolding kolejnych stacków, eksport/import konfiguracji. Wersja **v1.0** wymaga 3 mies. stabilności + ścieżki dla community providerów potwierdzonej realnym PR albo jawnie odroczonej w GA review.
+
+**Estymata solo (P50): ~22 tygodnie**. Pełne uzasadnienie w [§3.5](#35-estymata). Sprint plan i taktyka w [`sprints/`](./sprints/). Aktywne ryzyka w [`RISKS.md`](./RISKS.md).
 
 ## Spis treści
 
@@ -57,6 +59,22 @@ GA = `v1.0.0`. Wymagania (wszystkie naraz):
 6. **Bez `experimental` flag** na żadnym providerze włączonym domyślnie.
 
 ## 3. MVP (v0.1) — wyłącznie small.pl
+
+### 3.0 Mapowanie sprint → release
+
+| Sprint | Temat | Co dostarcza |
+|--------|-------|--------------|
+| 00 | Bootstrap | Repo, CI, tooling. Brak ficzerów user-visible. |
+| 01 | Foundations | `config/`, `secrets/`, redactor, `webox doctor` minimum. |
+| 02 | SSH + status cache | Connection pool, SWR cache, redacted SSH logging. |
+| 03 | Provider abstraction + small.pl | `HostingProvider` interface + adapter `smallhost` (status, list, restart). |
+| 04 | TUI shell | MVU, navigation, dashboard (read-only). |
+| 05 | Wizard tworzenia projektu | 5-step wizard + LIFO rollback + `pending_cleanups.json`. |
+| 06 | GitHub deploy workflow | Deploy keys, fine-grained PAT, embed.FS templates, SSL Let's Encrypt. |
+| 07 | Doctor + diagnostics + i18n | `webox doctor` rozszerzony, i18n PL/EN core screens. |
+| 08 | Polish + release hardening | Bug bash, RC1 → v0.1. |
+
+Pełna dekompozycja per sprint: [`sprints/`](./sprints/).
 
 ### 3.1 Zakres ficzerowy
 
@@ -110,7 +128,28 @@ Lista P0 z [PRD §6](./PRD.md#6-ficzery--z-priorytetami) (skrócone IDs):
 
 ### 3.5 Estymata
 
-12–20 tygodni jednoosobowej pracy maintainera (P50: 16 tygodni), lub 6–10 tygodni przy 2-osobowym zespole. Ścieżka krytyczna: SSH layer + Provider Pattern + wizard + integracja GH = ~60 % czasu. Reszta to UI polerka, testy, fixture capture na realnym small.pl i release hardening.
+**Solo maintainer (20h/tydzień focus time):**
+
+| Percentyl | Czas (tyg) | Komentarz |
+|-----------|------------|-----------|
+| P50 | **22** | Median scenario, brak większych blokerów. |
+| P70 | 26 | Jeden większy spike (np. crypto rework, parser overhaul). |
+| P90 | 32 | Wystąpi 1-2 ryzyka z [`RISKS.md`](./RISKS.md) (R-001, R-002, R-004). |
+
+**Dwuosobowy zespół (każdy 25h/tydzień):** 10-14 tygodni (P50: 12).
+
+**Ścieżka krytyczna** (`~60% czasu`):
+
+1. SSH layer + connection pool (Sprint 02).
+2. Provider Pattern + `small.pl` adapter (Sprint 03).
+3. Wizard z LIFO rollback (Sprint 05).
+4. GitHub Actions integracja + workflow templates (Sprint 06).
+
+**Reszta** (`~40%`): TUI polish, testy live z `small.pl`, fixture capture, release hardening, contributor-facing docs EN, dogłębne security review.
+
+**Sprint cadence:** ~9 sprintów (00-08) × 1-2 tyg, planowane rolling-wave. Pełna metodologia w [`sprints/README.md`](./sprints/README.md).
+
+> ⚠️ **Honest disclaimer:** historyczna dokładność estymat solo-devów to 1.5×-2.5× pierwotnej wartości. Re-baseline ROADMAP planowany po sprincie 03 (mamy wtedy 3 punkty rzeczywistej velocity).
 
 ## 4. v0.2 — drugi provider + dokończenie palette
 

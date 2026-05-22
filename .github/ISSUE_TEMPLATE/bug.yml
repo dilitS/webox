@@ -1,0 +1,91 @@
+name: Bug report
+description: Report a defect in Webox
+title: "[bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. Please redact any secrets, tokens, or hostnames before posting.
+        For security vulnerabilities, **do not open a public issue** — see [SECURITY.md](../SECURITY.md).
+
+  - type: input
+    id: version
+    attributes:
+      label: Webox version
+      description: Output of `webox --version`
+      placeholder: "webox v0.x.y (abc1234) built 2026-..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux (x86_64)
+        - Linux (arm64)
+        - Other (please specify in description)
+    validations:
+      required: true
+
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal emulator
+      placeholder: "iTerm2 3.5 / Ghostty / Alacritty / kitty / Linux console"
+    validations:
+      required: true
+
+  - type: input
+    id: provider
+    attributes:
+      label: Hosting provider
+      placeholder: "small.pl (Devil) — or 'not applicable'"
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered, deterministic steps.
+      placeholder: |
+        1. Run `webox` from a clean state.
+        2. Press `/create`.
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / output
+      description: |
+        Attach `~/.config/webox/logs/webox.log` (already redacted by the secret redactor).
+        If asciinema is possible (`asciinema rec`), even better.
+      render: shell
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Pre-submit checklist
+      options:
+        - label: I redacted secrets and hostnames manually as a second check.
+          required: true
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
