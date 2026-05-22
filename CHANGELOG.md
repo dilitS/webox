@@ -215,4 +215,4 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   Docs-only PRs (typos, formatting) can skip too. When in doubt, add
   an entry — better noisy than missing context months later.
 
-[Unreleased]: https://github.com/dilitS/webox/compare/v0.0.0...HEAD
+[Unreleased]: https://github.com/dilitS/webox/compare/v0.0.0-bootstrap...HEAD
