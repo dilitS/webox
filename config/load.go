@@ -42,7 +42,9 @@ func Load(ctx context.Context, path string) (*Config, error) {
 	}
 
 	if vErr := Validate(raw); vErr != nil {
-		if errors.Is(vErr, ErrSchemaViolation) {
+		if errors.Is(vErr, ErrSchemaViolation) ||
+			errors.Is(vErr, ErrSecretInConfig) ||
+			errors.Is(vErr, ErrDanglingProfileAlias) {
 			return nil, fmt.Errorf("%w: %w", ErrSchemaMismatch, vErr)
 		}
 		return nil, fmt.Errorf("%w: %w", ErrCorruptedConfig, vErr)

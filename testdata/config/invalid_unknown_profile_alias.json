@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "profiles": [
+    {
+      "alias": "main",
+      "type": "smallhost",
+      "host": "s1.small.pl",
+      "user": "testuser"
+    }
+  ],
+  "projects": [
+    {
+      "id": "0c4a4f5a-3a6f-4f4f-9a3a-3a6f4f4f9a3a",
+      "domain": "demo.testuser.smallhost.pl",
+      "profile_alias": "missing-profile"
+    }
+  ]
+}

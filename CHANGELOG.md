@@ -15,6 +15,20 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ## [Unreleased]
 
+### Fixed
+- `config.Validate()` now enforces two non-negotiable guardrails that the
+  first Sprint 01 pass missed during review:
+  - rejects secret-shaped strings anywhere in `config.json`
+    (`ghp_`, `ghs_`, `github_pat_`, `sk-`, PEM private-key headers) via
+    `ErrSecretInConfig`, matching `AGENTS.md §2.1`;
+  - rejects dangling `projects[].profile_alias` references via
+    `ErrDanglingProfileAlias`, aligning runtime validation with
+    `docs/DESIGN.md §6.1` FK semantics.
+- `config.Load()` maps both review-fix sentinels to `ErrSchemaMismatch`
+  instead of accepting malformed-but-well-shaped configs.
+- `docs/DESIGN.md §6.1` now points at the real fixture path
+  `testdata/config/valid_v1.json` instead of the stale pre-bootstrap path.
+
 ### Added
 - `config/load.go` — `config.Load(ctx, path) (*Config, error)` reads, schema-validates,
   decodes, and forward-migrates `config.json`. Distinguishable error sentinels:

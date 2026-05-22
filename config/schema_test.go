@@ -53,6 +53,20 @@ func TestValidate_Fixtures(t *testing.T) {
 			wantErrIs:   config.ErrSchemaViolation,
 			wantContain: "uuid",
 		},
+		{
+			name:        "secret_shaped_string_rejected",
+			fixture:     "invalid_secret_token.json",
+			wantErr:     true,
+			wantErrIs:   config.ErrSecretInConfig,
+			wantContain: "github_token",
+		},
+		{
+			name:        "unknown_profile_alias_rejected",
+			fixture:     "invalid_unknown_profile_alias.json",
+			wantErr:     true,
+			wantErrIs:   config.ErrDanglingProfileAlias,
+			wantContain: "missing-profile",
+		},
 	}
 
 	for _, tt := range tests {

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
+	"sort"
 	"strings"
 	"sync"
 
@@ -27,10 +29,33 @@ var SchemaJSON string
 // the jsonschema compiler. It must match the "$id" inside schema.json.
 const schemaURI = "https://webox.dev/schema/config/v1.json"
 
+type secretPattern struct {
+	label string
+	re    *regexp.Regexp
+}
+
 var (
-	schemaOnce sync.Once
-	schemaSrc  *jsonschema.Schema
-	schemaErr  error
+	schemaOnce     sync.Once
+	schemaSrc      *jsonschema.Schema
+	schemaErr      error
+	secretPatterns = []secretPattern{
+		{
+			label: "github classic token",
+			re:    regexp.MustCompile(`\bgh[ps]_[A-Za-z0-9]{36,255}\b`),
+		},
+		{
+			label: "github fine-grained token",
+			re:    regexp.MustCompile(`\bgithub_pat_[A-Za-z0-9_]{20,}\b`),
+		},
+		{
+			label: "openai-style secret",
+			re:    regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{16,}\b`),
+		},
+		{
+			label: "private key block",
+			re:    regexp.MustCompile(`(?s)-{5}BEGIN [A-Z ]+PRIVATE KEY-{5}`),
+		},
+	}
 )
 
 // compiledSchema lazily compiles SchemaJSON exactly once. Compilation is
@@ -61,18 +86,22 @@ func compiledSchema() (*jsonschema.Schema, error) {
 	return schemaSrc, schemaErr
 }
 
-// Validate parses raw as JSON and asserts it against the embedded
-// config.json schema. It returns:
+// Validate parses raw as JSON and rejects three classes of problems:
 //
 //   - errors.Is(err, ErrInvalidJSON) when raw is not well-formed JSON;
 //   - errors.Is(err, ErrSchemaViolation) when raw is well-formed but
 //     violates the schema (missing required field, wrong type, regex
 //     mismatch, format failure, etc.);
+//   - errors.Is(err, ErrSecretInConfig) when any string value looks like
+//     a plaintext credential (`ghp_`, `ghs_`, `github_pat_`, `sk-`,
+//     `BEGIN ... PRIVATE KEY`);
+//   - errors.Is(err, ErrDanglingProfileAlias) when some
+//     projects[].profile_alias references no profiles[].alias;
 //   - nil when raw conforms to the schema.
 //
-// Validate does NOT decode raw into a Go struct — that's [Decode]'s job.
-// Splitting the two surfaces keeps schema feedback decoupled from any
-// strict-JSON struct decoder we layer on top later.
+// Validate intentionally works on the generic decoded JSON tree instead
+// of the typed Config struct so it can enforce semantic guardrails
+// before Load/Save materialise a partially trusted object.
 func Validate(raw []byte) error {
 	var doc any
 	if err := json.Unmarshal(raw, &doc); err != nil {
@@ -86,6 +115,12 @@ func Validate(raw []byte) error {
 
 	if vErr := s.Validate(doc); vErr != nil {
 		return fmt.Errorf("%w: %s", ErrSchemaViolation, summarise(vErr))
+	}
+	if err := validateNoSecrets(doc); err != nil {
+		return err
+	}
+	if err := validateProfileAliasIntegrity(doc); err != nil {
+		return err
 	}
 	return nil
 }
@@ -114,4 +149,77 @@ func collect(ve *jsonschema.ValidationError, out *[]string) {
 	for _, child := range ve.Causes {
 		collect(child, out)
 	}
+}
+
+func validateNoSecrets(doc any) error {
+	return walkStrings(doc, "$")
+}
+
+func walkStrings(node any, path string) error {
+	switch v := node.(type) {
+	case map[string]any:
+		keys := make([]string, 0, len(v))
+		for key := range v {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			if err := walkStrings(v[key], path+"."+key); err != nil {
+				return err
+			}
+		}
+	case []any:
+		for idx, item := range v {
+			if err := walkStrings(item, fmt.Sprintf("%s[%d]", path, idx)); err != nil {
+				return err
+			}
+		}
+	case string:
+		for _, pattern := range secretPatterns {
+			if pattern.re.MatchString(v) {
+				return fmt.Errorf("%w: %s matches %s", ErrSecretInConfig, path, pattern.label)
+			}
+		}
+	}
+	return nil
+}
+
+func validateProfileAliasIntegrity(doc any) error {
+	root, ok := doc.(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	aliases := map[string]struct{}{}
+	if profiles, ok := root["profiles"].([]any); ok {
+		for _, rawProfile := range profiles {
+			profile, ok := rawProfile.(map[string]any)
+			if !ok {
+				continue
+			}
+			alias, ok := profile["alias"].(string)
+			if !ok {
+				continue
+			}
+			aliases[alias] = struct{}{}
+		}
+	}
+
+	if projects, ok := root["projects"].([]any); ok {
+		for idx, rawProject := range projects {
+			project, ok := rawProject.(map[string]any)
+			if !ok {
+				continue
+			}
+			alias, ok := project["profile_alias"].(string)
+			if !ok {
+				continue
+			}
+			if _, exists := aliases[alias]; !exists {
+				return fmt.Errorf("%w: $.projects[%d].profile_alias=%q", ErrDanglingProfileAlias, idx, alias)
+			}
+		}
+	}
+
+	return nil
 }
