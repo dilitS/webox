@@ -20,7 +20,12 @@ warn() { printf '%b\n' "${C_YELLOW}⚠ pre-commit${C_RESET} $*" >&2; }
 err()  { printf '%b\n' "${C_RED}✗ pre-commit${C_RESET} $*" >&2; }
 
 # ── Staged Go files only ───────────────────────────────────────────────
-mapfile -t go_files < <(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.go$' || true)
+# `mapfile` is bash 4+, but macOS still ships /bin/bash 3.2. Use a
+# portable `while read` loop instead so the hook works everywhere.
+go_files=()
+while IFS= read -r f; do
+  [[ -n "$f" ]] && go_files+=("$f")
+done < <(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.go$' || true)
 
 if [[ ${#go_files[@]} -eq 0 ]]; then
   ok "no staged Go files — skipping format/lint"
