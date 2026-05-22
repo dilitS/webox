@@ -103,7 +103,7 @@ func TestLoad_TableDriven(t *testing.T) {
 		},
 		{
 			name:      "secret_shaped_string",
-			body:      mustReadFile(t, "../testdata/config/invalid_secret_token.json"),
+			body:      secretTokenFixture(),
 			wantErrIs: config.ErrSchemaMismatch,
 		},
 		{

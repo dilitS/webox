@@ -115,29 +115,30 @@ Po sprincie 01:
 - **Estymata:** L
 - **Zależności:** TASK-01.1, TASK-01.2
 - **Acceptance Criteria:**
-  - [ ] `func Save(ctx context.Context, path string, cfg *Config) error`.
-  - [ ] **Algorytm:**
+  - [x] `func Save(ctx context.Context, path string, cfg *Config) error`.
+  - [x] **Algorytm:**
     1. Acquire `flock(2)` exclusive na `<path>.lock` (timeout 5s, exponential backoff).
     2. Walidacja `cfg` przeciw schema.
     3. Marshal JSON do bufora.
     4. Zapis do `<path>.tmp.<pid>.<rand>`.
     5. `f.Sync()` (fsync).
     6. `os.Rename(tmp, path)` (atomic POSIX).
-    7. `fsync` katalogu (`syscall.Fsync(dirFd)`).
+    7. `fsync` katalogu (`os.Open(dir)` + `Sync()`, równoważne `fsync(dirFd)` na MVP targetach).
     8. Release lock.
-  - [ ] Tabela testów:
-    - happy path (cfg → file → read back → equal)
-    - concurrent saves (goroutines, wszyscy widzą consistent state)
-    - kill mid-save (symulacja: użyj `t.Fatal` w mid-write hook) → no corrupt
-    - invalid cfg → no write
-    - perms (umask 0077 dla `.lock`, file `0600`)
-  - [ ] Race detector: `go test -race ./config/...` green.
-  - [ ] Coverage ≥ 85%.
+  - [x] Tabela testów:
+    - happy path (cfg → file → read back → equal) — `TestSave_HappyPathRoundTripAndPerms`
+    - concurrent saves (goroutines, wszyscy widzą consistent state) — `TestSave_ConcurrentSaves_ConsistentState`
+    - kill mid-save (pre-rename hook returns error) → no corrupt — `TestSave_BeforeRenameHook_LeavesOriginalIntact`
+    - invalid cfg → no write — `TestSave_InvalidConfig_NoWrite`
+    - perms (lock `0600`, file `0600`) — `TestSave_HappyPathRoundTripAndPerms`
+    - lock timeout — `TestSave_LockTimeout_ReturnsErrConfigLocked`
+  - [x] Race detector: `go test -race ./config/...` green (`make ci`).
+  - [x] Coverage ≥ 85% (`config/` = 85.9% after `internal_branches_test.go`).
 - **Pliki:**
   - `config/save.go` (new)
   - `config/save_test.go` (new)
-  - `config/lock_unix.go` (new — `//go:build !windows`)
-  - `config/lock_windows.go` (new — `//go:build windows`, użyj `LockFileEx`)
+  - `config/lock_unix.go` (new — `//go:build unix`, `syscall.Flock`)
+  - `config/lock_windows.go` (new — `//go:build windows`, compile-only stub; real `LockFileEx` port zostaje na v0.2+, zgodnie z ryzykiem `R-013`)
 - **Docs:** [`DESIGN.md §6.2`](../DESIGN.md), [`AUDIT §A4` lockfile](../AUDIT.md)
 - **Notatki:**
   - **Pułapka 1:** `flock(2)` na NFS nie działa. To OK dla MVP — w docs napiszemy „local FS only".

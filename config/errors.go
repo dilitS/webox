@@ -42,6 +42,11 @@ var ErrSchemaMismatch = errors.New("config: schema mismatch")
 // registered".
 var ErrMigrationFailed = errors.New("config: schema migration failed")
 
+// ErrConfigLocked is returned when Save cannot acquire the per-config
+// flock within the retry window. DESIGN §6 prescribes an actionable
+// message so the operator knows to close the other instance or wait.
+var ErrConfigLocked = errors.New("config: webox is already running; close the other instance or wait")
+
 // errNilConfig is returned by the migrate stub when it is called with a
 // nil receiver. It is wrapped by [ErrMigrationFailed] in [Load], but
 // kept private so callers don't grow a habit of switching on it.
