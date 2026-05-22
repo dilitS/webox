@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://webox.dev/schema/config/v1.json",
+  "title": "WeboxConfig",
+  "description": "On-disk Webox state at $XDG_CONFIG_HOME/webox/config.json. Source of truth: docs/DESIGN.md §6.1. NEVER stores secrets — only metadata; runtime values live in keyring or AES-GCM fallback (docs/SECURITY.md §4).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profiles", "projects"],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Schema version. v0.1 ships with 1; bumped on every backward-incompatible change (DESIGN §6.4)."
+    },
+    "language": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 8,
+      "default": "en",
+      "description": "UI language code (ADR-0006)."
+    },
+    "profiles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/profile" }
+    },
+    "projects": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/project" }
+    },
+    "settings": { "$ref": "#/$defs/settings" }
+  },
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alias", "type", "host", "user"],
+      "properties": {
+        "alias": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{1,32}$",
+          "description": "Lowercase alphanumeric + dash, 1-32 chars."
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Provider type registered via providers.Register (e.g. 'smallhost')."
+        },
+        "host": {
+          "type": "string",
+          "minLength": 1
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 22
+        },
+        "user": {
+          "type": "string",
+          "minLength": 1
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "domain", "profile_alias"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile_alias": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{1,32}$"
+        },
+        "repo": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$",
+          "description": "GitHub slug org/name."
+        },
+        "local_path": { "type": "string" },
+        "stack": { "type": "string" },
+        "node_version": { "type": "string" },
+        "imported_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "secrets_meta": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/secret_meta" }
+        }
+      }
+    },
+    "secret_meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "created_at", "source"],
+      "description": "Application-secret metadata only (docs/SECURITY.md §10.6). Never carries plaintext.",
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "last_rotated": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source": {
+          "type": "string",
+          "enum": ["managed", "server_only", "external"]
+        },
+        "last_synced_github": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "last_synced_server": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "rotation_reminder_days": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 90
+        }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "expert_mode": { "type": "boolean" },
+        "refresh_interval_s": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

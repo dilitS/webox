@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "profiles": [
+    {
+      "alias": "Main",
+      "type": "smallhost",
+      "host": "s1.small.pl",
+      "user": "testuser"
+    }
+  ],
+  "projects": []
+}

@@ -15,7 +15,35 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ## [Unreleased]
 
+### Added
+- `config/types.go` — strongly-typed `Config`, `Profile`, `Project`,
+  `SecretMeta`, `Settings` structs implementing `docs/DESIGN.md §6.1`. No
+  field uses `any`/`interface{}` (enforced by reflection-driven test).
+  `SecretSource` enum constants (`managed`/`server_only`/`external`)
+  mirror `docs/SECURITY.md §10.6`.
+- `config/schema.json` + `config/schema.go` — embedded JSON Schema
+  (Draft 2020-12) describing the on-disk format, lazily compiled with
+  format assertion enabled (`uuid`, `date-time`). New
+  `config.Validate(raw []byte) error` returns `errors.Is(_, ErrInvalidJSON)`
+  for malformed JSON and `errors.Is(_, ErrSchemaViolation)` for
+  schema-level errors with a flattened, lower-cased message digest.
+- `config/errors.go` — sentinel errors `ErrInvalidJSON`,
+  `ErrSchemaViolation` (additional `Err*` will land with TASK-01.2 Load).
+- `testdata/config/valid_v1.json` — canonical golden fixture
+  exercising every documented optional field (language, port,
+  properties, repo, imported_at, secrets_meta, settings).
+- `testdata/config/invalid_*.json` — four negative fixtures driving the
+  schema test table: missing schema_version, missing profile.type,
+  uppercase alias regex violation, non-UUID project id.
+
 ### Changed
+- `go.mod` — added `github.com/santhosh-tekuri/jsonschema/v6` v6.0.2
+  (Apache 2.0; no-network compiler, format assertion via
+  `c.AssertFormat()`).
+- `docs/sprints/sprint-01-foundations.md` — TASK-01.1 acceptance criteria
+  marked done; field list aligned with DESIGN §6.1
+  (`Profiles/Projects/Settings`, dropping the speculative
+  `Defaults/LastSync` from the original draft).
 - `docs/sprints/sprint-00-bootstrap.md` — marked all 46 acceptance-criteria
   checkboxes and 4 pre-flight items as done; populated `## Outcome` with
   decisions (module path, `tools/go.mod` over `tools.go`, signs placeholder,

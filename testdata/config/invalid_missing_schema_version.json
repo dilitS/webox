@@ -1,0 +1,12 @@
+{
+  "language": "en",
+  "profiles": [
+    {
+      "alias": "main",
+      "type": "smallhost",
+      "host": "s1.small.pl",
+      "user": "testuser"
+    }
+  ],
+  "projects": []
+}
