@@ -1,2 +1,80 @@
+### Webox — .gitignore
+# Goal: ignore build artifacts, transient state, secrets, and editor noise.
+# Anything tracked here would either bloat the repo, leak data, or break
+# reproducibility across contributors.
+
+### Project-specific
 archive/
+
+### Build / release artifacts
+/dist/
+/build/
+/bin/
+/webox
+/webox.exe
+*.exe
+*.test
+*.out
+*.prof
+*.cpuprofile
+*.memprofile
+/coverage.out
+/coverage.html
+/coverage/
+
+### GoReleaser
+/dist/
+/.goreleaser/cache/
+
+### Go module cache (rarely committed)
+/vendor/
+
+### Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.history/
+
+### OS metadata
 .DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+### Webox runtime state — never commit (would leak project layout + maybe creds)
+*.log
+webox.log
+webox.log.*
+pending_cleanups.json
+secrets.enc
+secrets.enc.bak
+config.json
+config.lock
+known_hosts
+
+### Local env / secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+id_*
+*.crt
+.netrc
+
+### Mock testing artifacts (kept locally only)
+testing/fixtures/**/.captured
+testing/cassettes/**.recorded
+
+### Go workspace files (avoid leaking dev paths)
+go.work
+go.work.sum
+
+### Cosign signing transient
+*.cosign.bundle
+*.cosign.pem
+*.sig

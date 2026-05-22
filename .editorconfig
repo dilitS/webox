@@ -1,0 +1,43 @@
+# EditorConfig — https://editorconfig.org/
+# Webox repo conventions. Keep this file lean: only what differs from "be
+# sensible". Anything project-wide (e.g. line endings) is enforced here so
+# Linux + macOS + Windows contributors don't churn the diff.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Go: tabs by spec (gofmt enforces). Tab width = 4 visually.
+[*.go]
+indent_style = tab
+indent_size = 4
+
+[Makefile]
+indent_style = tab
+
+[*.{yml,yaml,json,toml}]
+indent_size = 2
+
+[*.md]
+# Trailing spaces in markdown are sometimes intentional (line break).
+trim_trailing_whitespace = false
+indent_size = 2
+
+[{go.mod,go.sum,go.work,go.work.sum}]
+indent_style = tab
+
+[.golangci.yml]
+indent_size = 2
+
+[*.sh]
+indent_size = 2
+shell_variant = bash
+
+[Dockerfile*]
+indent_size = 2
