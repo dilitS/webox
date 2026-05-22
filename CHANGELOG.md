@@ -30,6 +30,24 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   `testdata/config/valid_v1.json` instead of the stale pre-bootstrap path.
 
 ### Added
+- `config/save.go` — atomic `Save(ctx, path, cfg)` for `config.json`:
+  parent-dir create (`0700`), exclusive `<path>.lock` `flock(2)` with
+  timeout/backoff, JSON marshal+validate, write to
+  `<path>.tmp.<pid>.<rand>`, `fsync(file)`, atomic `rename`, and
+  `fsync(parent dir)` for durability on Unix filesystems.
+- `config/lock_unix.go` — Unix lock helper around `syscall.Flock`
+  (`LOCK_EX|LOCK_NB`) with exponential backoff and `ErrConfigLocked`
+  sentinel on timeout; `config/lock_windows.go` added as compile stub so
+  future `LockFileEx` work has a stable seam.
+- `config/save_test.go` — TDD suite for the write path:
+  happy path + perms, concurrent saves, invalid cfg no-write, pre-rename
+  abort leaves original intact, cancelled context, parent-dir creation,
+  lock timeout, and helper branch tests (`writeTempFile`, `syncDirectory`,
+  `marshalConfig`).
+- `config/internal_branches_test.go` — white-box tests covering otherwise
+  hard-to-hit branches: broken embedded schema parse/compile, lowered
+  generic `summarise()` path, `tempPath()` randomness failure, and
+  non-object `validateProfileAliasIntegrity`.
 - `config/load.go` — `config.Load(ctx, path) (*Config, error)` reads, schema-validates,
   decodes, and forward-migrates `config.json`. Distinguishable error sentinels:
   `ErrCorruptedConfig` (I/O / malformed JSON), `ErrSchemaMismatch` (schema
