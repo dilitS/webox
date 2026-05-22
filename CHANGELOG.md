@@ -16,6 +16,26 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `config/load.go` — `config.Load(ctx, path) (*Config, error)` reads, schema-validates,
+  decodes, and forward-migrates `config.json`. Distinguishable error sentinels:
+  `ErrCorruptedConfig` (I/O / malformed JSON), `ErrSchemaMismatch` (schema
+  violation or future-version downgrade), `ErrMigrationFailed` (legacy
+  `schema_version` cannot be advanced — wired up fully in TASK-01.4). Missing
+  files return `DefaultConfig()` without any disk side effect.
+- `config/migrate.go` — package-private migrate stub that satisfies the Load
+  contract. `errNilConfig` and `errNoMigrator` sentinels prepared for the full
+  migration framework in TASK-01.4.
+- `config.DefaultConfig()` — exported factory for the in-memory defaults
+  (`SchemaVersion: 1`, `Language: "en"`, allocated empty Profile/Project slices)
+  Load returns when `config.json` is absent.
+- Tests:
+  - `config/load_test.go` — table-driven `TestLoad_TableDriven` (corrupt JSON,
+    two schema-violation fixtures, future schema_version), plus dedicated tests
+    for happy path, missing-file no-side-effect invariant, cancelled context,
+    and unreadable file (chmod 000, skipped under root).
+  - `config/migrate_internal_test.go` — white-box tests for `migrate(nil)`,
+    `migrate(SchemaVersion=Current)`, `migrate(SchemaVersion=0)` covering all
+    branches of the stub.
 - `config/types.go` — strongly-typed `Config`, `Profile`, `Project`,
   `SecretMeta`, `Settings` structs implementing `docs/DESIGN.md §6.1`. No
   field uses `any`/`interface{}` (enforced by reflection-driven test).
