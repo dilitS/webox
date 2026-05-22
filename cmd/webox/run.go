@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/webox/webox/internal/version"
+	"github.com/dilitS/webox/internal/version"
 )
 
 // Exit codes follow the POSIX convention: 0 success, 1 general error,
@@ -25,7 +25,7 @@ Flags:
   --debug          enable verbose diagnostic logging
 
 Documentation:
-  https://github.com/webox/webox/tree/main/docs
+  https://github.com/dilitS/webox/tree/main/docs
 `
 
 // opts holds the parsed startup flags. The TUI lands in Sprint 04, so

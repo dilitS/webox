@@ -164,8 +164,8 @@ In `cmd/webox/main.go` or `providers/imports.go`:
 
 ```go
 import (
-    _ "github.com/webox/webox/providers/smallhost"
-    _ "github.com/webox/webox/providers/<name>"  // ← new
+    _ "github.com/dilitS/webox/providers/smallhost"
+    _ "github.com/dilitS/webox/providers/<name>"  // ← new
 )
 ```
 

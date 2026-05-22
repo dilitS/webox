@@ -3,7 +3,7 @@ package version_test
 import (
 	"testing"
 
-	"github.com/webox/webox/internal/version"
+	"github.com/dilitS/webox/internal/version"
 )
 
 func TestFormat(t *testing.T) {

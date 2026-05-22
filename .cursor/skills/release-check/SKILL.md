@@ -61,8 +61,8 @@ In `CHANGELOG.md`:
 Add new empty `[Unreleased]` section above the new version. Update compare links at the bottom:
 
 ```markdown
-[Unreleased]: https://github.com/webox/webox/compare/v0.1.0...HEAD
-[v0.1.0]: https://github.com/webox/webox/releases/tag/v0.1.0
+[Unreleased]: https://github.com/dilitS/webox/compare/v0.1.0...HEAD
+[v0.1.0]: https://github.com/dilitS/webox/releases/tag/v0.1.0
 ```
 
 ### 3. Version constant
@@ -78,7 +78,7 @@ Tag must match: `git tag v0.1.0` (with `v` prefix).
 
 ```bash
 head -3 go.mod
-# module github.com/webox/webox
+# module github.com/dilitS/webox
 # 
 # go 1.24
 ```
@@ -189,12 +189,12 @@ Draft retro in `docs/retros/release-v0.1.0.md` (run `retro` skill).
 
 1. `git tag v0.1.0 && git push origin v0.1.0` triggers `release.yml` workflow.
 2. Monitor `gh run watch` until success.
-3. Verify [GitHub Releases page](https://github.com/webox/webox/releases) shows v0.1.0 with all assets.
+3. Verify [GitHub Releases page](https://github.com/dilitS/webox/releases) shows v0.1.0 with all assets.
 4. Verify `cosign verify` works:
    ```bash
    cosign verify-blob --certificate webox_v0.1.0_darwin_arm64.tar.gz.cosign.pem \
                       --signature webox_v0.1.0_darwin_arm64.tar.gz.sig \
-                      --certificate-identity-regexp '^https://github.com/webox/webox' \
+                      --certificate-identity-regexp '^https://github.com/dilitS/webox' \
                       --certificate-oidc-issuer https://token.actions.githubusercontent.com \
                       webox_v0.1.0_darwin_arm64.tar.gz
    ```

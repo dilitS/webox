@@ -1,3 +1,3 @@
-module github.com/webox/webox
+module github.com/dilitS/webox
 
 go 1.24

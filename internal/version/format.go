@@ -13,7 +13,7 @@ const (
 
 // Build metadata populated at link time via:
 //
-//	go build -ldflags '-X github.com/webox/webox/internal/version.Version=v0.1.0 ...'
+//	go build -ldflags '-X github.com/dilitS/webox/internal/version.Version=v0.1.0 ...'
 //
 // Tests treat these as plain package-level vars and restore them with
 // t.Cleanup. Production code reads them through String, never directly.

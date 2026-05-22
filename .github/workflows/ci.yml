@@ -175,7 +175,7 @@ jobs:
           CGO_ENABLED: "0"
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          MODULE: github.com/webox/webox
+          MODULE: github.com/dilitS/webox
           VERSION: v0.0.0-ci
         run: |
           short_sha="${GITHUB_SHA::7}"

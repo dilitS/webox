@@ -13,9 +13,9 @@ builds:
     ldflags:
       - >-
         -s -w
-        -X github.com/webox/webox/internal/version.Version={{ .Version }}
-        -X github.com/webox/webox/internal/version.Commit={{ .Commit }}
-        -X github.com/webox/webox/internal/version.Date={{ .Date }}
+        -X github.com/dilitS/webox/internal/version.Version={{ .Version }}
+        -X github.com/dilitS/webox/internal/version.Commit={{ .Commit }}
+        -X github.com/dilitS/webox/internal/version.Date={{ .Date }}
     mod_timestamp: "{{ .CommitTimestamp }}"
     goos:
       - linux

@@ -19,7 +19,7 @@ SHELL          := /bin/bash
 .SHELLFLAGS    := -eu -o pipefail -c
 .DEFAULT_GOAL  := help
 
-MODULE         := github.com/webox/webox
+MODULE         := github.com/dilitS/webox
 GO             ?= go
 GOFLAGS        ?= -trimpath
 LDFLAGS_BASE   := -s -w

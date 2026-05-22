@@ -318,7 +318,7 @@ func GetOrFetch[T any](c *Cache, key string, fetch func() T) T {}
 import (
     "log/slog"
 
-    "github.com/webox/webox/internal/log"
+    "github.com/dilitS/webox/internal/log"
 )
 
 // ✅ structured logging z slog.

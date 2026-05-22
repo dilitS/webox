@@ -129,7 +129,7 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/webox/webox
+        - github.com/dilitS/webox
 
 issues:
   max-issues-per-linter: 0

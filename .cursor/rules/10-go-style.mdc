@@ -16,7 +16,7 @@ import (
     "github.com/charmbracelet/bubbletea"   // third-party drugi
     "golang.org/x/crypto/ssh"
 
-    "github.com/webox/webox/internal/log"  // own module trzeci
+    "github.com/dilitS/webox/internal/log"  // own module trzeci
 )
 ```
 

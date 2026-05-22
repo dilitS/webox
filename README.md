@@ -7,10 +7,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/webox/webox/actions/workflows/ci.yml"><img src="https://github.com/webox/webox/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
-  <a href="https://github.com/webox/webox/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-7d56f4" alt="License: MIT"></a>
+  <a href="https://github.com/dilitS/webox/actions/workflows/ci.yml"><img src="https://github.com/dilitS/webox/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="https://github.com/dilitS/webox/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-7d56f4" alt="License: MIT"></a>
   <a href="docs/ROADMAP.md"><img src="https://img.shields.io/badge/status-docs--first%20pre--MVP-d846ef" alt="Stage: docs-first pre-MVP"></a>
-  <a href="https://pkg.go.dev/github.com/webox/webox"><img src="https://img.shields.io/badge/go-1.24%2B-00ADD8?logo=go" alt="Go 1.24+"></a>
+  <a href="https://pkg.go.dev/github.com/dilitS/webox"><img src="https://img.shields.io/badge/go-1.24%2B-00ADD8?logo=go" alt="Go 1.24+"></a>
   <a href="docs/ROADMAP.md"><img src="https://img.shields.io/badge/v0.1-in--design-ffb800" alt="v0.1 in design"></a>
 </p>
 
@@ -46,7 +46,7 @@ Planned install paths for `v0.1`:
 
 ```bash
 brew install webox/tap/webox   # planned
-go install github.com/webox/webox/cmd/webox@latest   # planned
+go install github.com/dilitS/webox/cmd/webox@latest   # planned
 ```
 
 Track release readiness in [`docs/ROADMAP.md`](docs/ROADMAP.md) and the pre-implementation audit in [`docs/AUDIT.md`](docs/AUDIT.md).

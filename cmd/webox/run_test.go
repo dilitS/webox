@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/webox/webox/internal/version"
+	"github.com/dilitS/webox/internal/version"
 )
 
 func TestRun_Version_PrintsVersionLine(t *testing.T) {
