@@ -1,0 +1,70 @@
+---
+description: Shell command + GitHub Actions workflow conventions — pinned SHAs, rsync excludes, env perms.
+globs: .github/workflows/*.yml,assets/workflow_*.yml,assets/workflow_*.tmpl.yml,Makefile,**/*.sh
+alwaysApply: false
+---
+
+# Shell + Workflow — Webox
+
+## GitHub Actions pinned by SHA
+
+```yaml
+# ❌ NIGDY tag (supply chain attack: tag może być przepisany)
+uses: actions/checkout@v4
+
+# ✅ ZAWSZE full 40-char SHA
+uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+```
+
+Reguła dotyczy wszystkich `uses:` (`setup-node`, `cache`, `ssh-key-action`, etc.).
+
+## rsync excludes obowiązkowe
+
+```yaml
+- name: Deploy
+  run: |
+    rsync -avz --delete \
+      --exclude='.env' \
+      --exclude='node_modules/' \
+      --exclude='uploads/' \
+      --exclude='tmp/' \
+      --exclude='cache/' \
+      dist/ user@host:path/
+```
+
+Brak excludes → `--delete` usuwa pliki klientów. Patrz [AUDIT C6](../../docs/AUDIT.md#c6-providerssmallhostmd-6--workflow-deployyml-u%C5%BCywa-rsync-z---delete).
+
+## .env permission verification post-deploy
+
+```yaml
+- name: Verify .env perms
+  run: |
+    ssh user@host 'stat -c "%a %U" path/../.env' \
+      | grep -q '^600 user$' \
+      || (echo "::error::.env has insecure permissions" && exit 1)
+```
+
+## npm cache (deploy.yml)
+
+```yaml
+- uses: actions/cache@<SHA>
+  with:
+    path: ~/.npm
+    key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+    restore-keys: ${{ runner.os }}-node-
+```
+
+## Workflow templates osadzone w binarce
+
+`//go:embed assets/workflow_deploy_smallhost.tmpl.yml` — **nigdy** dynamiczne pobieranie z sieci podczas wizard.
+
+## Makefile targets
+
+Każdy target ma `## one-line summary` — `make help` wypisuje wszystko. Targets są **idempotentne** — `make build` wywołane dwa razy daje ten sam efekt.
+
+## Shell scripts (hooks, tooling)
+
+- Shebang: `#!/usr/bin/env bash`.
+- `set -euo pipefail` w pierwszej linii po shebangu.
+- Quotowanie zmiennych: `"$var"`, nie `$var`.
+- Brak `cd` bez sprawdzenia (`cd "$dir" || exit 1`).

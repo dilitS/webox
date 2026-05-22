@@ -1,0 +1,83 @@
+---
+description: Provider Pattern rules — HostingProvider interface, registry, defensive parsing.
+globs: providers/**/*.go
+alwaysApply: false
+---
+
+# Providers — Webox
+
+## Kontrakt jest świętością
+
+Każdy provider implementuje **wszystkie** metody `HostingProvider` z [DESIGN §3](../../docs/DESIGN.md#3-provider-pattern-kontrakty-v2):
+
+```go
+type HostingProvider interface {
+    Name() string
+    CreateSubdomain(ctx context.Context, domain string, nodeVersion string) error
+    SetupSSL(ctx context.Context, domain string) error
+    CreateDatabase(ctx context.Context, dbType, dbName string) (user, password string, err error)
+    RestartNodeApp(ctx context.Context, domain string) error
+    GetDeployPath(domain string) string
+    GetLogPath(domain string) string
+    CheckStatus(ctx context.Context) (*ProviderStatus, error)
+    ListSubdomains(ctx context.Context) ([]string, error)
+    RemoveSubdomain(ctx context.Context, domain string) error
+    RemoveDatabase(ctx context.Context, dbName string) error
+    RemoveSSL(ctx context.Context, domain string) error
+}
+```
+
+## Idempotentność `Remove*`
+
+Brak zasobu == sukces (`nil`). LIFO rollback **wymaga** tego.
+
+## Factory
+
+```go
+func init() {
+    providers.Register("smallhost", New)
+}
+
+func New(cfg providers.ProviderConfig) (providers.HostingProvider, error) {
+    if cfg.User == "" {
+        return nil, fmt.Errorf("%w: user is required", providers.ErrInvalidProviderConfig)
+    }
+    return &SmallHostProvider{cfg: cfg}, nil
+}
+```
+
+## Defensywne parsowanie outputu
+
+```go
+// 1. Strip ANSI
+clean := ansiRegex.ReplaceAllString(raw, "")
+
+// 2. Walidacja rozmiaru
+if len(clean) > maxOutputSize {
+    return nil, ErrOutputTooLarge
+}
+
+// 3. Named regex groups, NIGDY exec/eval na zawartości
+match := mysqlAddPattern.FindStringSubmatch(clean)
+if match == nil {
+    return nil, ErrUnknownOutputFormat
+}
+
+// 4. Golden file dla success + malicious input
+// patrz testing/fixtures/<provider>/*.fixture.md
+```
+
+## Logika biznesowa NIGDY nie zna providera po nazwie
+
+```go
+// ❌ NIGDY w wizard / TUI / cmd
+if profile.Type == "smallhost" { ... }
+
+// ✅ ZAWSZE przez interface
+provider, err := registry.New(cfg)
+if err := provider.CreateSubdomain(ctx, domain, nodeVersion); err != nil { ... }
+```
+
+## MVP scope
+
+W MVP **tylko** `smallhost`. `cpanel`, `directadmin`, `cyberpanel` są research-only w `docs/providers/`. Wszelka implementacja tych adapterów w MVP PR = automatic reject.

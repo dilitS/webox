@@ -1,0 +1,106 @@
+---
+description: Test conventions — TDD for parsers/validators, table-driven, golden files, race detector.
+globs: **/*_test.go,testing/**/*
+alwaysApply: false
+---
+
+# Tests — Webox
+
+## TDD pierwsze (red → green → refactor)
+
+Dla parserów, walidatorów, redaktora sekretów, status cache, maszyny stanów TUI, keyring detekcji, config migracji — test pierwszy.
+
+```go
+func TestParseDevilMysqlAdd_Success(t *testing.T) {
+    input := loadFixture(t, "devil/mysql_add_ok.txt")
+    got, err := parseDevilMysqlAdd(input)
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if got.User != "testuser_app" {
+        t.Errorf("user = %q, want %q", got.User, "testuser_app")
+    }
+}
+```
+
+## Table-driven dla parserów
+
+```go
+func TestParseDevilWwwAdd(t *testing.T) {
+    tests := []struct {
+        name    string
+        fixture string
+        want    *AddResult
+        wantErr error
+    }{
+        {"success", "devil/www_add_ok.txt", &AddResult{Domain: "test.user.smallhost.pl"}, nil},
+        {"exists",  "devil/www_add_exists.txt", nil, ErrSubdomainExists},
+        {"invalid_node", "devil/www_add_invalid_node.txt", nil, ErrNodeVersionUnsupported},
+        {"malicious_ansi", "devil/www_add_malicious_ansi.txt", nil, ErrUnknownOutputFormat},
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            input := loadFixture(t, tt.fixture)
+            got, err := parseDevilWwwAdd(input)
+            if !errors.Is(err, tt.wantErr) {
+                t.Fatalf("err = %v, want %v", err, tt.wantErr)
+            }
+            // ... porównanie got vs want
+        })
+    }
+}
+```
+
+## Każdy parser ma malicious fixture
+
+`\r\n` injection, ANSI escape sequences, 1MB+ output, format degradacja. Patrz `testing/fixtures/<provider>/`.
+
+## `t.Helper()` w helperach
+
+```go
+func loadFixture(t *testing.T, name string) string {
+    t.Helper()
+    data, err := os.ReadFile(filepath.Join("testing/fixtures", name))
+    if err != nil {
+        t.Fatalf("load fixture %s: %v", name, err)
+    }
+    return string(data)
+}
+```
+
+## TUI snapshot przez `teatest`
+
+```go
+tm := teatest.NewTestModel(t, newDashboardModel(...))
+tm.Send(tea.WindowSizeMsg{Width: 100, Height: 30})
+tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+out := tm.FinalOutput(t)
+teatest.RequireEqualOutput(t, out)
+```
+
+Golden files w `tui/testdata/golden/*.golden.txt`. Regen przez `make test-tui` (nigdy ślepe `-update` w PR — review diff).
+
+## Coverage gate
+
+- MVP: ≥ 70% globalnie, ≥ 80% w `config/`, `providers/<x>/`, `status/`, `secrets/`, `tui/`.
+- v0.2+: ≥ 80% globalnie.
+- `make cover-check` failuje pod progiem.
+
+## Race detector
+
+```bash
+go test -race ./...
+```
+
+Brak path do merge'a bez `-race`.
+
+## Fixture metadata
+
+Każdy fixture w `testing/fixtures/devil/*.txt` ma towarzyszący `*.fixture.md`:
+
+```markdown
+captured: 2026-04-12
+account: testuser@s1.small.pl
+command: devil www add test.testuser.smallhost.pl nodejs 24
+sanitized: login -> testuser, IP -> 203.0.113.10
+```

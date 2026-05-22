@@ -1,0 +1,31 @@
+---
+description: Webox project charter — high-priority guardrails always loaded.
+alwaysApply: true
+---
+
+# Webox — Charter
+
+Treat `AGENTS.md` (repo root) and `docs/AUDIT.md` + `docs/IMPROVEMENT_PLAN.md` as the source of truth. When in doubt: read those first, code second.
+
+## Non-negotiable
+
+- **Sekrety nigdy w `config.json`, logach, error messages, stack trace.** Tylko keyring lub `secrets.enc`.
+- **AES-GCM nonce TYLKO z `crypto/rand.Read(12 bytes)`.** Brak `time.Now()`, brak licznika.
+- **SSH host key mismatch = strict block.** Brak auto-accept poza explicit user TUI confirmation z out-of-band phrase.
+- **MVP scope = small.pl/Devil only.** Live log stream, sound engine, Bento Ultra, env merger, topology map, fast-chord bindings, DAG-based rollback → **STRETCH v0.2+**, **nie** w MVP.
+- **TDD obowiązkowe** dla: parserów outputu providera, walidatorów, redaktora sekretów, status cache, maszyny stanów TUI, keyring detekcji, config migracji.
+- **Conventional Commits 1.0.0 bez gitmoji.** `feat(scope): ...`, `fix(scope): ...`, etc.
+- **Każdy behavior-affecting PR → wpis w `CHANGELOG.md [Unreleased]`.**
+
+## Decision policy
+
+| Sytuacja | Postępowanie |
+|---|---|
+| Wątpliwość w MVP scope | sprawdź [ROADMAP §3.3](../../docs/ROADMAP.md) i [PRD §6 priorytety](../../docs/PRD.md) |
+| Konflikt między docs | wyższy priorytet: PRD > ROADMAP > DESIGN > UX |
+| Brak ADR dla architektonicznej decyzji | zatrzymaj się, zaproponuj ADR maintainerowi |
+| Nowa zależność `go.mod` | wymaga uzasadnienia w PR + sign-off maintainera |
+
+## Mode of work
+
+Linijka po linijce: czytaj docs, planuj minimalny krok, napisz failing test, napisz minimalny kod, refactor, commit z CHANGELOG. Powtarzaj.

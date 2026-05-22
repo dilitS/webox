@@ -1,0 +1,52 @@
+---
+description: Documentation conventions — anchor sync, scope markers, ADR triggers.
+globs: docs/**/*.md,*.md
+alwaysApply: false
+---
+
+# Docs — Webox
+
+## Anchor synchronization
+
+Każda referencja `[label](./SOME.md#anchor)` **musi** wskazywać istniejący nagłówek. Jeśli edytujesz tytuł nagłówka — sprawdź **wszystkie** referencje przed commitem.
+
+Polskie znaki w anchorach: GitHub stosuje URL-encoded form. `## Przechowywanie sekretów` → `#przechowywanie-sekret%C3%B3w`. Lepiej tytułować nagłówki bez polskich znaków diakrytycznych dla łatwego linkowania (kompromis: alias EN w nawiasie).
+
+## Scope markers
+
+Każda sekcja `DESIGN.md` / `UX.md` opisująca ficzer ma **explicit marker**:
+
+```markdown
+## 11.1 Architektura Env Merger
+
+> 🔶 **STRETCH (v0.2+)** — wymaga `/env` post-MVP. W `v0.1` ta sekcja jest tylko architekturalnym planem; implementacja po dostarczeniu MVP.
+```
+
+Markery:
+
+- `🔵 MVP (v0.1)` — w zakresie MVP.
+- `🔶 STRETCH (v0.2+)` — zaplanowane, ale po MVP.
+- `🔶 STRETCH (osobny RFC)` — wymaga decyzji produktowej zanim planujemy.
+
+## ADR trigger
+
+Kiedy stworzyć ADR (`docs/adr/000X-...md`):
+
+- Zmiana publicznego API (HostingProvider, ProviderConfig).
+- Dodanie/usunięcie dużej zależności (`go.mod`).
+- Zmiana strategii bezpieczeństwa (keyring/fallback/host key).
+- Zmiana strategii rollback (LIFO ↔ DAG).
+- Zmiana modelu danych config.json.
+- Zmiana strategii i18n.
+
+Każdy ADR ma: kontekst (problem), decyzja (co), konsekwencje (trade-offy), alternatywy (co rozważono i czemu nie), reviewers.
+
+## CHANGELOG entries
+
+Każdy behavior-affecting PR → wpis w `CHANGELOG.md [Unreleased]` w odpowiedniej sekcji (`Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security`).
+
+Tekst: 1-2 zdania **dlaczego**, nie **co**. Link do PR + AUDIT/IMPROVEMENT_PLAN finding gdy istotne.
+
+## Konwencja "TO BE VERIFIED"
+
+W `docs/providers/<x>.md` używaj `TO BE VERIFIED` jako marker open question'a. Każdy taki marker trafia do sekcji `7. Otwarte pytania / TODO`.

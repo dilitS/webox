@@ -1,0 +1,79 @@
+---
+description: Go coding conventions for Webox — Go 1.24+, no panic outside init, sentinel errors, gofumpt.
+globs: **/*.go
+alwaysApply: false
+---
+
+# Go style — Webox
+
+## Imports
+
+```go
+import (
+    "context"           // stdlib pierwszy blok
+    "fmt"
+
+    "github.com/charmbracelet/bubbletea"   // third-party drugi
+    "golang.org/x/crypto/ssh"
+
+    "github.com/webox/webox/internal/log"  // own module trzeci
+)
+```
+
+## Error handling
+
+```go
+// ✅ wrap z context
+if err := pool.Acquire(ctx, host); err != nil {
+    return fmt.Errorf("acquire ssh session for %s: %w", host, err)
+}
+
+// ✅ sentinel errors w errors.go per pakiet
+var ErrSubdomainExists = errors.New("provider: subdomain already exists")
+
+// ✅ porównanie przez errors.Is
+if errors.Is(err, providers.ErrSubdomainExists) { ... }
+
+// ❌ NIGDY: comparing przez err.Error() == "..."
+// ❌ NIGDY: fmt.Errorf w error message zawiera sekret
+```
+
+## Context discipline
+
+- Każda metoda I/O ma `ctx context.Context` jako pierwszy parametr.
+- `ctx.Done()` jest **respektowany** wewnątrz długich operacji (np. SSH command exec).
+- `ctx` **nie** jest zapisany jako pole `struct` (poza krótko żyjącymi obiektami).
+
+## Generics
+
+Go 1.24 **nie** wspiera generic methods. Zamiast `func (c *Cache) Get[T any]()` → użyj **funkcji pakietowej** `func GetOrFetch[T any](c *Cache, ...)`.
+
+## Logging
+
+```go
+// ✅ structured slog
+log.Info("ssh connection established", "host", profile.Host, "duration_ms", elapsed.Milliseconds())
+
+// ❌ NIGDY plain fmt z sekretem
+fmt.Printf("connecting with %s\n", password)  // ❌
+```
+
+## Naming
+
+- Pakiety: krótkie, lowercase, **bez** `_`/myślnika (`providers`, nie `provider_pattern`).
+- Interface: rzeczownik bez `I` prefix (`HostingProvider`, nie `IHostingProvider`).
+- Sentinel errors: `ErrFoo`.
+- Constructor: `New`, nie `Make`.
+
+## Formatter
+
+`gofumpt` + `goimports`. `make fmt` jest jedynym dopuszczalnym sposobem.
+
+## Linter override
+
+```go
+//nolint:gocyclo // SetupSSL: 7 explicit error paths, refactor would reduce readability
+func SetupSSL(...) {}
+```
+
+Każdy `//nolint` **wymaga** komentarza-uzasadnienia.

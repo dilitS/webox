@@ -1,0 +1,64 @@
+---
+description: Bubble Tea MVU rules — pure Update/View, all I/O in tea.Cmd, no globals.
+globs: tui/**/*.go
+alwaysApply: false
+---
+
+# Bubble Tea — MVU discipline (Webox)
+
+## Pure functions
+
+```go
+// ✅ Update jest pure
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    switch msg := msg.(type) {
+    case tea.KeyMsg:
+        if msg.String() == "r" {
+            return m, restartProjectCmd(m.ctx, m.selected.ID)
+        }
+    }
+    return m, nil
+}
+
+// ✅ View jest pure
+func (m Model) View() string {
+    return lipgloss.JoinVertical(lipgloss.Top, m.header(), m.body())
+}
+
+// ❌ NIGDY I/O w Update
+case tea.KeyMsg:
+    go fetchData() // ❌ — raw goroutine, brak Cmd lifecycle
+    os.Mkdir("/tmp/webox", 0700) // ❌ — side effect w Update
+```
+
+## Cmd dla side effects
+
+```go
+func restartProjectCmd(ctx context.Context, projectID string) tea.Cmd {
+    return func() tea.Msg {
+        if err := webox.RestartProject(ctx, projectID); err != nil {
+            return ErrorMsg{Err: err}
+        }
+        return RestartedMsg{ProjectID: projectID}
+    }
+}
+```
+
+## Context cancellation
+
+Model trzyma `context.Context` + `context.CancelFunc` dla aktywnej długiej operacji (np. wizard step). `q`/`Esc` woła `cancel()`.
+
+## Brak globalnych mutable
+
+Cały stan w `Model`. Wyjątek: provider registry zamknięty po `init()`.
+
+## Tick dla animacji / auto-refresh
+
+```go
+case tickMsg:
+    return m, tea.Tick(time.Second*30, func(t time.Time) tea.Msg {
+        return refreshDashboardMsg{}
+    })
+```
+
+Patrz [DESIGN §2.3](../../docs/DESIGN.md#23-zasady-przep%C5%82ywu-danych-mvu).
