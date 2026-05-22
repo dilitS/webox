@@ -302,7 +302,7 @@ Plik `~/.config/webox/config.json` zawiera **tylko metadane**, **bez sekretów**
 | `projects[].secrets_meta` | array | nie | Metadane sekretów aplikacji (patrz [SECURITY §10.6](./SECURITY.md#106-rotacja-sekret%C3%B3w-aplikacji--metadane-i-warningi)). |
 | `settings` | object | nie | Globalne preferencje (`expert_mode`, `refresh_interval_s`, ...). |
 
-Pełny przykład jako fixture w `testing/fixtures/config/valid_v1_0.json` (patrz [TESTING §7](./TESTING.md#7-test-fixtures)).
+Pełny przykład jako fixture w `testdata/config/valid_v1.json` (patrz [TESTING §7](./TESTING.md#7-test-fixtures)).
 
 ### 6.2 Permisje
 

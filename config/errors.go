@@ -14,6 +14,16 @@ var ErrInvalidJSON = errors.New("config: invalid JSON")
 // render actionable messages without parsing it back.
 var ErrSchemaViolation = errors.New("config: schema violation")
 
+// ErrSecretInConfig is returned when the config document contains a
+// secret-shaped string. Per AGENTS.md §2.1 this is a non-negotiable
+// guardrail: plaintext secrets never belong in config.json.
+var ErrSecretInConfig = errors.New("config: secret-shaped string rejected")
+
+// ErrDanglingProfileAlias is returned when some projects[].profile_alias
+// points at no profiles[].alias. DESIGN §6.1 defines profile_alias as an
+// FK, so accepting dangling references would violate the in-memory model.
+var ErrDanglingProfileAlias = errors.New("config: project references unknown profile alias")
+
 // ErrCorruptedConfig wraps any failure that prevents Load from turning
 // the on-disk file into a *Config: I/O failure, malformed JSON, struct
 // decoding failure. The companion message points at `webox doctor` so

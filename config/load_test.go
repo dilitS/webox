@@ -101,6 +101,16 @@ func TestLoad_TableDriven(t *testing.T) {
 			body:      []byte(`{"schema_version":99,"profiles":[],"projects":[]}`),
 			wantErrIs: config.ErrSchemaMismatch,
 		},
+		{
+			name:      "secret_shaped_string",
+			body:      mustReadFile(t, "../testdata/config/invalid_secret_token.json"),
+			wantErrIs: config.ErrSchemaMismatch,
+		},
+		{
+			name:      "unknown_profile_alias",
+			body:      mustReadFile(t, "../testdata/config/invalid_unknown_profile_alias.json"),
+			wantErrIs: config.ErrSchemaMismatch,
+		},
 	}
 
 	for _, tt := range tests {
