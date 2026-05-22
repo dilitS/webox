@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": ".cursor/hooks/secret-scan-prompt.sh",
+        "timeout": 5,
+        "failClosed": false
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/secret-scan-shell.sh",
+        "timeout": 5,
+        "failClosed": false
+      },
+      {
+        "command": ".cursor/hooks/commit-validator.sh",
+        "matcher": "git commit",
+        "timeout": 5,
+        "failClosed": false
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": ".cursor/hooks/gofmt.sh",
+        "matcher": "Write|Edit|MultiEdit|StrReplace",
+        "timeout": 10,
+        "failClosed": false
+      },
+      {
+        "command": ".cursor/hooks/secret-scan-file.sh",
+        "matcher": "Write|Edit|MultiEdit|StrReplace",
+        "timeout": 5,
+        "failClosed": false
+      },
+      {
+        "command": ".cursor/hooks/scope-guard.sh",
+        "matcher": "Write|Edit|MultiEdit|StrReplace",
+        "timeout": 5,
+        "failClosed": false
+      }
+    ]
+  }
+}
