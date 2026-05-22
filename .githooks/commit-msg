@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# commit-msg: validate Conventional Commits 1.0.0 on the subject line.
+#
+# Rules:
+# - type(scope)?(!)?: subject
+# - type ∈ {feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert, security}
+# - subject: imperative present-tense, no trailing period, ≤ 72 chars
+# - "!" marker or "BREAKING CHANGE:" in body indicates breaking change
+#
+# Bypass:  git commit --no-verify
+
+set -euo pipefail
+COMMIT_MSG_FILE="$1"
+
+if [[ "${WEBOX_HOOK_SKIP:-}" == "1" ]]; then exit 0; fi
+
+if [[ -t 2 ]]; then C_RED=$'\033[31m'; C_YELLOW=$'\033[33m'; C_RESET=$'\033[0m';
+else C_RED=""; C_YELLOW=""; C_RESET=""; fi
+err()  { printf '%b\n' "${C_RED}✗ commit-msg${C_RESET} $*" >&2; }
+warn() { printf '%b\n' "${C_YELLOW}⚠ commit-msg${C_RESET} $*" >&2; }
+
+# Skip merge / squash / fixup / amend templates that pre-fill subject
+first_line="$(head -n1 "$COMMIT_MSG_FILE")"
+case "$first_line" in
+  "Merge "*|"Revert "*|"fixup!"*|"squash!"*|"amend!"*) exit 0 ;;
+  "") err "empty commit subject"; exit 1 ;;
+esac
+
+# Strip leading comments (e.g. # …)
+subject="$first_line"
+
+TYPE_RE='(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|security)'
+SUBJECT_RE="^${TYPE_RE}(\([a-z0-9-]+\))?!?: [^A-Z].{0,70}[^.]\$"
+
+if ! [[ "$subject" =~ $SUBJECT_RE ]]; then
+  err "subject does not match Conventional Commits 1.0.0"
+  err "got:     '$subject'"
+  err "expect:  type(scope)?(!)?: short description (lowercase first letter, no period, ≤72 chars)"
+  err "types:   feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert, security"
+  exit 1
+fi
+
+# Imperative-mood heuristics (warn only)
+if echo "$subject" | grep -iE ': (added|adds|fixed|fixes|changed|changes|removed|removes)\b' >/dev/null; then
+  warn "subject sounds past-tense or 3rd-person — prefer imperative ('add', 'fix', 'change')."
+fi
+
+# Body checks (optional but encouraged)
+if [[ "$(wc -l < "$COMMIT_MSG_FILE" | tr -d ' ')" -gt 1 ]]; then
+  # Body line length (soft wrap at 100)
+  if awk 'NR>1 && length($0) > 100 { exit 1 }' "$COMMIT_MSG_FILE"; then :; else
+    warn "body line exceeds 100 chars — consider wrapping."
+  fi
+fi
+
+exit 0

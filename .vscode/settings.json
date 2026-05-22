@@ -1,0 +1,86 @@
+{
+  "_comment": "Project-scoped editor settings. Cursor inherits VS Code semantics. User-scoped settings can still override.",
+
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit",
+    "source.fixAll": "explicit"
+  },
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "files.trimFinalNewlines": true,
+  "files.eol": "\n",
+  "editor.rulers": [100],
+
+  "[go]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "golang.go",
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    },
+    "editor.snippetSuggestions": "none"
+  },
+
+  "go.useLanguageServer": true,
+  "go.lintTool": "golangci-lint",
+  "go.lintFlags": ["--fast-only", "--timeout=30s"],
+  "go.lintOnSave": "package",
+  "go.formatTool": "custom",
+  "go.alternateTools": {
+    "customFormatter": "gofumpt"
+  },
+  "go.testFlags": ["-race", "-count=1", "-failfast"],
+  "go.testTimeout": "60s",
+  "go.coverOnSave": false,
+  "go.coverOnSingleTest": true,
+  "go.toolsManagement.autoUpdate": false,
+  "gopls": {
+    "ui.semanticTokens": true,
+    "ui.completion.usePlaceholders": true,
+    "ui.diagnostic.staticcheck": true,
+    "formatting.gofumpt": true
+  },
+
+  "[markdown]": {
+    "editor.formatOnSave": false,
+    "editor.wordWrap": "on",
+    "editor.tabSize": 2
+  },
+
+  "[yaml]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true
+  },
+
+  "[shellscript]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true
+  },
+
+  "files.associations": {
+    "*.mdc": "markdown",
+    "go.sum": "plaintext"
+  },
+
+  "search.exclude": {
+    "**/bin": true,
+    "**/dist": true,
+    "**/coverage.html": true,
+    "**/coverage.out": true,
+    "**/testdata/golden/**": true,
+    "**/.git": true,
+    "**/node_modules": true
+  },
+
+  "files.watcherExclude": {
+    "**/bin/**": true,
+    "**/dist/**": true,
+    "**/.git/objects/**": true
+  },
+
+  "todo-tree.tree.scanMode": "workspace",
+  "todo-tree.regex.regex": "(//|#|<!--|;|/\\*|^|^\\s*(-|\\d+.))\\s*($TAGS)",
+  "todo-tree.general.tags": ["TODO", "FIXME", "HACK", "BUG", "XXX"],
+
+  "terminal.integrated.scrollback": 10000
+}

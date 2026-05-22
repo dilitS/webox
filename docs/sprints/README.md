@@ -143,6 +143,49 @@ Każdy `sprint-XX-name.md` ma sztywny szablon, żeby było predykcyjnie:
 
 ## 6. Wzorce wykonania
 
+### 6.0 Automatyzacja workflow (zero ceremonii)
+
+Wszystkie powtarzalne kroki są skryptowane. Główne komendy z `Makefile`:
+
+| Komenda | Co robi |
+|---------|---------|
+| `make bootstrap` | One-shot setup nowego klona: instaluje narzędzia + git hooks + cursor hooks. |
+| `make setup-hooks` | Tylko git hooks (jeśli `bootstrap` już był). |
+| `make sprint-status` | Postęp bieżącego sprintu (taski done/open, AC checked). |
+| `make next-task` | Wypisuje id następnego otwartego taska (parseable). |
+| `make sprint-start` | Branch `feat/sNN-TT-slug` + opcjonalnie otwiera plan w `$EDITOR`. |
+| `make new-task NAME="..." EST=M` | Dopisuje task do bieżącego sprintu. |
+| `make dev PKG=./config/...` | TDD watch loop (`gow` / `fswatch+entr` / `inotifywait` / poll). |
+| `make ci-fast` | `lint + vet + test-short` — szybki sanity check. |
+| `make ci` | Pełny CI bundle lokalnie (mirror GitHub Actions). |
+| `make commit-suggest` | Conventional Commits z diffa (input do `git commit -em "$(...)"`). |
+| `make changelog KIND=fixed MSG="..."` | Wpis do `CHANGELOG.md` Unreleased. |
+| `make retro` | Skeleton retrospektywy dla bieżącego sprintu. |
+| `make pr` | Otwiera draft PR via `gh` z prefilled body (sprint context, DoD checklist). |
+
+**Git hooks** (`make setup-hooks` ustawia `core.hooksPath = .githooks`):
+
+- `pre-commit` — `gofumpt + goimports` auto-fix, fast lint na staged Go, secret tripwire.
+- `commit-msg` — Conventional Commits 1.0.0 validation.
+- `prepare-commit-msg` — pre-fill CC template gdy wiadomość pusta.
+- `pre-push` — `make test-short` (override: `WEBOX_PREPUSH=full git push`).
+
+**Cursor skills** które „same się odpalą" w odpowiednich momentach:
+
+- `task-start` — kompletny pickup nowego taska (branch + read spec + watch + plan).
+- `tdd-loop` — Red → Green → Refactor → Commit.
+- `auto-changelog` — wpis do `CHANGELOG.md` zaraz po implementacji.
+- `commit-policy` — walidacja przed commitem.
+- `retro` — generacja + wypełnienie retra na koniec sprintu.
+
+**CI side** automatyzacja:
+
+- `actions/labeler@v5` — path-based labels na każdym PR (`.github/labeler.yml`).
+- `dependabot/fetch-metadata@v2` + `gh pr merge --auto` — auto-merge patch/minor non-prod deps.
+- `dependabot.yml` — weekly Go + Actions updates.
+
+**Zasada:** jeśli pewien krok robisz ręcznie **3 razy w sprincie**, to jest sygnał do dodania go do `scripts/` / `Makefile` / skill / hook.
+
 ### 6.1 TDD loop (skill: `tdd-loop`)
 
 1. Wybierz najmniejsze AC z taska.

@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# pre-push: quick safety net before code leaves the laptop.
+#
+# Runs `make test-short` (no race / -short). Falls back to a no-op if Go isn't
+# set up yet (pre-Sprint-00).
+#
+# Bypass:  git push --no-verify
+# Heavy mode: WEBOX_PREPUSH=full git push    (runs full `make ci`)
+
+set -euo pipefail
+
+if [[ "${WEBOX_HOOK_SKIP:-}" == "1" ]]; then exit 0; fi
+
+if [[ -t 1 ]]; then C_RED=$'\033[31m'; C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'; C_RESET=$'\033[0m';
+else C_RED=""; C_GREEN=""; C_YELLOW=""; C_RESET=""; fi
+ok()   { printf '%b\n' "${C_GREEN}✓ pre-push${C_RESET} $*"; }
+warn() { printf '%b\n' "${C_YELLOW}⚠ pre-push${C_RESET} $*" >&2; }
+err()  { printf '%b\n' "${C_RED}✗ pre-push${C_RESET} $*" >&2; }
+
+# Skip if pushing only tags
+remote="${1:-}"
+url="${2:-}"
+if [[ -z "$remote" ]]; then : ; fi  # silence unused if invoked manually
+
+# No Go module yet → soft pass (we're still in pre-Sprint-00)
+if [[ ! -f go.mod ]]; then
+  warn "no go.mod — skipping test (pre-Sprint-00)"
+  exit 0
+fi
+
+if [[ "${WEBOX_PREPUSH:-short}" == "full" ]]; then
+  warn "WEBOX_PREPUSH=full → running full make ci (slow)"
+  make ci
+  ok "full CI bundle passed"
+  exit 0
+fi
+
+if ! command -v go >/dev/null 2>&1; then
+  err "go binary not found"
+  exit 1
+fi
+
+start=$(date +%s)
+if ! make test-short >/dev/null 2>&1; then
+  err "make test-short failed — fix or use --no-verify (last resort)"
+  make test-short || true
+  exit 1
+fi
+elapsed=$(( $(date +%s) - start ))
+ok "test-short passed (${elapsed}s)"

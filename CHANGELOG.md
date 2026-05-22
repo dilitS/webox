@@ -16,6 +16,33 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `scripts/` — full dev-loop automation: `dev-watch.sh` (TDD with
+  auto-detected gow / fswatch+entr / inotifywait / polling fallback),
+  `sprint-status.sh`, `next-task.sh`, `new-task.sh`, `start-sprint.sh`,
+  `retro-new.sh`, `pr-create.sh`, `commit-msg-suggest.sh`,
+  `changelog-add.sh`, `install-git-hooks.sh`, `bootstrap.sh`. All scripts
+  share `lib.sh` (colors, sprint discovery, repo helpers).
+- `.githooks/` — versioned, opt-in git hooks wired by `make setup-hooks`:
+  `pre-commit` (gofumpt/goimports auto-fix, fast lint, secret tripwire),
+  `commit-msg` (Conventional Commits 1.0.0 validation), `pre-push`
+  (`make test-short`, override `WEBOX_PREPUSH=full`), `prepare-commit-msg`
+  (auto-suggest CC from staged diff).
+- `Makefile` — new dev-flow targets (`dev`, `bootstrap`, `setup-hooks`,
+  `sprint-status`, `next-task`, `next-task-verbose`, `sprint-start`,
+  `new-task`, `retro`, `pr`, `commit-suggest`, `changelog`, `ci-fast`).
+- `.github/labeler.yml` + `.github/workflows/labeler.yml` — automatic
+  path-based PR labels (area/docs, area/security, area/config, …).
+- `.github/workflows/dependabot-auto-merge.yml` — auto-merge patch + minor
+  (non-prod) Dependabot bumps after CI green; majors require human review.
+- `.vscode/settings.json` + `.vscode/extensions.json` — project-scoped
+  format-on-save, gopls with gofumpt, golangci-lint on save, recommended
+  Cursor/VS Code extensions for new contributors.
+- `.cursor/skills/task-start/SKILL.md` — agent picks next sprint task,
+  reads spec, branches, starts watch loop, hands off to `tdd-loop`.
+- `.cursor/skills/auto-changelog/SKILL.md` — agent maintains
+  `CHANGELOG.md` `[Unreleased]` as part of every behavior change.
+- `docs/sprints/README.md` §6.0 — automation reference for the whole
+  workflow (Makefile / hooks / skills / CI).
 - `docs/sprints/` — rolling-wave sprint planning system:
   - `README.md` — methodology (DoR, DoD, cadence, anti-patterns, capacity rules).
   - `sprint-00-bootstrap.md` — full task breakdown (10 tasks) for repo

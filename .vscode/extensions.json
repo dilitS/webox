@@ -1,0 +1,16 @@
+{
+  "recommendations": [
+    "golang.go",
+    "redhat.vscode-yaml",
+    "tamasfe.even-better-toml",
+    "editorconfig.editorconfig",
+    "yzhang.markdown-all-in-one",
+    "davidanson.vscode-markdownlint",
+    "ms-azuretools.vscode-docker",
+    "github.vscode-github-actions",
+    "esbenp.prettier-vscode",
+    "streetsidesoftware.code-spell-checker",
+    "gruntfuggly.todo-tree",
+    "eamodio.gitlens"
+  ]
+}

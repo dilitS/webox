@@ -186,8 +186,66 @@ i18n-check: ## Verify translations/ have identical key sets.
 release-dry-run: ## GoReleaser dry-run for a release candidate.
 	goreleaser release --snapshot --skip=publish --clean
 
+# ── Dev workflow / automation ──────────────────────────────────────────
+
+PKG ?= ./...
+
+.PHONY: dev
+dev: ## TDD watch loop: re-runs `go test` on every change. Override with PKG=./config/...
+	@scripts/dev-watch.sh "$(PKG)"
+
+.PHONY: bootstrap
+bootstrap: ## One-shot local environment setup: tools, deps, git hooks.
+	@scripts/bootstrap.sh
+
+.PHONY: setup-hooks
+setup-hooks: ## Install versioned git hooks (.githooks/) into this clone.
+	@scripts/install-git-hooks.sh
+
+.PHONY: sprint-status
+sprint-status: ## Show current sprint progress (tasks done / open).
+	@scripts/sprint-status.sh
+
+.PHONY: next-task
+next-task: ## Print the next open task id (parseable) from current sprint.
+	@scripts/next-task.sh
+
+.PHONY: next-task-verbose
+next-task-verbose: ## Print the next open task with full block.
+	@scripts/next-task.sh --verbose
+
+.PHONY: sprint-start
+sprint-start: ## Create branch + open current sprint plan. Pass TASK=TASK-01.3 to pick explicitly.
+	@scripts/start-sprint.sh $(TASK) $(SLUG)
+
+.PHONY: new-task
+new-task: ## Append a task to current sprint. Required: NAME="..."  Optional: EST=M
+	@test -n "$(NAME)" || { echo "usage: make new-task NAME=\"...\" [EST=S|M|L|XL]"; exit 1; }
+	@scripts/new-task.sh "$(NAME)" "$(EST)"
+
+.PHONY: retro
+retro: ## Generate retrospective skeleton for current sprint (or pass SPRINT=01).
+	@scripts/retro-new.sh $(SPRINT) $(DATE)
+
+.PHONY: pr
+pr: ## Create draft PR via gh, body pre-filled from sprint/task context.
+	@scripts/pr-create.sh $(TITLE)
+
+.PHONY: commit-suggest
+commit-suggest: ## Print Conventional Commit suggestion from staged changes.
+	@scripts/commit-msg-suggest.sh
+
+.PHONY: changelog
+changelog: ## Append entry to CHANGELOG.md Unreleased. Required: KIND=added|fixed|... MSG="..."
+	@test -n "$(KIND)" -a -n "$(MSG)" || { echo "usage: make changelog KIND=added MSG=\"...\""; exit 1; }
+	@scripts/changelog-add.sh "$(KIND)" "$(MSG)"
+
 # ── CI bundle ──────────────────────────────────────────────────────────
 
 .PHONY: ci
 ci: tidy lint vet vulncheck test cover-check ## Run the exact CI bundle locally.
 	@printf "$(COLOR_GREEN)✓ CI bundle passed.$(COLOR_RESET)\n"
+
+.PHONY: ci-fast
+ci-fast: lint vet test-short ## Lightweight CI subset for local pre-push.
+	@printf "$(COLOR_GREEN)✓ ci-fast passed.$(COLOR_RESET)\n"

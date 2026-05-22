@@ -1,0 +1,36 @@
+name: Dependabot auto-merge
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Auto-merge trusted Dependabot PRs
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        # NOTE: Pin to commit SHA in Sprint 00, TASK-00.4.
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Auto-merge patch + minor (non-major) updates
+        if: |
+          steps.meta.outputs.update-type == 'version-update:semver-patch' ||
+          (
+            steps.meta.outputs.update-type == 'version-update:semver-minor' &&
+            steps.meta.outputs.dependency-type != 'direct:production'
+          )
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          gh pr review "$PR_URL" --approve --body "auto-approve: trusted dependabot bump"
+          gh pr merge "$PR_URL" --auto --squash

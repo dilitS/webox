@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# prepare-commit-msg: pre-fill an empty commit message with a Conventional
+# Commits suggestion derived from staged files.
+#
+# Skips when message is already populated (merge, squash, amend, -m).
+
+set -euo pipefail
+
+if [[ "${WEBOX_HOOK_SKIP:-}" == "1" ]]; then exit 0; fi
+
+COMMIT_MSG_FILE="$1"
+COMMIT_SOURCE="${2:-}"
+
+# Skip when source is already populated by another mechanism
+case "$COMMIT_SOURCE" in
+  merge|squash|message|template|commit) exit 0 ;;
+esac
+
+# Skip if the user already supplied a non-comment subject
+if grep -vE '^[[:space:]]*#|^$' "$COMMIT_MSG_FILE" | head -n1 | grep -q .; then
+  exit 0
+fi
+
+# Generate suggestion (best-effort; never blocks commit)
+SCRIPT_DIR="$(git rev-parse --show-toplevel)/scripts"
+if [[ -x "$SCRIPT_DIR/commit-msg-suggest.sh" ]]; then
+  suggestion="$("$SCRIPT_DIR/commit-msg-suggest.sh" 2>/dev/null || true)"
+  if [[ -n "$suggestion" ]]; then
+    # Inject at top, keep existing comments
+    tmp="$(mktemp)"
+    {
+      printf '%s\n\n' "$suggestion"
+      cat "$COMMIT_MSG_FILE"
+    } > "$tmp"
+    mv "$tmp" "$COMMIT_MSG_FILE"
+  fi
+fi

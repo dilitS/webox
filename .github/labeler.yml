@@ -1,0 +1,79 @@
+# Maps changed paths to PR labels. Used by .github/workflows/labeler.yml.
+# Schema: actions/labeler@v5
+# https://github.com/actions/labeler
+
+area/docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**'
+          - '*.md'
+          - '!CHANGELOG.md'
+
+area/sprints:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/sprints/**'
+
+area/risks:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/RISKS.md'
+
+area/security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/SECURITY.md'
+          - 'SECURITY.md'
+          - 'secrets/**'
+          - 'internal/log/redact*.go'
+
+area/config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'config/**'
+
+area/providers:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'providers/**'
+          - 'docs/providers/**'
+
+area/tui:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'tui/**'
+
+area/ssh:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'ssh/**'
+
+area/ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/workflows/**'
+          - '.github/labeler.yml'
+          - '.github/dependabot.yml'
+          - '.golangci.yml'
+
+area/build:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'Makefile'
+          - 'go.mod'
+          - 'go.sum'
+          - 'tools/**'
+          - '.goreleaser.yml'
+
+area/automation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'scripts/**'
+          - '.githooks/**'
+          - '.cursor/**'
+
+type/test:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*_test.go'
+          - 'testdata/**'

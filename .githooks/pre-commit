@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# pre-commit: fast, fixable checks on staged files.
+#
+# - Auto-format staged Go files with gofumpt + goimports (re-stages).
+# - Light lint pass on staged Go files (golangci-lint with `--new-from-rev`).
+# - Block on detected secrets (deferred to Cursor hook + commit-msg backup).
+#
+# Bypass:  git commit --no-verify
+
+set -euo pipefail
+
+if [[ "${WEBOX_HOOK_SKIP:-}" == "1" ]]; then exit 0; fi
+
+# ── Color helpers (TTY-aware) ──────────────────────────────────────────
+if [[ -t 1 ]]; then C_RED=$'\033[31m'; C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'; C_RESET=$'\033[0m';
+else C_RED=""; C_GREEN=""; C_YELLOW=""; C_RESET=""; fi
+
+ok()   { printf '%b\n' "${C_GREEN}✓ pre-commit${C_RESET} $*"; }
+warn() { printf '%b\n' "${C_YELLOW}⚠ pre-commit${C_RESET} $*" >&2; }
+err()  { printf '%b\n' "${C_RED}✗ pre-commit${C_RESET} $*" >&2; }
+
+# ── Staged Go files only ───────────────────────────────────────────────
+mapfile -t go_files < <(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.go$' || true)
+
+if [[ ${#go_files[@]} -eq 0 ]]; then
+  ok "no staged Go files — skipping format/lint"
+  exit 0
+fi
+
+start=$(date +%s)
+
+# ── Auto-format ────────────────────────────────────────────────────────
+fmt_changed=()
+if command -v gofumpt >/dev/null 2>&1; then
+  for f in "${go_files[@]}"; do
+    [[ -f "$f" ]] || continue
+    if ! gofumpt -d "$f" | head -1 | grep -q .; then continue; fi
+    gofumpt -w "$f"
+    fmt_changed+=("$f")
+  done
+else
+  warn "gofumpt not installed (run make bootstrap)"
+fi
+
+if command -v goimports >/dev/null 2>&1; then
+  for f in "${go_files[@]}"; do
+    [[ -f "$f" ]] || continue
+    goimports -w "$f"
+  done
+else
+  warn "goimports not installed (run make bootstrap)"
+fi
+
+# Re-stage formatted files transparently
+if [[ ${#fmt_changed[@]} -gt 0 ]]; then
+  git add -- "${fmt_changed[@]}"
+  ok "re-staged ${#fmt_changed[@]} reformatted file(s)"
+fi
+
+# ── Lint (fast subset on staged files) ─────────────────────────────────
+if command -v golangci-lint >/dev/null 2>&1; then
+  if ! golangci-lint run --fast-only --new-from-rev=HEAD --timeout=30s 2>&1; then
+    err "lint failed on staged changes — fix issues or use --no-verify (last resort)"
+    exit 1
+  fi
+  ok "lint pass"
+else
+  warn "golangci-lint not installed — CI will catch issues later"
+fi
+
+# ── Secret tripwire (cheap, regex-based; Cursor hook is deeper) ────────
+secret_re='(gh[ps]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{82}|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{32,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)'
+if git diff --cached -U0 -- "${go_files[@]}" 2>/dev/null | grep -E "$secret_re" >/dev/null; then
+  err "potential secret detected in staged diff — review before committing"
+  err "if false-positive, use --no-verify (and add a regression test)"
+  exit 1
+fi
+
+elapsed=$(( $(date +%s) - start ))
+ok "pre-commit checks passed (${elapsed}s)"

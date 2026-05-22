@@ -31,7 +31,12 @@ archive/
 
 ### Editor / IDE
 .idea/
-.vscode/
+# Allow shared project defaults; ignore user-specific files.
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
 *.swp
 *.swo
 *~
