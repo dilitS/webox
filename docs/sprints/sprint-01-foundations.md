@@ -46,13 +46,20 @@ Po sprincie 01:
 - **Estymata:** M
 - **Zależności:** Sprint 00 done
 - **Acceptance Criteria:**
-  - [ ] `config/types.go` z `Config struct` wg `DESIGN.md §6.1`:
-    - `SchemaVersion int`, `Defaults struct{ Provider, Author }`, `Projects []Project`, `LastSync time.Time`.
-    - `Project struct{ ID, Slug, Provider, RepoURL, EnvHash, CreatedAt, ... }`.
+  - [x] `config/types.go` z `Config struct` wg `DESIGN.md §6.1`:
+    - `SchemaVersion int`, `Language string`, `Profiles []Profile`,
+      `Projects []Project`, `Settings *Settings` (DESIGN §6.1 wygrywa
+      nad wcześniejszym draftem AC `Defaults/LastSync` — zob. Outcome §S01).
+    - `Project struct{ ID, Domain, ProfileAlias, Repo, LocalPath, Stack,
+      NodeVersion, ImportedAt *time.Time, SecretsMeta []SecretMeta }`.
     - **Wszystkie pola** mają tag `json:"..."`.
-  - [ ] `config/schema.json` (JSON Schema Draft 2020-12) opisuje `Config`.
-  - [ ] `config/schema_test.go` weryfikuje pełen example config przeciw schema (golden file `testdata/config_v1.json`).
-  - [ ] Brak `interface{}`/`any` w polach — wszystko silnie typowane.
+  - [x] `config/schema.json` (JSON Schema Draft 2020-12) opisuje `Config`.
+  - [x] `config/schema_test.go` weryfikuje pełen example config przeciw schema
+    (golden file `testdata/config/valid_v1.json`) plus cztery negatywne
+    fixtures: missing `schema_version`, missing `profile.type`, uppercase
+    alias regex, non-UUID project id.
+  - [x] Brak `interface{}`/`any` w polach — wszystko silnie typowane
+    (`TestConfig_NoEmptyInterfaceFields` chodzi po reflect AST struktury).
 - **Pliki:**
   - `config/types.go` (new)
   - `config/schema.json` (new, embedded via `//go:embed`)
