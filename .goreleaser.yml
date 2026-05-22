@@ -1,0 +1,51 @@
+version: 2
+
+project_name: webox
+
+builds:
+  - id: webox
+    main: ./cmd/webox
+    binary: webox
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - >-
+        -s -w
+        -X github.com/webox/webox/internal/version.Version={{ .Version }}
+        -X github.com/webox/webox/internal/version.Commit={{ .Commit }}
+        -X github.com/webox/webox/internal/version.Date={{ .Date }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - ids:
+      - webox
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+signs:
+  # Placeholder only: Sprint 00 verifies the signing pipeline shape without
+  # requiring a real cosign identity or local key material yet.
+  - cmd: sh
+    artifacts: checksum
+    signature: "${artifact}.sigstore.json"
+    args:
+      - -c
+      - >-
+        echo "placeholder: cosign sign-blob --bundle=${signature} ${artifact}
+        --yes" >/dev/null
+
+changelog:
+  disable: true
