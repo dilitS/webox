@@ -116,10 +116,37 @@ Biblioteka: `github.com/zalando/go-keyring`. Mapa kluczy → [DESIGN.md §7](./D
 |---|---|
 | Algorytm szyfrowania | AES-GCM-256 |
 | KDF | Argon2id (parametry: `memory=64MB`, `iterations=3`, `parallelism=2`, sól 16 B losowa per plik) |
-| Master password | wpisywany przy starcie webox (lub przekazany przez `WEBOX_MASTER_PASSWORD` env w trybie CI) |
+| Master password | wpisywany przy starcie webox (interactive prompt) **lub** przez `WEBOX_MASTER_PASSWORD` env w **trybie CI ephemeral** (patrz ostrzeżenie poniżej) |
 | Cache hasła w sesji | tak, w pamięci procesu; nie persystowane |
 | Format pliku | NDJSON encoded, każda linia: `{"key": "...", "ciphertext": "...", "nonce": "..."}` |
+| **Nonce per wpis** | **96-bitów (12 B) generowane przez `crypto/rand.Read`** — patrz §4.2.1 |
 | Backup | webox tworzy `.bak` przed każdym zapisem |
+
+### 4.2.1 Generowanie nonce (krytyczne dla AES-GCM)
+
+> ⚠ **Kluczowa zasada:** AES-GCM **przestaje być bezpieczne** gdy ten sam `(key, nonce)` zostanie użyty dwa razy — atakujący odzyskuje klucz strumieniowy XOR i łączy dwa plaintexts. Nigdy nie używać nonce:
+>
+> - czasowego (`time.Now().UnixNano()` — kolizja po restarcie lub w tej samej nanosekundzie),
+> - opartego o licznik per plik (zerowanie po reload),
+> - na podstawie hash'a key+timestamp (deterministyczne, atakujący odgadnie).
+
+**Webox MUSI:**
+
+1. Generować nowy nonce dla **każdego wpisu** NDJSON przez `crypto/rand.Read(nonce[:12])`.
+2. Zapisać nonce razem z ciphertext w tej samej linii NDJSON (`"nonce": "<base64-encoded 12 bytes>"`).
+3. Sprawdzać **przy każdej operacji write** czy `crypto/rand.Read` nie zwrócił błędu — błąd CSPRNG = panic + abort write.
+4. Nie ponawiać write w pętli przy CSPRNG-error (potencjalna zła entropia w systemie).
+5. Mieć test jednostkowy weryfikujący że dwa kolejne write'y różnych wpisów dają **różne** nonce.
+
+Limit z birthday paradox dla 96-bit nonce + `crypto/rand`: **~2³² wpisów** zanim szansa kolizji przekroczy 2⁻³². Webox zaczyna ostrzegać po `2²⁰ = ~1M` wpisach (`webox doctor security`).
+
+### 4.2.2 Ostrzeżenie o `WEBOX_MASTER_PASSWORD`
+
+> ⚠ **CI ephemeral only.** `WEBOX_MASTER_PASSWORD` jest **czytelny dla każdego procesu** tego samego usera przez `/proc/<pid>/environ`, `ps eaux`, narzędzia introspekcyjne IDE i shell history przy `export`. Akceptowalny **wyłącznie** w ephemeral CI runnerach (GitHub Actions, GitLab CI), które są tworzone i niszczone per job.
+>
+> **Webox loguje warning** przy uruchomieniu jeśli `WEBOX_MASTER_PASSWORD` jest ustawiona na **nie-CI** hoście (heurystyka: brak `CI=true`/`GITHUB_ACTIONS=true`/`GITLAB_CI=true` env, ale obecne `XDG_SESSION_TYPE`/`DISPLAY`/`SSH_CLIENT` → workstation lub bastion).
+>
+> **Na maszynie deweloperskiej** zawsze interaktywne `webox unlock` przez `term.ReadPassword(0)` z hidden input.
 
 **Tryb degraded** wskazywany w UI:
 
@@ -158,8 +185,17 @@ Biblioteka: `github.com/zalando/go-keyring`. Mapa kluczy → [DESIGN.md §7](./D
 
 - Sekret pobierany na żądanie (np. tuż przed `ssh.Dial`).
 - Nie cache'owany dłużej niż jedna operacja.
-- Po użyciu zmienna `password` jest zerowana (`zerocopy.Wipe(buf)`).
+- Po użyciu bufor jest **mlock'owany** (zapobiega swapowaniu) i nadpisywany zerami przez `awnumar/memguard` (`memguard.LockedBuffer.Destroy()`).
 - Brak dump'u stack trace z sekretem — patrz [§9](#9-logging-i-wycieki).
+
+**Ograniczenia (uczciwie):**
+
+- Go GC może kopiować pamięć podczas compacting GC — `memguard.LockedBuffer` mityguje (poza heap GC), ale **nie eliminuje** ryzyka jeśli sekret przeszedł przez `string`/`[]byte` przed wejściem do `LockedBuffer`.
+- Akceptujemy to ryzyko: atakujący potrzebuje fizycznego dostępu do RAM lub core dump (które wyłączamy — §9.4).
+- Release build **musi** mieć `GODEBUG=clobberfree=1` (nadpisuje zwolnione bloki, runtime overhead ~1%).
+- Sekret **nigdy** nie wchodzi do `fmt.Sprintf`, `log.*`, `errors.New` — sentinel `ErrInvalidCredentials` zamiast wartości.
+
+Patrz [AUDIT C4](./AUDIT.md#c4-securitymd-43--zerocopywipe-jako-wymy%C5%9Blona-biblioteka) i [IMPROVEMENT_PLAN §IMP-9](./IMPROVEMENT_PLAN.md#imp-9-securitymd-43--zerocopywipe-nie-gwarantuje-wymazania-w-go).
 
 ### 4.4 Rotacja sekretów
 
@@ -227,15 +263,22 @@ Akceptacja zapisuje wpis do `~/.config/webox/known_hosts` (format kompatybilny z
 │  • Server reinstalled / migrated.                              │
 │  • Man-in-the-middle attack.                                   │
 │                                                                │
-│  Webox will NOT auto-accept. Verify out-of-band, then:        │
+│  Webox will NOT auto-accept. Verify the new fingerprint        │
+│  out-of-band via hosting panel before accepting.               │
 │                                                                │
-│  webox doctor security --update-host-key s1.small.pl          │
-│                                                                │
-│  [ Abort connection ]                                          │
+│  [ Abort connection ]   [ Accept and update known_hosts ]     │
 ╰────────────────────────────────────────────────────────────────╯
 ```
 
-`--update-host-key` jest świadomym, manualnym krokiem; wymaga wpisania `confirm` w trybie interaktywnym lub flagi `--force` w skrypcie CI.
+**v0.1 (MVP) — rozwiązanie host key mismatch:**
+
+W v0.1 wybór *Accept and update known_hosts* w confirm dialogu **wymaga** drugiego potwierdzenia (`Type 'I have verified the new fingerprint out-of-band' to confirm`), po którym webox nadpisuje wpis w `~/.config/webox/known_hosts`. Brak osobnej komendy CLI — wszystko w confirm flow TUI.
+
+**v0.2+ — komenda CLI:**
+
+`webox doctor security --update-host-key <host>` jako świadomy, manualny krok dla skryptów CI lub headless workflow. Wymaga flagi `--force` lub interaktywnego wpisania frazy. Implementacja po dostarczeniu `webox doctor security` (post-MVP, patrz §7).
+
+Patrz [IMPROVEMENT_PLAN §IMP-4](./IMPROVEMENT_PLAN.md#imp-4-securitymd-54--resolution-host-key-mismatch-przez-webox-doctor-security-v02--ale-w-v01-nie-ma-alternatywy).
 
 ### 5.5 Algorytmy
 
@@ -252,14 +295,31 @@ Webox eksplicitnie deklaruje listę dozwolonych algorytmów w `ssh.ClientConfig`
 
 ### 6.1 Wymagane scope (fine-grained PAT — zalecane)
 
+Webox **rozdziela** scope per scenariusz, żeby user nie musiał dawać przesadnych uprawnień:
+
+#### 6.1.a Tryb domyślny — konfiguracja **istniejącego** repo
+
+Webox dodaje deploy keys, secrets, workflow do repo które już istnieje. To **zalecane** dla MVP. Wymagane scope (per repo):
+
 | Scope | Cel | Wymagane? |
 |---|---|---|
-| `Contents: Read and write` | Tworzenie i edycja plików w repo (workflow). | Tak. |
+| `Contents: Read and write` | Edycja plików w repo (workflow). | Tak. |
 | `Workflows: Read and write` | Pisanie `.github/workflows/deploy.yml`. | Tak. |
 | `Actions: Read` | Monitoring runów. | Tak. |
 | `Secrets: Read and write` | Zapis SSH key + DEPLOY_* do secrets repo. | Tak. |
-| `Metadata: Read` | Default required. | Tak. |
-| `Administration: Read and write` | Tworzenie repo. | Tak (per organization scope). |
+| `Metadata: Read` | Default required dla każdego PAT. | Tak. |
+
+**Bez** `Administration: Read and write` — webox nie tworzy nowych repo w tym trybie.
+
+#### 6.1.b Tryb opt-in — webox **tworzy** nowe repo
+
+Tylko gdy user explicite chce żeby webox tworzył nowe repo (toggle `settings.gh_auto_create_repo = true`). Dodaje:
+
+| Scope | Cel | Ryzyko |
+|---|---|---|
+| `Administration: Read and write` (per organization lub user) | Tworzenie repo. | **Wysokie** — to scope pozwala także **usuwać** repo całej organizacji. Webox loguje warning przy starcie, jeśli token ma ten scope na poziomie org. |
+
+Webox rekomenduje **scoped PAT per repo** (fine-grained), nie classic PAT, dla obu trybów. Patrz [AUDIT B7](./AUDIT.md#b7-securitymd-61--fine-grained-pat-z-administration-read-and-write).
 
 ### 6.2 Classic PAT
 
@@ -354,7 +414,26 @@ Warstwa loggingu używa filtra: regex match na typowe wzorce (`ghp_[A-Za-z0-9]{3
 
 ### 9.3 Schowek systemowy
 
-`Ctrl+Y` w `/env` (kopiowanie wartości) — sekret idzie do clipboard. Webox **ostrzega**: clipboard managers mogą zachować historię. Po 30 s webox próbuje wyczyścić clipboard (best-effort — niektóre OS nie pozwalają).
+`Ctrl+Y` w `/env` (kopiowanie wartości) — sekret idzie do clipboard. Webox **NIE obiecuje** automatycznego czyszczenia clipboardu — jest to praktycznie niemożliwe w sposób, który user może uznać za skuteczny:
+
+- **macOS:** `pbcopy` nadpisuje, ale clipboard managers (Alfred, Raycast, Maccy) zachowują historię niezależnie.
+- **Linux:** X11 ma osobne `PRIMARY` i `CLIPBOARD` selections; Wayland nie ma unified API; każdy clipboard manager (CopyQ, GPaste) ma własną historię.
+- **Windows:** wymaga Win32 API + cooperatywnego clipboard managera.
+- **Terminal multiplexer (tmux/screen):** ma własny clipboard, niezależny od OS.
+
+**Polityka Webox:** zamiast obiecywać czyszczenie, **ostrzegamy** użytkownika przy pierwszym `Ctrl+Y` w sesji:
+
+```
+╭─ ⚠ Secret copied to clipboard ────────────────────────────────╮
+│  Webox cannot guarantee clipboard cleanup across all systems.  │
+│  Clipboard managers, terminal multiplexers, and OS APIs vary.  │
+│  Clear your clipboard manually after pasting.                  │
+│                                                                │
+│  [ Don't show again for this session ]                         │
+╰────────────────────────────────────────────────────────────────╯
+```
+
+W status bar po `Ctrl+Y`: `Secret copied. Clear your clipboard after use.` (zamiast timera). Patrz [IMPROVEMENT_PLAN §IMP-8](./IMPROVEMENT_PLAN.md#imp-8-clipboard-clearing-best-effort--obietnica-niemo%C5%BCliwa-do-spe%C5%82nienia).
 
 ### 9.4 Core dumps
 
@@ -455,6 +534,7 @@ Wykrywanie web root per provider:
 | `smallhost` | `~/domains/<domain>/public_html/` |
 | `cpanel` (post-MVP) | `~/public_html/<subdomain>/` |
 | `directadmin` (post-MVP) | `~/domains/<domain>/public_html/` |
+| `cyberpanel` (post-MVP) | `~/<DOMAIN>/public_html/` (patrz [providers/cyberpanel.md §6](./providers/cyberpanel.md)) |
 
 Jeśli `GetDeployPath` zwraca ścieżkę **wewnątrz** web root, Webox umieszcza `.env` obok aplikacji, ale poza publicznym katalogiem.
 

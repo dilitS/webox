@@ -60,7 +60,7 @@ Co testujemy:
 - **Rollback stack:** LIFO ordering, kontynuacja na błędach, persystencja do `pending_cleanups.json`.
 - **Workflow template generation:** `deploy.yml` renderuje poprawne placeholdery, nie gubi quoting i nie wypisuje sekretów do logów.
 - **I18n integrity:** `en.json` i `pl.json` mają ten sam zestaw kluczy dla ekranów core, brakujące tłumaczenia failują check.
-- **Maszyna stanów:** każde przejście z [DESIGN.md §12](./DESIGN.md#12-maszyna-stan%C3%B3w-tui).
+- **Maszyna stanów:** każde przejście z [DESIGN.md §12](./DESIGN.md#12-maszyna-stan%C3%B3w-tui-tabbed-cockpit-spec), w tym lista stanów top-level (`StateInitWizard`, `StateDashboard`, `StateProjectDetail`, `StateCommandPalette`, `StateConfirmDialog`) i sub-stany zakładek (`TabOverview`, `TabEnvDiff` — v0.2+, `TabDatabase` — v0.2+, `TabLogs` — v0.2+).
 - **Key bindings:** mapowanie klawiszy → akcje per stan.
 
 Cel: **≥ 80 %** pokrycia w pakietach `config/`, `providers/` (parsery), `status/`, `secrets/redactor`, `tui/wizard` (state machine).
@@ -196,6 +196,8 @@ Dla testów które nie wymagają realistycznych payloadów (np. testy logiki ret
 
 Patrz [DESIGN.md §2.3 MVU](./DESIGN.md#23-zasady-przep%C5%82ywu-danych-mvu) — czystość `update()` + `view()` to fundament testowalności.
 
+> ⚠ **Uwaga o stabilności:** `teatest` żyje w `x/exp/` — ścieżka **eksperymentalna**, może zmieniać API między minor release'ami Charm. Webox pinuje konkretny commit hash w `go.mod` (nie `latest`) i ma osobny smoke test `TestTeatestSmoke` weryfikujący że harness w ogóle startuje. Migracja na stable path (jeśli Charm wypromuje teatest do `bubbletea/testing/`) wymaga `MINOR` bump webox + entry w `CHANGELOG.md` w sekcji `Changed`.
+
 ### 5.2 Wzorzec testu snapshot
 
 ```text
@@ -215,19 +217,22 @@ TestDashboardFallbacksTo88x28:
 
 Golden files leżą w `tui/testdata/golden/*.golden.txt` i są aktualizowane przez `go test -update`.
 
-### 5.3 Co testujemy w TUI
+### 5.3 Co testujemy w TUI (MVP v0.1)
 
-| Scenariusz | Forma |
-|---|---|
-| Render dashboardu — pełen rozmiar | snapshot |
-| Render dashboardu — fallback rozmiaru | snapshot |
-| Render Init Wizard | snapshot |
-| Render każdego kroku 1–5 wizardu nowego projektu | snapshot |
-| Smart skip kroku DB dla statycznego stack'u | snapshot + key sequence assertion |
-| Confirm dialog Yes/No | sequence test |
-| Reveal `.env` (key `v` + confirm) | sequence test + assertion że value plaintext widoczny po confirm |
-| Stale project banner | snapshot z mock providerem `ListSubdomains` zwracającym braki |
-| Command Palette fuzzy `/cre` → highlight `/create` | snapshot |
+| Scenariusz | Forma | Scope |
+|---|---|---|
+| Render dashboardu — pełen rozmiar (100×30) | snapshot | v0.1 |
+| Render dashboardu — fallback rozmiaru (88×28) | snapshot | v0.1 |
+| Render Init Wizard | snapshot | v0.1 |
+| Render każdego kroku 1–5 wizardu nowego projektu | snapshot | v0.1 |
+| Smart skip kroku DB dla statycznego stack'u | snapshot + key sequence assertion | v0.1 |
+| Confirm dialog Yes/No | sequence test | v0.1 |
+| Confirm dialog z phrase confirmation (host key mismatch) | sequence test + assertion że dialog wymaga manualnego wpisu frazy | v0.1 |
+| Stale project banner | snapshot z mock providerem `ListSubdomains` zwracającym braki | v0.1 |
+| Command Palette fuzzy `/cre` → highlight `/create` | snapshot | v0.1 |
+| Reveal `.env` (key `v` + confirm) | sequence test + assertion że value plaintext widoczny po confirm | **v0.2+** (`/env` post-MVP, patrz [ROADMAP §3.3](./ROADMAP.md#33-czego-nie-ma-w-mvp)) |
+
+> Patrz [AUDIT B1](./AUDIT.md#b1-testingmd-53--testy-mvp-zawieraj%C4%85-zak%C5%82adki-spoza-zakresu-v01) — `Reveal .env` przeniesione poza MVP, bo cała zakładka `/env` jest post-MVP.
 
 ### 5.4 Czego TUI testy NIE robią
 
@@ -250,8 +255,9 @@ Trigger: `push` (każdy branch) + `pull_request` (do `main`).
 
 #### `lint`
 
-- `golangci-lint run` z config `.golangci.yml`.
-- Linterzy włączeni: `gofmt`, `goimports`, `govet`, `staticcheck`, `errcheck`, `gocritic`, `revive`, `gocyclo`, `gosec`, `misspell`.
+- `golangci-lint run` z config `.golangci.yml` (**`version: "2"`** w head konfigu — patrz [CONTRIBUTING §2.1](./CONTRIBUTING.md#21-linter)).
+- Wersja: `golangci-lint v2.x+`. Wybrane mapowania nazw względem v1: `gas → gosec`, `goerr113 → err113`, `gomnd → mnd`, `logrlint → loggercheck`, `megacheck → staticcheck`.
+- Linterzy włączeni (v2 names): `gofmt`, `goimports`, `govet`, `staticcheck`, `errcheck`, `gocritic`, `revive`, `gocyclo`, `gosec`, `misspell`, `unused`, `err113`, `mnd`.
 - Whitelist: brak.
 - Gdy `translations/` istnieje: `make i18n-check` jako część joba `lint`.
 

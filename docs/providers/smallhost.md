@@ -138,17 +138,28 @@ Password:\s+(?P<pass>\S+)
 
 ### 5.4 SSL — DNS not propagated
 
-Let's Encrypt wymaga, by DNS subdomeny ustawiał się na IP serwera. Dla domyślnej subdomeny `<sub>.<user>.smallhost.pl` propagacja jest natychmiastowa (DNS small.pl wewnętrznie zarządza). Dla custom domain — może być opóźnienie do 48 h.
+Let's Encrypt wymaga, by DNS subdomeny ustawiał się na IP serwera. Adapter rozdziela dwa **fundamentalnie różne** scenariusze:
+
+#### 5.4.a Subdomena small.pl (`*.<user>.smallhost.pl`)
+
+DNS instant (rekord A zarządzany przez small.pl natywnie). Webox **może** wykonać `SetupSSL` natychmiast po `CreateSubdomain`. Flow:
+
+1. `CreateSubdomain`
+2. `net.LookupHost(domain)` z timeoutem 5 s (sanity check, nie blokujący)
+3. `SetupSSL`
+
+#### 5.4.b Custom domain (np. `app.example.com`)
+
+DNS może propagować do 48 h. Webox **nie czeka** synchronnie. Flow:
+
+1. `CreateSubdomain`
+2. Wizard kończy z sukcesem, projekt dostaje status `SSL_PENDING` z opisem: *"Custom domain DNS not yet resolved. SSL will be issued automatically on next status refresh (max 48h)."*.
+3. Background ticker w `status/` cache retry'uje `SetupSSL` co 15 min aż do sukcesu lub przekroczenia 48 h.
+4. Przy sukcesie status zmienia się na `ONLINE` z banner *"SSL issued. Click to dismiss."*. Przy 48 h timeout — `SSL_FAILED` z linkiem do DNS troubleshooting.
 
 Adapter wykrywa rate limit / propagation error w outpucie `devil ssl` i mapuje na `ErrDNSNotResolving` lub `ErrRateLimitLetsEncrypt`.
 
-Webox nie powinien wykonywać ślepego `SetupSSL` natychmiast po dodaniu custom domain. Poprawny flow:
-
-1. `CreateSubdomain`
-2. DNS readiness probe (`dig` / `net.LookupHost` z timeoutem)
-3. dopiero potem `SetupSSL`
-
-Jeśli probe nie przejdzie, wizard kończy się błędem kontrolowanym i rollback nie próbuje wystawiać certyfikatu w pętli.
+Patrz [IMPROVEMENT_PLAN §IMP-15](../IMPROVEMENT_PLAN.md#imp-15-providerssmallhostmd-54--dns-readiness-probe-blokuje-wizard-na-48h-dla-custom-domain).
 
 ### 5.5 `devil www restart` — czas oczekiwania
 
@@ -201,14 +212,28 @@ Workflow w wysokim poziomie:
 ```
 1. Checkout
 2. Setup Node {{NodeVersion}}
-3. npm ci
-4. {{BuildCommand}}
-5. Setup SSH (write key + known_hosts)
-6. rsync -avz --delete {{DistDir}}/ {{DeployUser}}@{{DeployHost}}:{{DeployPath}}/
-7. ssh {{DeployUser}}@{{DeployHost}} 'devil www restart {{Domain}}'
+3. Cache ~/.npm (cache key: hashFiles(**/package-lock.json))    # IMP-17
+4. npm ci
+5. {{BuildCommand}}
+6. Setup SSH (write key + known_hosts)
+7. rsync -avz --delete                                            # C6 — excludes
+     --exclude='.env'
+     --exclude='node_modules/'
+     {{#each PersistentDirs}}--exclude='{{this}}/' {{/each}}
+     {{DistDir}}/ {{DeployUser}}@{{DeployHost}}:{{DeployPath}}/
+8. Verify .env permissions:                                       # IMP-10
+     ssh {{DeployUser}}@{{DeployHost}}
+       'stat -c "%a %U" {{DeployPath}}/../.env'
+       | grep -q '^600 {{DeployUser}}$'
+       || (echo "::error::.env has insecure permissions" && exit 1)
+9. ssh {{DeployUser}}@{{DeployHost}} 'devil www restart {{Domain}}'
 ```
 
-Pełen szablon żyje w `assets/workflow_deploy.tmpl.yml` (build embed). Patrz [DESIGN §13.5](../DESIGN.md#135-szablon-workflow-parametryzowany).
+> **Krytyczne — `--exclude` dla persistent dirs:** bez tego `--delete` usuwa pliki na zdalnym, których brak w lokalnym `dist/` — np. `public/uploads/` z assetami klientów lub `.env` materializowany przez GHA. To **destructive operation** którą widzieliśmy zabijać produkcję klientów. Patrz [AUDIT C6](../AUDIT.md#c6-providerssmallhostmd-6--workflow-deployyml-u%C5%BCywa-rsync-z---delete).
+
+`{{PersistentDirs}}` to `properties.persistent_dirs` per profile (default: `["uploads", "tmp", "cache"]`). Webox automatycznie dodaje `.env` jako zawsze excluded.
+
+Pełen szablon żyje w `assets/workflow_deploy_smallhost.tmpl.yml` (build embed). Patrz [DESIGN §13.5](../DESIGN.md#135-szablon-workflow-parametryzowany).
 
 ## 7. Otwarte pytania / TODO
 

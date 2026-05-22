@@ -26,8 +26,8 @@ Webox jest open-source (MIT). Każdy PR przechodzi przez `golangci-lint`, testy 
 
 | Narzędzie | Wersja minimalna | Cel |
 |---|---|---|
-| Go | 1.24 | Build. |
-| `golangci-lint` | 1.60+ | Linter. |
+| Go | 1.24+ (target: 1.24 LTS-style; CI matrix testuje też 1.25 RC gdy dostępne) | Build. `CGO_ENABLED=0` dla release. |
+| `golangci-lint` | **2.x+** (uwaga: zmiana mappingu nazw względem v1 — patrz §2.1) | Linter. |
 | `govulncheck` | latest | Skan CVE. |
 | `goreleaser` | 2.x | Lokalne snapshot builds. |
 | `git` | 2.30+ | Oczywiste. |
@@ -75,9 +75,23 @@ Testy z `// +build integration` uruchamiają się **tylko** z tymi zmiennymi.
 
 ### 2.1 Linter
 
-`golangci-lint` z konfiguracją w `.golangci.yml`. Włączone:
+`golangci-lint v2.x+` z konfiguracją w `.golangci.yml`. Konfiguracja **wymaga** deklaracji `version: "2"` na wierzchu pliku.
 
-`gofmt`, `goimports`, `govet`, `staticcheck`, `errcheck`, `gocritic`, `revive`, `gocyclo` (max 15), `gosec` (z exemptionami), `misspell`, `unconvert`, `prealloc`, `whitespace`.
+Włączone (nazwy v2):
+
+`gofmt`, `goimports`, `govet`, `staticcheck`, `errcheck`, `gocritic`, `revive`, `gocyclo` (**max 20**, motywacja patrz [IMPROVEMENT_PLAN §IMP-19](./IMPROVEMENT_PLAN.md#imp-19-contributingmd-21--gocyclo-max-15-dla-metod-providera)), `gosec`, `misspell`, `unconvert`, `prealloc`, `whitespace`, `unused`, `err113` (post-v1 nazwa `goerr113`), `mnd` (post-v1 nazwa `gomnd`), `loggercheck` (post-v1 nazwa `logrlint`).
+
+Mapowanie nazw v1 → v2 (do uwzględnienia przy migracji starych config'ów):
+
+| v1 | v2 |
+|---|---|
+| `gas` | `gosec` |
+| `goerr113` | `err113` |
+| `gomnd` | `mnd` |
+| `logrlint` | `loggercheck` |
+| `megacheck` | `staticcheck` |
+
+Override per funkcja przez `//nolint:<lint-name>` z **wymaganym** komentarzem uzasadniającym, np. `//nolint:gocyclo // SetupSSL: 7 explicit error paths, splitting would reduce readability`. Każdy `//nolint` review'owany w PR.
 
 ### 2.2 Konwencje nazewnicze
 

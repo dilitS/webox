@@ -2,13 +2,15 @@
 
 > Status: Approved · Ostatnia aktualizacja: 2026-05-22 · Właściciel: @maintainer
 >
-> Pokrewne dokumenty: [PRD.md](./PRD.md) (cele biznesowe), [DESIGN.md](./DESIGN.md) (architektura TUI i silnika), [adr/0006](./adr/0006-jezyk-interfejsu-en-domyslny.md) (język interfejsu).
+> Pokrewne dokumenty: [PRD.md](./PRD.md) (cele biznesowe), [DESIGN.md](./DESIGN.md) (architektura TUI i silnika), [adr/0006](./adr/0006-jezyk-interfejsu-en-domyslny.md) (język interfejsu), [AUDIT.md](./AUDIT.md) (scope decisions).
 
 ---
 
 ## TL;DR
 
-UX/UI Webox wkracza w generację **2026/2027** jako zintegrowany **Terminal Cockpit klasy premium**. Odrzucamy proste, dwukolumnowe layouty na rzecz elastycznego systemu **Bento-Box Grid** (optymalizowanego dla rozdzielczości `≥ 120×35`), dynamicznych gradientów blokowych (`█▓▒░`) imitujących cieniowanie przestrzenne, zunifikowanego standardu **Nerd Font** z pełnym fallbackiem, oraz beztarciowej nawigacji za pomocą kart szczegółów (Tabs). Tradycyjny, liniowy kreator zastępujemy **Self-Healing Wizardem** prezentującym wizualny graf zależności z opcją chirurgicznego wznawiania i korekcji błędów na żywo.
+UX/UI Webox wkracza w generację **2026/2027** jako zintegrowany **Terminal Cockpit klasy premium**. **MVP (v0.1)** celuje w **Standard Cockpit Mode (`100×30`)** jako default — to **zalecany** rozmiar z [PRD §10.3](./PRD.md#103-terminal). Pełna siatka **Bento-Box Grid (`≥ 120×35`)** jest 🔶 **STRETCH (v0.2+)**, podobnie jak: **Sound Engine** (§12), **Live Service Topology Map** (§3.4), **`/env` Merger** (§9.3) i **Live Log Stream** (§4.3 Tab [4]). Tradycyjny, liniowy kreator zastępujemy **Self-Healing Wizardem** prezentującym wizualny graf zależności z opcją chirurgicznego wznawiania i korekcji błędów na żywo — to **w MVP**, ale jako liniowy step-by-step z prostym LIFO rollback (graf jako wizualizacja, **nie** DAG-based engine — patrz [DESIGN §10](./DESIGN.md#10-dag-based-transactional-engine-wznawialny-rollback)).
+
+> **Konwencja scope w tym dokumencie:** `🔵 MVP (v0.1)` = w zakresie pierwszego release'u. `🔶 STRETCH (v0.2+)` = zaprojektowane, ale **niezimplementowane** w MVP. Patrz [ROADMAP §3.3](./ROADMAP.md#33-czego-nie-ma-w-mvp).
 
 ---
 
@@ -162,6 +164,8 @@ Spinner Webox to nie tylko statyczny zestaw klatek. Jego prędkość (Tick Durat
 
 ### 3.4 Wizualny Graf Topologii Usług (Live Service Topology Map)
 
+> 🔶 **STRETCH (v0.2+)** — wymaga Bento Ultra (`≥120×35`), który sam jest stretch. W MVP zastępujemy tabelaryczną listą połączeń w `Overview` zakładki projektu. Specyfikacja zachowana jako materiał do planowania v0.2+. Patrz [AUDIT A6](./AUDIT.md#a6-scope-creep-w-designmd-i-uxmd-poza-zakresem-mvp-z-roadmapmd-33).
+
 W kafelku Bento dedykowanym dla topologii (dostępnym w trybie Bento Grid przy szerokości `≥ 120` znaków) Webox renderuje w czasie rzeczywistym schemat przepływu danych i relacji między elementami systemu. Pozwala to na natychmiastową diagnozę wąskich gardeł lub uszkodzonych węzłów.
 
 ```text
@@ -211,7 +215,9 @@ W kafelku Bento dedykowanym dla topologii (dostępnym w trybie Bento Grid przy s
 
 ---
 
-### 4.2 Dashboard 2.0 — Bento-Box Grid System (`≥ 120×35`)
+### 4.2 Dashboard 2.0 — Bento-Box Grid System (`≥ 120×35`) — STRETCH
+
+> 🔶 **STRETCH (v0.2+)** — Bento Ultra przy `≥120×35` przewyższa "zalecane" `100×30` z [PRD §10.3](./PRD.md#103-terminal). MVP target = **Standard Cockpit Mode** (§5, próg `100–119`). Sekcja zachowana jako specyfikacja architektoniczna; implementacja po dostarczeniu MVP. Patrz [AUDIT B5](./AUDIT.md#b5-uxmd-42--bento-przy-12035-ale-prdmd-103-deklaruje-zalecane-10030).
 
 Gdy rozmiar okna terminala przekracza próg komfortu (`120×35`), Webox automatycznie transformuje interfejs w pełnoprawny, pięciomodułowy pulpit nawigacyjny. Aktywny panel (w tym przypadku *Projects*) jest podświetlony ramką o grubości 2 znaków (tutaj symbolicznie podwójną) i fioletowym kolorem.
 
@@ -253,7 +259,16 @@ Gdy rozmiar okna terminala przekracza próg komfortu (`120×35`), Webox automaty
 
 Gdy użytkownik wciśnie `→` lub `Tab` na projekcie, przechodzi do panelu szczegółów. Górna belka zamienia się w system zakładek. Nawigacja odbywa się za pomocą klawiszy `H`/`L` (lewo/prawo) lub cyfr `1`–`4`.
 
-#### Karta [2] — Env Diff (Dwukierunkowy Podgląd Różnic Zmiennych)
+| Karta | Skrót | Scope | Status |
+|---|---|---|---|
+| [1] Overview | `1` | 🔵 MVP (v0.1) | implementowane |
+| [2] Env Diff | `2` | 🔶 STRETCH (v0.2+) | wymaga `/env` post-MVP |
+| [3] Database | `3` | 🔶 STRETCH (v0.2+) | wymaga `/db` post-MVP |
+| [4] Logs | `4` | 🔶 STRETCH (v0.2+) | wymaga `Live log stream` post-MVP — patrz [ROADMAP §3.3](./ROADMAP.md#33-czego-nie-ma-w-mvp) |
+
+> W MVP karta `[1] Overview` jest **jedyną** zakładką — wciśnięcie `→`/`Tab` przenosi do widoku Overview z `[r] Restart`, `[s] SSL Renew`, `[v] Logs (last 200 lines)`. Pozostałe (`H`/`L`, cyfry 2–4) są disabled z dimmed indicator `unlocked in v0.2`.
+
+#### Karta [2] — Env Diff (Dwukierunkowy Podgląd Różnic Zmiennych) — STRETCH v0.2+
 
 Ta karta pozwala na graficzne porównanie lokalnego pliku `.env` z rzeczywistym plikiem `.env` wdrożonym na serwerze produkcyjnym, zapobiegając częstym błędom braku konfiguracji.
 
@@ -274,7 +289,7 @@ Ta karta pozwala na graficzne porównanie lokalnego pliku `.env` z rzeczywistym 
  └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Karta [3] — Database Management
+#### Karta [3] — Database Management — STRETCH v0.2+
 
 ```text
  ┌─ sui.biuromody.smallhost.pl ── [1] Overview  [2] Env Diff  ▶ [3] Database  [4] Logs ──────────────────────────────────────┐
@@ -298,7 +313,7 @@ Ta karta pozwala na graficzne porównanie lokalnego pliku `.env` z rzeczywistym 
  └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Karta [4] — Live Log Stream
+#### Karta [4] — Live Log Stream — STRETCH v0.2+
 
 ```text
  ┌─ sui.biuromody.smallhost.pl ── [1] Overview  [2] Env Diff  [3] Database  ▶ [4] Logs ──────────────────────────────────────┐
@@ -383,7 +398,9 @@ Webox 2.0 dynamicznie nasłuchuje zdarzeń zmiany rozmiaru terminala (`tea.Windo
 
 ## 6. System nawigacji i Key bindings (UX 2.0)
 
-### 6.1 Szybkie skróty akordowe (Fast-Chord Bindings)
+### 6.1 Szybkie skróty akordowe (Fast-Chord Bindings) — STRETCH v0.2+
+
+> 🔶 **STRETCH (v0.2+)** — chord bindings są niewystarczająco priorytetowe dla MVP. W MVP klawisze `r`, `s`, `v` w widoku Overview wystarczają. Chordy implementujemy po pomiarze realnej żądanej kadencji operacji w wczesnym dogfooding'u. Patrz [AUDIT A6](./AUDIT.md#a6-scope-creep-w-designmd-i-uxmd-poza-zakresem-mvp-z-roadmapmd-33).
 
 Dla zaawansowanych użytkowników (Power-Users) Webox 2.0 wprowadza skróty akordowe (dwuklawiszowe kombinacje wzorowane na edytorze Vim/Neovim), które pozwalają na błyskawiczne wyzwalanie akcji na aktualnie zaznaczonym projekcie z poziomu listy głównej dashboardu — całkowicie **omijając konieczność otwierania szczegółów i potwierdzania**:
 
@@ -458,7 +475,9 @@ Zasada absolutnego bezpieczeństwa w UI Webox: **sekrety nigdy nie mogą być wi
 
 ---
 
-### 9.3 Interaktywny Dwukierunkowy TUI Env Merger
+### 9.3 Interaktywny Dwukierunkowy TUI Env Merger — STRETCH v0.2+
+
+> 🔶 **STRETCH (v0.2+)** — wymaga `/env` post-MVP. Cała sekcja jest architektonicznym planem dla v0.2+. Patrz [DESIGN §11.1](./DESIGN.md#111-architektura-dwukierunkowego-env-merger-tui-env-merger-engine), [ROADMAP §3.3](./ROADMAP.md#33-czego-nie-ma-w-mvp), [AUDIT A6](./AUDIT.md#a6-scope-creep-w-designmd-i-uxmd-poza-zakresem-mvp-z-roadmapmd-33).
 
 W przypadku wykrycia dryfu konfiguracji (`⚡ DRIFT`), użytkownik może wywołać klawiszem `m` dedykowane narzędzie do interaktywnego, bezpiecznego scalania plików konfiguracyjnych `.env` bez konieczności wychodzenia z terminala i manualnego przepisywania haseł.
 
@@ -526,7 +545,9 @@ Tłumaczenia są zorganizowane jako płaska struktura JSON z kontekstowymi prefi
 
 ---
 
-## 12. TUI Soundscapes & Akustyka Operacyjna
+## 12. TUI Soundscapes & Akustyka Operacyjna — STRETCH (osobny RFC)
+
+> 🔶 **STRETCH (osobny RFC, post-v0.2+)** — sound engine **nie jest** w żadnym planowanym release MVP/v0.2. Wymaga osobnego RFC z konkretną wartością user (research show'uje, że TUI z dźwiękiem przy daily-driver tools są **rzadko** chwalone i często wyciszane natychmiast po pierwszym kontakcie). Specyfikacja zachowana jako materiał do dyskusji. Patrz [DESIGN §17](./DESIGN.md#17-architektura-silnika-d%C5%BAwi%C4%99kowego-w-go-package-sound), [AUDIT A6+C1](./AUDIT.md#a6-scope-creep-w-designmd-i-uxmd-poza-zakresem-mvp-z-roadmapmd-33).
 
 Webox 2.0 to zmysłowe doświadczenie terminalowe. Poprzez opcjonalny, retro-futurystyczny system dźwiękowy, operacje deweloperskie zyskują fizyczny wymiar. Wszystkie sygnały są generowane bez dodatkowych zależności systemowych, bezpośrednio z kodu Go.
 
@@ -541,7 +562,11 @@ Webox 2.0 to zmysłowe doświadczenie terminalowe. Poprzez opcjonalny, retro-fut
 | **Przerwanie Kreatora / Błąd** | Dron ostrzegawczy | `180 Hz` | `350 ms` | Niski, pulsujący dźwięk o charakterze alarmowym. |
 
 ### 12.2 Kontrola akustyczna (Mute System)
-* **Klawisz szybkiego wyciszenia (`Ctrl+S`):** Pozwala na błyskawiczne włączenie/wyłączenie dźwięków w dowolnym momencie działania aplikacji.
+
+* **Klawisz szybkiego wyciszenia (`Alt+M` lub `Ctrl+M`):** Pozwala na błyskawiczne włączenie/wyłączenie dźwięków w dowolnym momencie działania aplikacji.
+
+  > **Dlaczego nie `Ctrl+S`:** w wielu terminalach (`xterm`, `Terminal.app`, `gnome-terminal`) `Ctrl+S` to **XON/XOFF flow control**, który zatrzymuje rendering TTY do czasu `Ctrl+Q`. User wcisnąwszy `Ctrl+S` zobaczyłby zamrożony ekran i pomyślał, że webox crashnął. `Alt+M` (Meta+M) jest standardem w innych TUI (Vim, Emacs, htop). Patrz [AUDIT D6](./AUDIT.md#d6-uxmd-12-sound--ctrls-jako-szybkie-wyciszenie-ale-w-wielu-terminalach-ctrls-to-xonxoff-flow-control).
+
 * **Wizualna reprezentacja w Status Barze:**
   * Przy aktywnym dźwięku: `[ 󰓃 █▄▅▇ ]` (dynamicznie animowany korektor graficzny).
   * Przy wyciszeniu: `[ 󰓄 MUTED ]` (szary, nieaktywny badge).

@@ -410,7 +410,25 @@ W przypadku zerwania połączenia SSH w trakcie wykonywania procedur operatorski
 
 ## 10. DAG-based Transactional Engine (Wznawialny Rollback)
 
-Zastępujemy prosty stos LIFO acyklicznym grafem skierowanym (DAG) dla operacji scaffoldingowych i instalacyjnych. Pozwala to na precyzyjne śledzenie zależności i wznawianie przerwanej pracy (Resumable Workflows).
+> 🔵 **MVP (v0.1)** — implementujemy **prosty stos LIFO** z `pending_cleanups.json`, zgodnie z [PRD §6 F10](./PRD.md#6-ficzery--z-priorytetami) i [ROADMAP §3.2](./ROADMAP.md#32-zakres-v01-mvp).
+>
+> 🔶 **STRETCH (v0.3+)** — pełny DAG z selektywnym rollbackiem, topologicznym sortowaniem i resume. Sekcje §10.1–§10.2 poniżej to **target architecture**, **nie** zakres MVP. Implementacja DAG po stabilizacji LIFO w v0.1. Patrz [IMPROVEMENT_PLAN §IMP-1](./IMPROVEMENT_PLAN.md#imp-1-designmd-10--dag-based-transactional-engine-vs-lifo-stack).
+
+### 10.0 LIFO stack (MVP v0.1)
+
+Wizard utrzymuje **stos operacji** (`type CleanupAction func(ctx context.Context) error`). Po każdym pomyślnym kroku wizard `push`uje na stos akcję odwracającą (np. `RemoveSubdomain`, `RemoveDatabase`). Przy błędzie i potwierdzeniu rollbacku przez user'a wizard zdejmuje akcje **w odwrotnej kolejności** i wykonuje każdą. Stos jest serializowany do `~/.config/webox/pending_cleanups.json` po każdym push'u, więc crash webox'a nie zostawia osieroconych zasobów — przy następnym uruchomieniu webox detektuje plik i proponuje *Resume cleanup* lub *Discard*.
+
+| Element | Typ |
+|---|---|
+| `CleanupAction` | `func(ctx context.Context) error` |
+| Stos | `[]CleanupStep` w pamięci + `pending_cleanups.json` na dysku |
+| `CleanupStep.Name` | semantyczna nazwa kroku do wyświetlenia (`"Remove subdomain sub.user.smallhost.pl"`) |
+| `CleanupStep.Params` | `map[string]string` z parametrami potrzebnymi do wykonania akcji |
+| Persistence | atomic write przez `config/`-style flock + fsync (§6) |
+
+LIFO nie wspiera selektywnego skipowania, równoległego wykonania ani resume z conditional state — to różnica fundamentalna względem DAG.
+
+### 10.1 Struktura silnika transakcyjnego (DAG — STRETCH v0.3+)
 
 ```
           [1. Pre-flight Check]
@@ -461,7 +479,7 @@ type ExecutionDAG struct {
 }
 ```
 
-### 10.2 Logika wznowienia i selektywnego rollbacku
+### 10.2 Logika wznowienia i selektywnego rollbacku (DAG — STRETCH v0.3+)
 
 Gdy dany węzeł DAG (np. `Provision Database`) zgłosi błąd, silnik:
 1. Oznacza stan węzła jako `StateFailed`.
