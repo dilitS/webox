@@ -30,6 +30,18 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   `testdata/config/valid_v1.json` instead of the stale pre-bootstrap path.
 
 ### Added
+- `internal/log/redact.go` — pure `Redact(input string) string` for local
+  diagnostic output. It redacts SSH private key blocks, GitHub classic and
+  fine-grained tokens, AWS access-key-shaped values, `Authorization: Bearer`
+  headers, password-bearing URLs, sensitive `.env` assignments, JSON
+  password/token/secret fields, OpenAI-style `sk-...` tokens, and long
+  `ssh-rsa` key material.
+- `internal/log/redact_test.go` and `testdata/redact/*.txt` — table-driven
+  malicious-input corpus without storing complete secret-shaped literals on
+  disk. Tests assert that redacted output never contains the original generated
+  secret and that safe substrings remain intact.
+- `internal/log/redact_bench_test.go` — `BenchmarkRedact100KB`, currently
+  ~4.64ms/op locally on Apple M4, satisfying the Sprint 01 <5ms target.
 - `config/migrate.go` — real migration framework for on-disk config data:
   `type Migration func(in []byte) (out []byte, newVersion int, err error)`,
   `var migrations = map[int]Migration{0: migrateV0toV1}`, and public

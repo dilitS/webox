@@ -175,8 +175,8 @@ Po sprincie 01:
 - **Estymata:** M
 - **Zależności:** TASK-01.1 (Config — do testów strukturyzowanych)
 - **Acceptance Criteria:**
-  - [ ] `func Redact(input string) string` — czysta funkcja, no I/O.
-  - [ ] Pokrywa **wszystkie** wzorce z `docs/SECURITY.md §3.1`:
+  - [x] `func Redact(input string) string` — czysta funkcja, no I/O.
+  - [x] Pokrywa **wszystkie** wzorce z `docs/SECURITY.md §3.1`:
     - SSH private keys (BEGIN/END markers, content)
     - GitHub tokens (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`)
     - AWS keys (placeholder — nie używamy, ale catch-all)
@@ -184,14 +184,14 @@ Po sprincie 01:
     - Passwords w URL (`https://user:pass@host`)
     - `.env` content (linie `KEY=VALUE`)
     - JSON fields `{"password": "..."}`, `"token": "..."`
-  - [ ] Tabela testów z **malicious inputs** (testdata/redact/):
+  - [x] Tabela testów z **malicious inputs** (testdata/redact/):
     - happy paths × 8
     - edge: token w środku zdania
     - edge: token podzielony na linie
     - edge: bardzo długi input (100KB)
     - **anti-pattern: redacted output NIE może zawierać oryginalnej treści** (assertion via `strings.Contains`)
-  - [ ] **Performance:** 100KB input < 5ms (benchmark).
-  - [ ] Coverage ≥ 95%.
+  - [x] **Performance:** 100KB input < 5ms (benchmark: `BenchmarkRedact100KB` ≈ 4.64ms/op on M4).
+  - [x] Coverage ≥ 95% (`internal/log` = 100%).
 - **Pliki:**
   - `internal/log/redact.go` (new)
   - `internal/log/redact_test.go` (new)
