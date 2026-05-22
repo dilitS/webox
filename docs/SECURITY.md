@@ -137,12 +137,22 @@ Biblioteka: `github.com/zalando/go-keyring`. Mapa kluczy → [DESIGN.md §7](./D
 - Brute force pliku wymaga dostępu do `secrets.enc`. Permisy `0600`.
 - **Brak recovery hasła master.** Jeśli user je zgubi, fallback secrets trzeba odtworzyć z ich źródeł pierwotnych. To celowa decyzja: recovery channel byłby backdoorem.
 
-**Detekcja środowiska** (kolejność prób):
+**Detekcja środowiska** (kolejność prób, jednoznaczne mapowanie błędów):
 
-1. `keyring.Get("webox-sentinel", "test")` w trybie probe.
-2. Jeśli błąd `d-bus connection error` lub `keyring not available` → flaga `fallback=true`.
-3. Przy pierwszym `Get` w trybie fallback webox prosi o master password.
-4. Jeśli `secrets.enc` nie istnieje → webox zakłada nowy z user-provided hasłem (z confirm).
+1. **Probe write+read+delete** sentinela: webox próbuje `keyring.Set("webox-probe", "sentinel", token)`, następnie `keyring.Get`, na końcu `keyring.Delete`. Token to losowych 16 B w hex.
+2. Klasyfikacja błędu (sentinel errors z [`go-keyring`](https://pkg.go.dev/github.com/zalando/go-keyring)):
+
+   | Błąd | Decyzja |
+   |---|---|
+   | `nil` na wszystkich trzech operacjach | keyring **działa** → `fallback=false` |
+   | `errors.Is(err, keyring.ErrUnsupportedPlatform)` | platforma bez wsparcia → `fallback=true` |
+   | `errors.Is(err, keyring.ErrSetDataTooBig)` na probe Set | konfiguracja problematyczna, ale keyring działa → `fallback=false` + warning |
+   | Inny błąd (D-Bus connection error / Secret Service unavailable / timeout) | log warning + `fallback=true` |
+   | `keyring.ErrNotFound` na probe Get **po** udanym Set | błąd implementacji backendu → log warning + `fallback=true` |
+3. **`keyring.ErrNotFound` przy normalnym pobraniu zapisanego wcześniej sekretu** to **nie** sygnał o braku keyringa, tylko o braku sekretu w keyringu — webox prosi user'a o ponowne wprowadzenie wartości. Probe write+read+delete jest osobnym mechanizmem detekcji.
+4. Wynik detekcji cache'owany na czas sesji. Można wymusić tryb przez `WEBOX_SECRETS_BACKEND=keyring|fallback`.
+5. Przy pierwszym `Get` w trybie fallback webox prosi o master password.
+6. Jeśli `secrets.enc` nie istnieje → webox zakłada nowy z user-provided hasłem (z confirm).
 
 ### 4.3 Cykl życia sekretu w pamięci
 
