@@ -1,0 +1,136 @@
+# golangci-lint v2 config for Webox.
+#
+# Source of truth for the enabled linter set:
+#   docs/CONTRIBUTING.md §2.1 + AGENTS.md §2.2 + sprint-00 TASK-00.3.
+# Whenever you add or remove a linter, update those docs in the same PR
+# (skill: audit-trace).
+#
+# Bumping linters: `cd tools && go get -tool github.com/golangci/...@<v>` then
+# `make tools-tidy && make lint`.
+
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  go: "1.24"
+
+linters:
+  default: none
+
+  enable:
+    # — bug-bear (correctness) —
+    - bodyclose       # HTTP body leaks
+    - errcheck        # unchecked error returns
+    - errorlint       # `errors.Is/As`, `%w` for wrapping
+    - govet           # bundle of standard go vet checks
+    - ineffassign     # ineffective assignments
+    - staticcheck     # the gold standard (also folds gosimple/stylecheck in v2)
+    - unused          # dead code / unused symbols / fields
+    # — security —
+    - gosec
+    # — style / consistency —
+    - dupl            # near-duplicate blocks (relaxed in tests)
+    - gocritic        # opinionated extra checks
+    - misspell        # `colour` → `color`, etc.
+    - revive          # the modern golint replacement
+    - whitespace      # trailing whitespace
+    # — complexity / maintainability —
+    - gocyclo         # cyclomatic complexity (max 20 — IMP-19)
+    - prealloc        # preallocate slices when length is known
+    - unconvert       # remove unneeded type conversions
+    - unparam         # unused function parameters
+    # — error-handling discipline —
+    - err113          # sentinel errors required (no `errors.New("...")` inline)
+    # — diagnostics / observability —
+    - loggercheck     # structured-log key/value pairs
+    - mnd             # magic numbers (relaxed in tests)
+
+  settings:
+    errcheck:
+      # Writes to stdout/stderr in a CLI fail only on broken pipe; the Go
+      # idiom is to ignore those errors. Excluding the `fmt.Fprint*` family
+      # avoids ugly `_, _ = fmt.Fprintln(...)` boilerplate everywhere.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintln
+        - fmt.Fprintf
+
+    gocyclo:
+      min-complexity: 20  # AGENTS §7.2 / AUDIT IMP-19
+
+    revive:
+      severity: warning
+      rules:
+        - name: package-comments
+        - name: var-naming
+        - name: exported
+          arguments:
+            - "checkPrivateReceivers"
+            - "disableStutteringCheck"
+        - name: indent-error-flow
+        - name: error-return
+        - name: error-naming
+        - name: error-strings
+        - name: receiver-naming
+        - name: increment-decrement
+        - name: range
+        - name: time-naming
+        - name: unexported-return
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: blank-imports
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+        - style
+      disabled-checks:
+        # `hugeParam` triggers on every Bubble Tea handler that takes a
+        # `tea.Msg`/`tea.Model`; the framework hands us values, not pointers.
+        - hugeParam
+        # `rangeValCopy` is noisy on tiny structs and would force pointer
+        # ranges that hurt readability.
+        - rangeValCopy
+
+    gosec:
+      excludes:
+        # G104: errcheck already covers unchecked errors; gosec on top is noise.
+        - G104
+
+  exclusions:
+    generated: strict
+    paths:
+      # `testing/` will hold fixtures and golden files; lint-irrelevant.
+      - testing/fixtures
+      - testing/cassettes
+    rules:
+      # Tests have their own ergonomics: table-driven tests look duplicated
+      # to `dupl`, often hardcode small numeric constants (`mnd`), and use
+      # `errors.New` inline for assertions (`err113`). Cyclomatic complexity
+      # in subtest dispatchers can also explode without harming clarity.
+      - path: _test\.go
+        linters:
+          - dupl
+          - err113
+          - errcheck
+          - gocyclo
+          - gosec
+          - mnd
+          - unparam
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/webox/webox
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

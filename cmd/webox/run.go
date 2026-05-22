@@ -7,6 +7,13 @@ import (
 	"github.com/webox/webox/internal/version"
 )
 
+// Exit codes follow the POSIX convention: 0 success, 1 general error,
+// 2 command-line misuse (unknown flag, bad arg).
+const (
+	exitOK     = 0
+	exitMisuse = 2
+)
+
 const helpText = `webox — keyboard-driven cockpit for shared-hosting deployments
 
 Usage:
@@ -35,40 +42,39 @@ type opts struct {
 // and returns the process exit code. Output is written to the supplied
 // writers so tests can capture it without touching os.Stdout/os.Stderr.
 func Run(args []string, stdout, stderr io.Writer) int {
-	o, errMsg := parseArgs(args)
+	parsed, errMsg := parseArgs(args)
 	if errMsg != "" {
 		fmt.Fprintln(stderr, errMsg)
-		return 2
+		return exitMisuse
 	}
 
 	switch {
-	case o.showVersion:
+	case parsed.showVersion:
 		fmt.Fprintln(stdout, version.String())
-		return 0
-	case o.showHelp:
+		return exitOK
+	case parsed.showHelp:
 		fmt.Fprint(stdout, helpText)
-		return 0
+		return exitOK
 	}
 
 	// `webox` alone shows help until the TUI is wired in Sprint 04. The
 	// --debug modifier is parsed (so order-independent invocations such
 	// as `webox --debug --version` work today) but has no observable
 	// effect yet.
-	_ = o.debug
+	_ = parsed.debug
 	fmt.Fprint(stdout, helpText)
-	return 0
+	return exitOK
 }
 
-func parseArgs(args []string) (opts, string) {
-	var o opts
+func parseArgs(args []string) (parsed opts, errMsg string) {
 	for _, arg := range args {
 		switch arg {
 		case "--version":
-			o.showVersion = true
+			parsed.showVersion = true
 		case "--help", "-h":
-			o.showHelp = true
+			parsed.showHelp = true
 		case "--debug":
-			o.debug = true
+			parsed.debug = true
 		default:
 			return opts{}, fmt.Sprintf(
 				"webox: unknown argument %q. Run `webox --help` for usage.",
@@ -76,5 +82,5 @@ func parseArgs(args []string) (opts, string) {
 			)
 		}
 	}
-	return o, ""
+	return parsed, ""
 }

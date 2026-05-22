@@ -27,12 +27,25 @@ Webox jest open-source (MIT). Każdy PR przechodzi przez `golangci-lint`, testy 
 | Narzędzie | Wersja minimalna | Cel |
 |---|---|---|
 | Go | 1.24+ (target: 1.24 LTS-style; CI matrix testuje też 1.25 RC gdy dostępne) | Build. `CGO_ENABLED=0` dla release. |
-| `golangci-lint` | **2.x+** (uwaga: zmiana mappingu nazw względem v1 — patrz §2.1) | Linter. |
-| `govulncheck` | latest | Skan CVE. |
-| `goreleaser` | 2.x | Lokalne snapshot builds. |
 | `git` | 2.30+ | Oczywiste. |
 | `gh` CLI | 2.30+ | Praca z PR-ami z konsoli. |
 | `make` | dowolny | Skróty zadań (`make test`, `make lint`). |
+
+#### Dev tools — pinned via `tools/go.mod`
+
+Webox używa **Go 1.24 `tool` directive** w **osobnym `tools/go.mod`** (izolacja od głównego modułu, patrz [ADR-0007 jeśli istnieje / sprint-00 TASK-00.2 commit body]). Wszystkie poniższe są przypinane do konkretnych wersji w `tools/go.mod` i odpalane przez `make` przez `go tool -modfile=tools/go.mod <bin>`. Bez instalowania na PATH:
+
+| Tool | Wersja pinned (May 2026) | Wywołanie |
+|---|---|---|
+| `golangci-lint` | v2.12.2 | `make lint` |
+| `gofumpt` | v0.10.0 | `make fmt` (część) |
+| `goimports` | (z `golang.org/x/tools` v0.45.0) | `make fmt` (część) |
+| `govulncheck` | v1.3.0 | `make vulncheck` |
+| `goreleaser` | v2.15.4 | `make snapshot` / `make release-dry-run` |
+
+Bumping: `cd tools && go get -tool <pkg>@<version>` → `make tools-tidy` → `make ci`.
+
+Jeśli wolisz mieć narzędzia na PATH (np. dla edytora), uruchom `make tools-install` — instaluje binaria do `$(go env GOBIN)`.
 
 ### 1.2 Pierwsze uruchomienie
 
