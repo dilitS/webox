@@ -91,6 +91,7 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   tab style, 2-space YAML/MD).
 - `.gitignore` — broadened to cover Go build artifacts, runtime state
   (`webox.log`, `pending_cleanups.json`, `secrets.enc`), and editor noise.
+- `go.mod` (`module github.com/webox/webox`, `go 1.24`) and the canonical package layout per docs/DESIGN.md §2.1: `cmd/webox`, `tui`/`tui/views`, `providers`/`smallhost`/`mock`, `ssh`, `services`, `config`, `secrets`, `status`, `wizard`, `env` (STRETCH stub), `i18n`, `assets`, `testing`, `internal/log`, `internal/version` — each with a godoc-style `doc.go` (TASK-00.1 + TASK-00.6).
 
 ### Changed
 - `docs/ROADMAP.md` — replaced single-line estimate with P50/P70/P90 table
