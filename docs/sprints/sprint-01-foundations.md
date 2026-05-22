@@ -152,18 +152,18 @@ Po sprincie 01:
 - **Estymata:** M
 - **Zależności:** TASK-01.1
 - **Acceptance Criteria:**
-  - [ ] `config/migrate.go` z `type Migration func(in []byte) (out []byte, newVersion int, err error)`.
-  - [ ] Registry: `var migrations = map[int]Migration{0: migrateV0toV1}`.
-  - [ ] `func Migrate(data []byte) (newest []byte, err error)` iteruje przez wersje.
-  - [ ] Każda migracja:
+  - [x] `config/migrate.go` z `type Migration func(in []byte) (out []byte, newVersion int, err error)`.
+  - [x] Registry: `var migrations = map[int]Migration{0: migrateV0toV1}`.
+  - [x] `func Migrate(data []byte) (newest []byte, err error)` iteruje przez wersje.
+  - [x] Każda migracja:
     - Backup oryginału w `<path>.bak.v<old>.<timestamp>` (przy `Load`).
     - Idempotentna (uruchom dwa razy = ten sam wynik).
-  - [ ] Test: golden file `testdata/config/v0.json` po migracji = `testdata/config/v0_migrated_to_v1.json`.
-  - [ ] Logging przez `slog` z `migrationFrom=0 migrationTo=1`.
+  - [x] Test: golden file `testdata/config/v0.json` po migracji = `testdata/config/v0_migrated_to_v1.json`.
+  - [x] Logging przez `slog` z `migrationFrom=0 migrationTo=1`.
 - **Pliki:**
-  - `config/migrate.go` (new)
+  - `config/migrate.go` (edit — replaces TASK-01.2 stub)
   - `config/migrate_v0_to_v1.go` (new)
-  - `config/migrate_test.go` (new)
+  - `config/migrate_internal_test.go` (edit)
   - `testdata/config/v0.json`, `v0_migrated_to_v1.json` (new)
 - **Docs:** [`DESIGN.md §14`](../DESIGN.md), [`TESTING.md`](../TESTING.md)
 - **Notatki:** **v0 → v1 to placeholder** (skoro v1 jest pierwszą wersją MVP). Sens: pokazujemy że framework działa, więc kiedy będzie v1 → v2, mamy infrastrukturę.

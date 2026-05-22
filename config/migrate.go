@@ -1,24 +1,89 @@
 package config
 
-import "fmt"
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log/slog"
+)
 
-// migrate forwards an in-memory Config from `cfg.SchemaVersion` to
-// [Current]. The full migration framework (registration, ordered chain,
-// idempotency, rollback backups per DESIGN §6.4) lands with TASK-01.4.
-//
-// Until then this stub satisfies the [Load] contract: it returns the
-// config unchanged when no migration is required, and a structured
-// error otherwise so [Load] can wrap it as [ErrMigrationFailed]. The
-// JSON schema's `schema_version >= 1` minimum keeps this branch
-// effectively unreachable from real files in v0.1, but the path exists
-// so future migrators have a single seam to plug into.
-func migrate(cfg *Config) (*Config, error) {
-	if cfg == nil {
-		return nil, errNilConfig
+// Migration transforms raw config JSON at one schema version into raw
+// config JSON at the next schema version. It returns the new version so
+// the registry can verify forward progress and avoid migration loops.
+type Migration func(in []byte) (out []byte, newVersion int, err error)
+
+var migrations = map[int]Migration{
+	0: migrateV0toV1,
+}
+
+// Migrate forwards data to [Current]. If data is already at [Current],
+// Migrate validates it and returns it unchanged, making the operation
+// idempotent for callers that cannot easily know whether a file is stale.
+func Migrate(data []byte) ([]byte, error) {
+	version, err := schemaVersionOf(data)
+	if err != nil {
+		return nil, err
 	}
-	if cfg.SchemaVersion == Current {
-		return cfg, nil
+	if version > Current {
+		return nil, fmt.Errorf("%w: file is v%d, this binary supports v%d (downgrade unsupported)",
+			ErrSchemaMismatch, version, Current)
 	}
-	return nil, fmt.Errorf("%w: v%d → v%d (TASK-01.4)",
-		errNoMigrator, cfg.SchemaVersion, Current)
+	if version == Current {
+		if err := Validate(data); err != nil {
+			return nil, err
+		}
+		return data, nil
+	}
+
+	current := data
+	for version < Current {
+		migration, ok := migrations[version]
+		if !ok {
+			return nil, fmt.Errorf("%w: %w: v%d → v%d",
+				ErrMigrationFailed, errNoMigrator, version, Current)
+		}
+
+		next, newVersion, err := migration(current)
+		if err != nil {
+			return nil, fmt.Errorf("%w: v%d → v%d: %w",
+				ErrMigrationFailed, version, newVersion, err)
+		}
+		if newVersion <= version {
+			return nil, fmt.Errorf("%w: migration v%d returned non-forward version %d",
+				ErrMigrationFailed, version, newVersion)
+		}
+		slog.Info(
+			"config schema migrated",
+			"migrationFrom", version,
+			"migrationTo", newVersion,
+		)
+
+		current = next
+		version = newVersion
+	}
+
+	if err := Validate(current); err != nil {
+		return nil, fmt.Errorf("%w: migrated config invalid: %w", ErrMigrationFailed, err)
+	}
+	return current, nil
+}
+
+func schemaVersionOf(data []byte) (int, error) {
+	var header struct {
+		SchemaVersion *int `json:"schema_version"`
+	}
+	if err := json.Unmarshal(data, &header); err != nil {
+		return 0, fmt.Errorf("%w: %w", ErrInvalidJSON, err)
+	}
+	if header.SchemaVersion == nil {
+		return 0, nil
+	}
+	return *header.SchemaVersion, nil
+}
+
+func wrapMigrationLoadError(err error) error {
+	if errors.Is(err, ErrInvalidJSON) {
+		return fmt.Errorf("%w: %w", ErrCorruptedConfig, err)
+	}
+	return fmt.Errorf("%w: %w", ErrMigrationFailed, err)
 }

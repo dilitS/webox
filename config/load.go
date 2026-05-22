@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
+	"time"
 )
 
 // Load reads path, validates it against the embedded JSON Schema, and
@@ -41,6 +43,33 @@ func Load(ctx context.Context, path string) (*Config, error) {
 		return nil, fmt.Errorf("%w: read %s: %w", ErrCorruptedConfig, path, err)
 	}
 
+	version, err := schemaVersionOf(raw)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrCorruptedConfig, err)
+	}
+	if version > Current {
+		return nil, fmt.Errorf("%w: file is v%d, this binary supports v%d (downgrade unsupported)",
+			ErrSchemaMismatch, version, Current)
+	}
+	if version < Current {
+		migratedRaw, err := Migrate(raw)
+		if err != nil {
+			return nil, wrapMigrationLoadError(err)
+		}
+		if err := backupOriginal(path, version, raw); err != nil {
+			return nil, fmt.Errorf("%w: backup original: %w", ErrMigrationFailed, err)
+		}
+
+		var migrated Config
+		if err := json.Unmarshal(migratedRaw, &migrated); err != nil {
+			return nil, fmt.Errorf("%w: decode migrated struct: %w", ErrMigrationFailed, err)
+		}
+		if err := Save(ctx, path, &migrated); err != nil {
+			return nil, fmt.Errorf("%w: save migrated config: %w", ErrMigrationFailed, err)
+		}
+		return &migrated, nil
+	}
+
 	if vErr := Validate(raw); vErr != nil {
 		if errors.Is(vErr, ErrSchemaViolation) ||
 			errors.Is(vErr, ErrSecretInConfig) ||
@@ -53,18 +82,6 @@ func Load(ctx context.Context, path string) (*Config, error) {
 	var cfg Config
 	if err := json.Unmarshal(raw, &cfg); err != nil {
 		return nil, fmt.Errorf("%w: decode struct: %w", ErrCorruptedConfig, err)
-	}
-
-	switch {
-	case cfg.SchemaVersion > Current:
-		return nil, fmt.Errorf("%w: file is v%d, this binary supports v%d (downgrade unsupported)",
-			ErrSchemaMismatch, cfg.SchemaVersion, Current)
-	case cfg.SchemaVersion < Current:
-		migrated, mErr := migrate(&cfg)
-		if mErr != nil {
-			return nil, fmt.Errorf("%w: %w", ErrMigrationFailed, mErr)
-		}
-		cfg = *migrated
 	}
 
 	return &cfg, nil
@@ -80,4 +97,27 @@ func DefaultConfig() *Config {
 		Profiles:      []Profile{},
 		Projects:      []Project{},
 	}
+}
+
+func backupOriginal(path string, oldVersion int, raw []byte) error {
+	name := fmt.Sprintf(
+		"%s.bak.v%d.%s",
+		filepath.Base(path),
+		oldVersion,
+		time.Now().UTC().Format("20060102T150405.000000000Z"),
+	)
+	backupPath := filepath.Join(filepath.Dir(path), name)
+	file, err := os.OpenFile(backupPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, ownerOnlyPerm) //nolint:gosec // G304: backup path is deterministic sibling of audited config path.
+	if err != nil {
+		return fmt.Errorf("open backup %s: %w", backupPath, err)
+	}
+	defer func() { _ = file.Close() }()
+
+	if _, err := file.Write(raw); err != nil {
+		return fmt.Errorf("write backup %s: %w", backupPath, err)
+	}
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("fsync backup %s: %w", backupPath, err)
+	}
+	return nil
 }

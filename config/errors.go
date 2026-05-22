@@ -47,11 +47,6 @@ var ErrMigrationFailed = errors.New("config: schema migration failed")
 // message so the operator knows to close the other instance or wait.
 var ErrConfigLocked = errors.New("config: webox is already running; close the other instance or wait")
 
-// errNilConfig is returned by the migrate stub when it is called with a
-// nil receiver. It is wrapped by [ErrMigrationFailed] in [Load], but
-// kept private so callers don't grow a habit of switching on it.
-var errNilConfig = errors.New("nil config")
-
 // errNoMigrator is returned by the migrate stub when a forward
 // migration is required but no migrator is registered for the source
 // version. Wrapped by [ErrMigrationFailed]; the migration framework
