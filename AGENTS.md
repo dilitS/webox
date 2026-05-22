@@ -133,7 +133,7 @@ testing/           fixtures, sshmock, ghmock cassettes
 |---|---|
 | **MVP = small.pl/Devil only** | Wszelkie referencje do `cpanel`/`directadmin`/`cyberpanel` w kodzie poza `provider.go` interface = automatic reject. |
 | **Sound engine, Bento Ultra, Topology Map, Env Merger, Live log stream — STRETCH v0.2+** | Każda implementacja tych ficzerów w MVP PR-ze = automatic reject. Wyjątek: explicit ADR + maintainer sign-off. |
-| **Brak CLI flags poza `webox doctor`** | Operacje przez TUI. Wyjątki w [ADR-0001](./docs/adr/0001-tui-zamiast-cli.md). |
+| **Brak operatorskich CLI commands poza `webox doctor`** | Operacje typu create/restart/import/provider CRUD idą przez TUI. Dozwolone są ograniczone startup/debug/diagnostic flags opisane w [ADR-0001](./docs/adr/0001-tui-zamiast-cli.md). |
 | **DAG-based rollback engine = v0.3+** | MVP używa LIFO stack. Patrz [DESIGN §10](./docs/DESIGN.md#10-dag-based-transactional-engine-wznawialny-rollback). |
 
 ---
@@ -152,7 +152,7 @@ testing/           fixtures, sshmock, ghmock cassettes
 - LIFO rollback przy częściowym fail wizard'a.
 - Keyring secrets + AES-GCM fallback z Argon2id.
 - `webox doctor` + `webox doctor --json`.
-- `webox doctor --update-host-key` (TUI flow + opcjonalna CLI w v0.2+).
+- Host-key mismatch resolution przez TUI phrase-confirm flow w `v0.1`; opcjonalna CLI (`webox doctor security --update-host-key`) dopiero `v0.2+`.
 
 ### 3.2 NIE w MVP (STRETCH v0.2+)
 
@@ -169,7 +169,7 @@ testing/           fixtures, sshmock, ghmock cassettes
 - Drugi provider (cPanel, DirectAdmin, CyberPanel) — research only.
 - Jump host / SSH bastion / ProxyJump.
 - In-app updater.
-- Non-interactive CLI flags poza `webox doctor`.
+- Non-interactive operatorskie CLI commands poza `webox doctor`.
 
 ### 3.3 Czego NIGDY nie będziemy robić
 
@@ -462,7 +462,7 @@ Refs: AUDIT A1
 - [ ] CHANGELOG.md [Unreleased] entry added
 - [ ] Docs updated (if behavior change)
 - [ ] No secrets in any committed file
-- [ ] Linked AUDIT/IMPROVEMENT_PLAN finding (if applicable)
+- [ ] Linked AUDIT finding (if applicable)
 ```
 
 ---
@@ -579,7 +579,7 @@ host SSH, więc niższe granularne ustawienie nie ma sensu.
 
 ### 9.2 Po każdym sprint'cie / fazie (eskalacja)
 
-- Update `docs/AUDIT.md` lub `docs/IMPROVEMENT_PLAN.md` jeśli pojawiły się nowe znaleziska.
+- Update `docs/AUDIT.md` jeśli pojawiły się nowe znaleziska.
 - Rewizja `AGENTS.md` jeśli pojawiła się nowa pułapka (`§7`).
 - Aktualizacja `.cursor/skills/*` jeśli skill okazał się za wąski/za szeroki.
 - Audit `make ci` overhead — czy CI nie rośnie ponad SLA.
@@ -596,7 +596,6 @@ host SSH, więc niższe granularne ustawienie nie ma sensu.
 - [ROADMAP.md](./docs/ROADMAP.md) — co kiedy, kryteria GA.
 - [CONTRIBUTING.md](./docs/CONTRIBUTING.md) — workflow contributora.
 - [AUDIT.md](./docs/AUDIT.md) — 39 znalezisk przed-implementacyjnych.
-- [IMPROVEMENT_PLAN.md](./docs/IMPROVEMENT_PLAN.md) — 19 dodatkowych znalezisk.
 - [adr/](./docs/adr/) — sześć ADR-ów z architecture rationale.
 - [providers/smallhost.md](./docs/providers/smallhost.md) — wzorzec dla providerów.
 - [CHANGELOG.md](./CHANGELOG.md) — historia zmian.

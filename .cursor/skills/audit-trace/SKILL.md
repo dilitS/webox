@@ -1,6 +1,6 @@
 ---
 name: audit-trace
-description: Trace any code change back to the authoritative docs (PRD, DESIGN, UX, SECURITY, ROADMAP, ADR, AUDIT, IMPROVEMENT_PLAN) and flag drift before commit. Use when reviewing diffs, before merging large PRs, or when uncertain whether a change is in MVP scope.
+description: Trace any code change back to the authoritative docs (PRD, DESIGN, UX, SECURITY, ROADMAP, ADR, AUDIT) and flag drift before commit. Use when reviewing diffs, before merging large PRs, or when uncertain whether a change is in MVP scope.
 ---
 
 # Audit Trace — Webox
@@ -40,7 +40,7 @@ Any row with "scope violation" must be either:
 - [ ] 3. Check the doc's scope marker (🔵 MVP, 🔶 STRETCH, etc.).
 - [ ] 4. Verify scope matches the current milestone (v0.1 → only 🔵).
 - [ ] 5. If a referenced anchor doesn't exist, fix it now.
-- [ ] 6. Check AUDIT.md / IMPROVEMENT_PLAN.md for relevant findings.
+- [ ] 6. Check AUDIT.md (including §8 folded IMP-* findings) for relevant findings.
 - [ ] 7. Confirm CHANGELOG entry references the AUDIT/IMP item.
 ```
 
@@ -49,7 +49,7 @@ Any row with "scope violation" must be either:
 | Violation | What was added | Why it's wrong | Fix |
 |---|---|---|---|
 | Live log stream | `tui/views/logs_live.go` | Marked `STRETCH v0.2+` in `UX §4.3 Tab [4]` | Remove from MVP PR; add to v0.2 milestone. |
-| DAG transactional engine | `wizard/dag.go` with topological sort | Marked `STRETCH v0.3+` per IMP-1 | MVP uses LIFO stack only. |
+| DAG transactional engine | `wizard/dag.go` with topological sort | Marked `STRETCH v0.3+` per AUDIT §8 IMP-1 | MVP uses LIFO stack only. |
 | Sound engine | `sound/player.go` | Marked `STRETCH (osobny RFC)` in `UX §12` + AUDIT C1 | Defer to separate RFC. |
 | Env merger | `env/merger.go` | Marked `STRETCH v0.2+` in `UX §9.3` + `DESIGN §11.1` | Out of MVP. |
 | Fast-chord bindings | `tui/keys/chord.go` | Marked `STRETCH v0.2+` in `UX §6.1` | Single keys only in MVP. |
@@ -95,12 +95,12 @@ If anchor doesn't exist, **fix the doc first** (add the section) before the code
 
 ## AUDIT-derived finding tracking
 
-When a commit addresses an AUDIT or IMPROVEMENT_PLAN finding:
+When a commit addresses an AUDIT finding:
 
 ```
 fix(security): correct AES-GCM nonce generation to use crypto/rand
 
-Per IMPROVEMENT_PLAN §IMP-2. Adds explicit panic-on-CSPRNG-failure and
+Per AUDIT §8 IMP-2. Adds explicit panic-on-CSPRNG-failure and
 deduplication test ensuring two consecutive writes produce different
 nonces.
 
@@ -120,4 +120,4 @@ In CHANGELOG:
 - [ ] No scope violations remain.
 - [ ] All referenced doc anchors exist.
 - [ ] CHANGELOG references relevant AUDIT/IMP findings.
-- [ ] Commit message links to docs/AUDIT.md or docs/IMPROVEMENT_PLAN.md entry by ID.
+- [ ] Commit message links to docs/AUDIT.md entry by ID.

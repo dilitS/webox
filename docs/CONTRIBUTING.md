@@ -79,7 +79,7 @@ Testy z `// +build integration` uruchamiają się **tylko** z tymi zmiennymi.
 
 Włączone (nazwy v2):
 
-`gofmt`, `goimports`, `govet`, `staticcheck`, `errcheck`, `gocritic`, `revive`, `gocyclo` (**max 20**, motywacja patrz [IMPROVEMENT_PLAN §IMP-19](./IMPROVEMENT_PLAN.md#imp-19-contributingmd-21--gocyclo-max-15-dla-metod-providera)), `gosec`, `misspell`, `unconvert`, `prealloc`, `whitespace`, `unused`, `err113` (post-v1 nazwa `goerr113`), `mnd` (post-v1 nazwa `gomnd`), `loggercheck` (post-v1 nazwa `logrlint`).
+`gofmt`, `goimports`, `govet`, `staticcheck`, `errcheck`, `gocritic`, `revive`, `gocyclo` (**max 20**, motywacja patrz [AUDIT §8 IMP-19](./AUDIT.md#8-uzupe%C5%82niaj%C4%85ce-znaleziska-po-drugim-przebiegu)), `gosec`, `misspell`, `unconvert`, `prealloc`, `whitespace`, `unused`, `err113` (post-v1 nazwa `goerr113`), `mnd` (post-v1 nazwa `gomnd`), `loggercheck` (post-v1 nazwa `logrlint`).
 
 Mapowanie nazw v1 → v2 (do uwzględnienia przy migracji starych config'ów):
 

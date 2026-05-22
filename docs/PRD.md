@@ -147,15 +147,15 @@ Priorytety: **P0** = MVP (v0.1, wyłącznie small.pl), **P1** = post-MVP (v0.2),
 | ID | Feature | Priorytet | Provider-agnostic? | Opis |
 |----|---------|-----------|-------------------|------|
 | F1 | Init wizard | P0 | Tak | Pierwsze uruchomienie: konfiguracja profilu hostingowego (typ + host + user + key), SSH key gen, GitHub Token. |
-| F2 | Provider management — CRUD profili | P0 | Tak | `/provider` + komenda CLI `webox provider add/list/remove`. **W MVP tylko `type=smallhost`**, inne typy schowane za feature-flagą `experimental`. |
+| F2 | Provider management — CRUD profili | P0 | Tak | `/provider` w TUI. **W MVP tylko `type=smallhost`**, inne typy schowane za feature-flagą `experimental`. Brak operatorskich CLI commands typu `webox provider add` w `v0.1`. |
 | F3 | Wizard nowego projektu (5 kroków, krok DB skippable) | P0 | Tak | provider → stack → DB (smart skip dla statycznych) → domena → deploy. |
 | F4 | Dashboard (lista + szczegóły, status HTTP + SSL + Node) | P0 | Tak | Lewy panel lista, prawy panel szczegóły. Dane przez Provider + HTTP ping. |
-| F5 | Status check (HTTP ping + cert info + Node version) | P0 | Tak | Per projekt, cache patrz [DESIGN.md §8](./DESIGN.md#8-status-cache). |
+| F5 | Status check (HTTP ping + cert info + Node version) | P0 | Tak | Per projekt, cache patrz [DESIGN.md §8](./DESIGN.md#8-tr%C3%B3jpoziomowy-status-cache-stale-while-revalidate). |
 | F6 | Restart aplikacji | P0 | Tak (przez `properties.restart_method`) | Provider decyduje *jak* (Devil / Passenger / systemd). |
 | F7 | SSL management — Let's Encrypt issue + renew | P0 | Tak | Provider definiuje komendy konkretne dla panelu. |
 | F8 | Podgląd logów (tail, niekoniecznie live stream) | P0 | Tak | Tail ostatnich N linii z `GetLogPath(domain)`. |
 | F9 | Import istniejących projektów | **P0** | Tak | Patrz [§7](#7-import-istniej%C4%85cych-projekt%C3%B3w). |
-| F10 | Rollback transakcyjny kreatora | P0 | Tak | Stos LIFO + `pending_cleanups.json`. Patrz [DESIGN.md §10](./DESIGN.md#10-rollback-transakcyjny). |
+| F10 | Rollback transakcyjny kreatora | P0 | Tak | Stos LIFO + `pending_cleanups.json`. Patrz [DESIGN.md §10](./DESIGN.md#10-dag-based-transactional-engine-wznawialny-rollback). |
 | F11 | Bezpieczne sekrety (keyring) | P0 | Tak | `go-keyring` + fallback (patrz [SECURITY.md §4](./SECURITY.md#4-przechowywanie-sekret%C3%B3w)). |
 | F12 | Command Palette `/` — fuzzy search | P0 (minimalny: `/create`, `/provider`, `/import`, `/settings`) | Tak | Pełne palette → P1. |
 | F13 | Live dashboard auto-refresh co N sekund | P1 | Tak | Konfigurowalny interwał, default 10 s. |
@@ -168,7 +168,7 @@ Priorytety: **P0** = MVP (v0.1, wyłącznie small.pl), **P1** = post-MVP (v0.2),
 | F20 | Export/Import konfiguracji (bez sekretów) | P2 | Tak | Backup + restore. |
 | F21 | Stack scaffolding (Vite/Next/Nuxt/Node) | P0 (Vite+React, Node.js backend, Static site) / P1 (Next.js, Nuxt, reszta) | Częściowo | Wybór szablonu w kreatorze. |
 | F22 | Non-interactive CLI flags (skryptowanie) | P2 | Tak | `webox restart <project> --json`, patrz [§12.3](#12-decyzje-otwarte). |
-| F23 | Manual changes detection ("stale projects") | P0 | Tak | Patrz [DESIGN.md §11](./DESIGN.md#11-konflikty-z-r%C4%99cznymi-zmianami-w-panelu). |
+| F23 | Manual changes detection ("stale projects") | P0 | Tak | Patrz [DESIGN.md §11](./DESIGN.md#11-detekcja-rozbie%C5%BCno%C5%9Bci-konfiguracji-drift--stale-detection). |
 | F24 | Auto-update binarki | P2 (in-app) / P0 (zewnętrznie przez `brew`/`go install`) | n/a | Patrz [DESIGN.md §14](./DESIGN.md#14-auto-update). |
 
 ## 7. Import istniejących projektów
@@ -186,7 +186,7 @@ Priorytety: **P0** = MVP (v0.1, wyłącznie small.pl), **P1** = post-MVP (v0.2),
 
 ### 7.3 Flow (skrócony, pełny w [UX.md §11.4](./UX.md#114-flow-d-import-istniej%C4%85cego-projektu))
 
-1. `webox` → `/` → `/import` (lub bezpośrednio `webox import`).
+1. `webox` → `/` → `/import`.
 2. Krok 1 — webox lista subdomen z serwera (przez provider) + opcja „wpisz ręcznie".
 3. Krok 2 — webox SSH-detect: czy `public_nodejs/` istnieje, jaka wersja Node, czy jest `.env`, czy katalog ma `.git/`.
 4. Krok 3 — user opcjonalnie wskazuje GitHub repo (URL slugu `org/name`) i lokalną ścieżkę.
@@ -208,10 +208,10 @@ Każde kryterium musi mieć metodę pomiaru. Brak pomiaru = kryterium niezdatne 
 | K3 | Czas codziennej operacji „restart" | Klawisz `r` → spinner → ✅. Mierzony lokalnie. | Mediana < 8 s, p95 < 20 s (na łączu 50 Mbit, hosting odpowiada do 2 s). |
 | K4 | Liczba kontekstów odwiedzanych do utrzymania projektu | Ankieta jakościowa po N=20 projektów: „Ile razy w ostatnim tygodniu otworzyłeś panel WWW small.pl?" / „Ile razy zalogowałeś się ręcznie do SSH?". | Spadek o ≥70% vs baseline pre-webox (deklaracja użytkownika). |
 | K5 | Płynność interfejsu na 20 projektach i 1 profilu | Benchmark integracyjny w CI: 20 mock projektów × pełny render dashboard. | Czas renderu pierwszej klatki < 200 ms, refresh tickiem < 100 ms. |
-| K6 | Dodanie nowego providera w społeczności | Realny PR z adapterem zewnętrznego panelu, w ramach `CONTRIBUTING.md`. | 1 community-provided provider w ciągu 6 miesięcy od v0.1. |
+| K6 | Dodanie nowego providera w społeczności | Realny PR z adapterem zewnętrznego panelu, w ramach `CONTRIBUTING.md`. | 1 community-provided provider w ciągu 12 miesięcy od `v0.1` **albo** 6 miesięcy od publikacji EN contributor surface (README + CONTRIBUTING + Provider Pattern + provider template), zależnie co nastąpi później. Niespełnienie K6 nie blokuje `v1.0`, ale przesuwa GA review o kolejne 6 miesięcy. |
 | K7 | Crash-free sesje | Lokalny `webox.log` (opt-in) loguje crash'e. Po release `v0.1` próbka 50 sesji → ≤2 crashe niepowtórzone. | ≥96 % crash-free w sample release-candidate. |
 
-> **Telemetria jest opt-in i lokalna** — webox nie wysyła nic na żaden serwer. Szczegóły w [DESIGN.md §15](./DESIGN.md#15-telemetria-i-logi-diagnostyczne) i [SECURITY.md §7](./SECURITY.md#7-audyt-sekret%C3%B3w-i-tryb-doctor).
+> **Telemetria jest opt-in i lokalna** — webox nie wysyła nic na żaden serwer. Szczegóły w [DESIGN.md §15](./DESIGN.md#15-diagnostyka-doctor--redacted-logger) i [SECURITY.md §7](./SECURITY.md#7-audyt-sekret%C3%B3w-i-tryb-doctor).
 
 ## 9. Non-goals
 
@@ -248,8 +248,9 @@ Aby uniknąć scope creep, webox **nie jest i nie będzie**:
 ### 10.3 Terminal
 
 - **Zalecane:** 100 × 30 znaków, true-color, czcionka z ligaturami i emoji wsparcia (np. JetBrains Mono Nerd Font).
-- **Minimalne:** 88 × 28 znaków z fallbackami (single-pane, brak help bar).
-- **Poniżej 88 × 28:** webox pokazuje pełnoekranowy komunikat „Terminal too small. Recommended ≥ 100×30."
+- **Minimalne komfortowe:** 88 × 28 znaków z klasycznym split-pane.
+- **Awaryjne:** 70 × 22 znaków w trybie single-pane focus (bez pełnego help bara).
+- **Poniżej 70 × 22:** webox pokazuje pełnoekranowy komunikat „Terminal too small. Recommended ≥ 100×30."
 
 Pełna analiza w [UX.md §5](./UX.md#5-wymagania-terminala).
 
@@ -257,7 +258,7 @@ Pełna analiza w [UX.md §5](./UX.md#5-wymagania-terminala).
 
 - Wymagane wyjście SSH na port serwera (zwykle 22, ale konfigurowalne).
 - Wymagane wyjście HTTPS na GitHub API (443).
-- W przypadku firewallu klienta blokującego SSH wychodzące — webox nie zadziała.
+- W przypadku firewallu klienta blokującego bezpośrednie SSH wychodzące — webox `v0.1` nie zadziała. `ProxyJump` / bastion / `ProxyCommand` są świadomie odroczone do `v0.2+`, bo wymagają dodatkowego modelu zaufania i testów host-key dla dwóch hopów.
 
 ## 11. Założenia i ryzyka produktowe
 

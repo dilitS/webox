@@ -8,7 +8,7 @@
 
 ## TL;DR
 
-Webox to lekki monolit w Go zorganizowany według paradygmatu **MVU (Model-View-Update)** z [Bubble Tea](https://github.com/charmbracelet/bubbletea). Architektura **MVP (v0.1)** opiera się na czterech filarach: (1) **Provider Pattern** z jednym adapterem `smallhost` i pełnym interfejsem `HostingProvider` dla przyszłych providerów, (2) **DAG-based Transactional Engine** dla rollback-safe wizardu, (3) **SSH Connection Pool** z `keepalive` dla responsywnego dashboardu, (4) **Stale-While-Revalidate Status Cache** dla płynności UI. **Sekrety wyłącznie w keyringu** (fallback AES-GCM z Argon2id) zgodnie z [ADR-0004](./adr/0004-przechowywanie-sekretow-keyring.md). Sekcje oznaczone `🔶 STRETCH (v0.2+)` opisują rozszerzenia poza MVP — implementowane dopiero po dostarczeniu `v0.1`, z mocą [ROADMAP §3.3](./ROADMAP.md#33-czego-nie-ma-w-mvp).
+Webox to lekki monolit w Go zorganizowany według paradygmatu **MVU (Model-View-Update)** z [Bubble Tea](https://github.com/charmbracelet/bubbletea). Architektura **MVP (v0.1)** opiera się na czterech filarach: (1) **Provider Pattern** z jednym adapterem `smallhost` i pełnym interfejsem `HostingProvider` dla przyszłych providerów, (2) **prosty LIFO rollback stack** z `pending_cleanups.json` dla rollback-safe wizardu, (3) **SSH Connection Pool** z `keepalive` dla responsywnego dashboardu, (4) **Stale-While-Revalidate Status Cache** dla płynności UI. **Sekrety wyłącznie w keyringu** (fallback AES-GCM z Argon2id) zgodnie z [ADR-0004](./adr/0004-przechowywanie-sekretow-keyring.md). Sekcje oznaczone `🔶 STRETCH (v0.2+)` opisują rozszerzenia poza MVP — implementowane dopiero po dostarczeniu `v0.1`, z mocą [ROADMAP §3.3](./ROADMAP.md#33-czego-nie-ma-w-mvp).
 
 > **Konwencja scope:** sekcje oznaczone `🔵 MVP (v0.1)` są w zakresie pierwszego release'u. Sekcje `🔶 STRETCH (v0.2+)` są **architekturalnie zaprojektowane**, ale **nie implementowane** w MVP. Lista co i kiedy w [ROADMAP.md](./ROADMAP.md).
 
@@ -66,7 +66,7 @@ webox/
 ├── config/                 # load/save config.json + migracje (§6)
 ├── secrets/                # keyring + AES-GCM fallback (§7 + SECURITY §4)
 ├── status/                 # SWR cache (§8 + ADR-0005)
-├── wizard/                 # DAG-based transactional engine (§10)
+├── wizard/                 # LIFO rollback stack (§10); DAG target architecture v0.3+
 ├── services/               # GitHub API client, HTTP probes (§13)
 ├── i18n/                   # translation loader (UX §10)
 ├── assets/                 # embedded workflow_deploy.tmpl.yml (§13.5)
@@ -180,6 +180,7 @@ Pełna lista metod ze szczegółami semantyki, możliwych błędów i mapowaniem
 - każdy provider dokumentuje swój zestaw kluczy w sekcji `Properties bag` swojego pliku w `docs/providers/`,
 - nieznany klucz = ignorowany (forward compatibility), brak wymaganego klucza = `ErrInvalidProviderConfig`,
 - `restart_method` jest **wymagany** dla wszystkich providerów — wartości enum per provider (`smallhost`: `"devil"`, `cpanel`: `"passenger"` / `"app_manager"`, ...).
+- `ssh_proxy` / `proxy_jump` są **zarezerwowane dla v0.2+**. W `v0.1` Webox łączy się bezpośrednio z hostem docelowym; brak bastionów i `ProxyJump`.
 
 ### 3.4 Defensywne parsowanie outputu
 
@@ -235,6 +236,8 @@ Aby zapobiec banom za nadużycie połączeń (IP Rate Limiting) oraz skrócić c
 ### 5.1 Algorithmy negocjacji
 
 Webox eksplicitnie deklaruje listę dozwolonych algorytmów w `ssh.ClientConfig` — zgodnie z [SECURITY §5.5](./SECURITY.md#55-algorytmy). Lista jest **konserwatywna**, ale konfigurowalna przez `properties.ssh_algorithms_legacy_compat` na poziomie providera (default `false`) dla edge case'ów ze starymi serwerami negocjującymi tylko `ssh-rsa` (SHA-1).
+
+> 🔶 **STRETCH (v0.2+) — ProxyJump / bastion.** W `v0.1` Webox wymaga bezpośredniego połączenia SSH do hosta providera. Wsparcie `ProxyJump`, bastionów i `ProxyCommand` wymaga osobnego modelu zaufania dla dodatkowego host key, konfiguracji per-profile i testów integracyjnych z dwoma serwerami SSH. Placeholder w `ProviderConfig.Properties` jest zarezerwowany, ale nie implementowany w MVP.
 
 ### 5.2 Host key verification
 
@@ -341,7 +344,7 @@ Krytyczna zasada: **Zero sekretów w pliku konfiguracyjnym**.
 
 ## 8. Trójpoziomowy Status Cache (Stale-While-Revalidate)
 
-W celu zachowania płynności UI (kluczowe kryterium wydajności `K5`), interfejs TUI pobiera dane z asynchronicznej pamięci podręcznej. Zgodnie z [ADR-0005](./adr/0005-cache-statusow-projektow.md) cache implementujemy jako **wzorzec funkcyjny** — pakietową funkcję `GetOrFetch`, **nie** generyczną metodę na strukturze (Go nie wspiera generyków na metodach, a opracowanie typowane przez `any` było źródłem błędów w prototypie — patrz [CHANGES.md §1 6.1](../CHANGES.md#1-poprawki-merytoryczne-z-tabeli-%C2%A76-briefu)).
+W celu zachowania płynności UI (kluczowe kryterium wydajności `K5`), interfejs TUI pobiera dane z asynchronicznej pamięci podręcznej. Zgodnie z [ADR-0005](./adr/0005-cache-statusow-projektow.md) cache implementujemy jako **wzorzec funkcyjny** — pakietową funkcję `GetOrFetch`, **nie** generyczną metodę na strukturze (Go nie wspiera generyków na metodach, a opracowanie typowane przez `any` było źródłem błędów w prototypie — patrz [CHANGES.md §1 6.1](../CHANGES.md#1-poprawki-merytoryczne-z-tabeli-6-briefu)).
 
 ### 8.1 Kontrakt funkcji
 
@@ -403,8 +406,8 @@ Wcześniejszy prototyp w `archive/PRD_v0_monolith.md` próbował zdefiniować `f
 
 W przypadku zerwania połączenia SSH w trakcie wykonywania procedur operatorskich:
 1. **Zatrzymanie stanu TUI:** TUI przechodzi w stan przejściowy, zamrażając interakcję użytkownika i wyświetlając w help barze alert: `Connection lost. Attempting reconnect (1/3)...`.
-2. **Exponential Backoff:** System podejmuje maksymalnie 3 próby nawiązania sesji SSH z interwałem kolejno `3s`, `6s` oraz `12s`.
-3. **Execution Recovery:** Jeśli połączenie zostanie odzyskane, ostatnia niedokończona komenda z bufora jest bezpiecznie ponawiana. W przypadku trwałego błędu połączenia, system zapisuje stan do pliku `pending_cleanups.json` i przechodzi do diagnozy.
+2. **Exponential Backoff:** System podejmuje maksymalnie 3 próby nawiązania sesji SSH z interwałem kolejno `3s`, `6s` oraz `12s` z jitterem 50-100%. Każdy dial ma własny timeout 15 s; worst-case reconnect trwa ~63 s.
+3. **Execution Recovery:** Webox **nie zakłada**, że ostatnia komenda jest bezpieczna do ślepego ponowienia. Po reconnect najpierw sprawdza stan serwera, jeśli provider ma idempotentny probe (np. `ListSubdomains` dla `CreateSubdomain`, `devil mysql list` dla `CreateDatabase`). Jeśli probe potwierdzi, że operacja już się wykonała, wizard kontynuuje. Jeśli probe potwierdzi brak zasobu, operacja może zostać ponowiona. Jeśli stan jest nieustalalny, wizard zapisuje `pending_cleanups.json` i przechodzi do kontrolowanego rollbacku / naprawy zamiast ryzykować duplikat.
 
 ---
 
@@ -412,7 +415,7 @@ W przypadku zerwania połączenia SSH w trakcie wykonywania procedur operatorski
 
 > 🔵 **MVP (v0.1)** — implementujemy **prosty stos LIFO** z `pending_cleanups.json`, zgodnie z [PRD §6 F10](./PRD.md#6-ficzery--z-priorytetami) i [ROADMAP §3.2](./ROADMAP.md#32-zakres-v01-mvp).
 >
-> 🔶 **STRETCH (v0.3+)** — pełny DAG z selektywnym rollbackiem, topologicznym sortowaniem i resume. Sekcje §10.1–§10.2 poniżej to **target architecture**, **nie** zakres MVP. Implementacja DAG po stabilizacji LIFO w v0.1. Patrz [IMPROVEMENT_PLAN §IMP-1](./IMPROVEMENT_PLAN.md#imp-1-designmd-10--dag-based-transactional-engine-vs-lifo-stack).
+> 🔶 **STRETCH (v0.3+)** — pełny DAG z selektywnym rollbackiem, topologicznym sortowaniem i resume. Sekcje §10.1–§10.2 poniżej to **target architecture**, **nie** zakres MVP. Implementacja DAG po stabilizacji LIFO w v0.1. Patrz [AUDIT §8 IMP-1](./AUDIT.md#8-uzupe%C5%82niaj%C4%85ce-znaleziska-po-drugim-przebiegu).
 
 ### 10.0 LIFO stack (MVP v0.1)
 
@@ -446,7 +449,7 @@ LIFO nie wspiera selektywnego skipowania, równoległego wykonania ani resume z 
           [6. GitHub Git Push]
 ```
 
-### 10.1 Struktura silnika transakcyjnego
+### 10.1.1 Szkic struktur Go
 
 ```go
 // wizard/dag.go
@@ -490,6 +493,8 @@ Gdy dany węzeł DAG (np. `Provision Database`) zgłosi błąd, silnik:
    * Resetuje stan węzła z `StateFailed` na `StatePending`.
    * Uruchamia ponownie procesor grafu, pomijając węzły o stanie `StateSuccess` (redukcja czasu i kosztów zasobów na serwerze).
 
+**GitHub Secrets edge case:** GitHub Secrets API jest write-only. Resume DAG nie próbuje odczytać plaintextu sekretu z GitHuba, bo API tego nie umożliwia. Krok `PutSecret` traktujemy jako idempotentny tylko wtedy, gdy wartość istnieje w `Params` zapisanych w snapshotcie transakcji albo jest nadal dostępna w secure store. W przeciwnym razie resume zatrzymuje się i prosi usera o ponowne podanie wartości zamiast nadpisywać nieznanym stanem.
+
 ---
 
 ## 11. Detekcja rozbieżności konfiguracji (Drift & Stale detection)
@@ -509,7 +514,7 @@ Aby zapewnić pełną spójność i transakcyjność operacji na zmiennych środ
 
 #### Algorytm Synchronizacji Różnicowej:
 1. **Asynchroniczne pobranie (Pull):** W momencie wejścia w interakcję z Env Resolverem, silnik za pomocą połączenia SFTP z Connection Poola pobiera zawartość pliku `.env` z serwera produkcyjnego.
-2. **Parsowanie i Mapowanie (Key-Value AST):** Oba pliki (lokalny i serwerowy) are parsed na abstrakcyjne struktury asocjacyjne z zachowaniem kolejności oraz komentarzy.
+2. **Parsowanie i Mapowanie (Key-Value AST):** Oba pliki (lokalny i serwerowy) są parsowane na abstrakcyjne struktury asocjacyjne z zachowaniem kolejności oraz komentarzy.
 3. **Wizualizacja Rozbieżności (Drift Resolution State):**
    * Jeśli klucz istnieje tylko w jednym pliku, otrzymuje flagę `ORPHANED`.
    * Jeśli wartości dla tego samego klucza się różnią, generowany jest hash MD5 obu ciągów i oznaczany jako `DRIFT`.
@@ -705,7 +710,7 @@ case PulseMsg:
 	return m, TickPulse()
 ```
 
-Dzięki temu Lipgloss generuje płynne przejście kolorów ramki Bento w locie, dając niesamowity efekt animacji bez obciążania procesora.
+Efekt jest wizualnie atrakcyjny, ale nie jest darmowy: każde odświeżenie ramki przez Lipgloss realokuje stringi i może podnieść zużycie CPU na dużych dashboardach. Warunek wejścia do implementacji `v0.2+`: benchmark `BenchmarkDashboardPulse20Projects` musi potwierdzić narzut <5% względem statycznego renderu przy 20 projektach i terminalu `120×35`.
 
 ### 16.2 Latency-Aware Spinner Scheduler
 
@@ -798,7 +803,7 @@ func (se *SoundEngine) Play(t SoundType) {
 
 ### 17.2 Niskopoziomowy Event Loop i Generowanie PCM
 Generowanie dźwięku wykorzystuje bezpośrednie odpytanie systemowych interfejsów audio lub wysyłanie odpowiednich kodów częstotliwości ANSI:
-* **macOS/Linux:** Silnik wykorzystuje natywne wywołania niskopoziomowe przez API `/dev/dsp` lub platform-native CLI (np. `afplay` w macOS, `aplay` w Linux), uruchamiane w odseparowanej od wątku TUI goroutynie.
+* **macOS/Linux:** Silnik użyje platform-native API lub CLI (`afplay` na macOS, `paplay`/`aplay` na Linux z PulseAudio/PipeWire) albo biblioteki Go typu `oto` / `beep`. Nie używamy `/dev/dsp` — to legacy OSS i na typowych systemach 2026+ nie istnieje.
 * **ANSI BEEP Fallback:** Na maszynach, gdzie fizyczne audio jest niedostępne (np. sesja SSH bez przekierowania dźwięku), silnik emituje krótkie sekwencje kodów ucieczki terminala (`\a` - BEL) o modulowanym czasie trwania, tworząc efekt mikro-klików w głośniku systemowym emulatora.
 
 ---

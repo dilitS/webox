@@ -26,7 +26,7 @@ Task progress:
 - [ ] 9. Manual checklist run (TESTING §8)
 - [ ] 10. Cosign signature successful in release dry-run
 - [ ] 11. SLSA provenance generated
-- [ ] 12. No P0 / P1 items left in AUDIT.md / IMPROVEMENT_PLAN.md
+- [ ] 12. No unresolved P0 / P1 items left in AUDIT.md
 - [ ] 13. Docs cross-references valid (no dead anchors)
 - [ ] 14. CODE_OF_CONDUCT.md present
 - [ ] 15. LICENSE present (MIT)
@@ -149,13 +149,13 @@ Verify in dist/:
 
 GoReleaser `release` workflow on tag push produces SLSA provenance. Verify in GH Release artifacts after publish.
 
-### 12. AUDIT / IMPROVEMENT_PLAN status
+### 12. AUDIT status
 
 ```bash
 make audit-status
 ```
 
-For v0.1: zero P0/P1 left in AUDIT.md. P2/P3 OK if documented as deferred. IMPROVEMENT_PLAN: zero IMP-1..4 left, others OK if v0.2+ scope.
+For v0.1: zero unresolved P0/P1 left in AUDIT.md. P2/P3 and folded `IMP-*` items are OK only if documented as fixed or explicitly deferred in `AUDIT.md §8`.
 
 ### 13. Doc cross-refs
 

@@ -141,6 +141,8 @@ command: devil www add test.testuser.smallhost.pl nodejs 24
 sanitized: login -> testuser
 ```
 
+Fixture'y z realnego panelu **starzeją się** wraz ze zmianami small.pl/Devil. Dlatego raz w miesiącu maintainer uruchamia `make test-integration-live` na sandbox account, porównuje aktualny output `devil` z fixture'ami i otwiera PR aktualizujący fixture'y, jeśli format się zmienił. Nightly CI może wykrywać rozbieżności na mockach, ale **nie** auto-aktualizuje fixture'ów — każdy diff z realnego panelu wymaga ręcznego review i sanityzacji.
+
 ### 3.4 Czego mock SSH NIE robi
 
 - **Nie emuluje realnej propagacji DNS** — testy SSL pomijają `SetupSSL` rzeczywiste, walidują tylko że adapter wykonał odpowiednią komendę.

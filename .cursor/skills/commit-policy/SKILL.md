@@ -44,7 +44,7 @@ Use the **most specific** scope. `feat(providers/smallhost): ...` is better than
 - [ ] 1. Run `make ci` locally → must pass.
 - [ ] 2. Stage exactly the files for this logical change (no junk).
 - [ ] 3. Draft summary (≤72 chars, imperative: "add", "fix", "remove").
-- [ ] 4. Draft body explaining "why" (link AUDIT/IMP/issue).
+- [ ] 4. Draft body explaining "why" (link AUDIT finding or issue when relevant).
 - [ ] 5. Update CHANGELOG.md [Unreleased] if user-visible.
 - [ ] 6. Stage CHANGELOG.md alongside the change.
 - [ ] 7. Commit with HEREDOC for clean formatting.
@@ -83,7 +83,7 @@ Refs: docs/providers/smallhost.md §2.1
 ```
 fix(secrets): use crypto/rand for AES-GCM nonce
 
-Per IMP-2 from IMPROVEMENT_PLAN. Replaces time-based nonce with
+Per AUDIT §8 IMP-2. Replaces time-based nonce with
 crypto/rand.Read(12 bytes). Adds panic on CSPRNG failure and unit
 test verifying nonce uniqueness across two consecutive writes.
 

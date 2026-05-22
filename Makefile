@@ -86,6 +86,13 @@ test-tui: ## Regenerate teatest golden files (-update). Review diff before commi
 test-integration: ## Run integration tests (needs sshmock + cassettes).
 	$(GO) test -race -tags=integration -timeout 300s ./...
 
+.PHONY: test-integration-live
+test-integration-live: ## Run maintainer-only live tests against real small.pl sandbox.
+	@test -n "$${WEBOX_TEST_HOST:-}" || { echo "WEBOX_TEST_HOST required"; exit 1; }
+	@test -n "$${WEBOX_TEST_USER:-}" || { echo "WEBOX_TEST_USER required"; exit 1; }
+	@test -n "$${WEBOX_TEST_KEY:-}" || { echo "WEBOX_TEST_KEY required"; exit 1; }
+	$(GO) test -race -tags='integration live' -timeout 600s ./...
+
 .PHONY: cover
 cover: test ## Show coverage report in a browser.
 	$(GO) tool cover -html=$(COVER_FILE) -o $(COVER_HTML)
@@ -161,11 +168,11 @@ docs-links: ## Check all relative links in docs/ resolve.
 		file://$$(pwd)/docs/
 
 .PHONY: audit-status
-audit-status: ## Print outstanding AUDIT.md and IMPROVEMENT_PLAN.md items.
+audit-status: ## Print outstanding AUDIT.md items.
 	@printf "$(COLOR_BOLD)AUDIT.md outstanding items:$(COLOR_RESET)\n"
 	@grep -E "^### [A-D][0-9]+\." docs/AUDIT.md | head -20 || true
-	@printf "\n$(COLOR_BOLD)IMPROVEMENT_PLAN.md outstanding items:$(COLOR_RESET)\n"
-	@grep -E "^### IMP-[0-9]+\." docs/IMPROVEMENT_PLAN.md | head -20 || true
+	@printf "\n$(COLOR_BOLD)Folded IMP-* findings in AUDIT.md §8:$(COLOR_RESET)\n"
+	@grep -E "^\| IMP-[0-9]+ \|" docs/AUDIT.md | head -20 || true
 
 # ── Internationalization ───────────────────────────────────────────────
 

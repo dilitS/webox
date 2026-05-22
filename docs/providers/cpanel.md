@@ -8,7 +8,7 @@
 
 **RESEARCH — implementacja zaplanowana na v0.2.** Ten dokument zawiera **wyłącznie notatki badawcze** i **otwarte pytania**. Wszystkie hipotezy oznaczone `[TO BE VERIFIED]` wymagają potwierdzenia na realnym koncie cPanel przed implementacją. Adapter nie istnieje w kodzie — w MVP profile typu `cpanel` są ukryte za `WEBOX_EXPERIMENTAL=1` i nie mają implementacji.
 
-> Oryginalny PRD zawierał implementację adaptera `cpanel.go` napisaną „z głowy", bez konfrontacji z UAPI. Została usunięta jako fałszywa implementacja (patrz [CHANGES.md poprawka 6.9](../../CHANGES.md#1-poprawki-merytoryczne-z-tabeli-%C2%A76-briefu)).
+> Oryginalny PRD zawierał implementację adaptera `cpanel.go` napisaną „z głowy", bez konfrontacji z UAPI. Została usunięta jako fałszywa implementacja (patrz [CHANGES.md poprawka 6.9](../../CHANGES.md#1-poprawki-merytoryczne-z-tabeli-6-briefu)).
 
 ## TL;DR
 

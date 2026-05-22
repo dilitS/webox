@@ -6,7 +6,7 @@
 
 ## TL;DR
 
-Webox jest narzędziem operatorskim z bezpośrednim dostępem do hostingu i GitHuba — błąd w sekrecie albo MITM SSH ma realny koszt (przejęcie konta, defacement strony). Polityka: **sekrety wyłącznie w systemowym keyringu** (fallback AES-GCM z Argon2id master-password tylko dla środowisk headless), **TOFU dla host keys** ze strict mismatch handling, **zero zdalnej telemetrii**, defensywne parsowanie outputu serwera (`devil`/`uapi`) i GitHub API. Threat model bazuje na STRIDE-light. Audyty stanu — przez `webox doctor security`.
+Webox jest narzędziem operatorskim z bezpośrednim dostępem do hostingu i GitHuba — błąd w sekrecie albo MITM SSH ma realny koszt (przejęcie konta, defacement strony). Polityka: **sekrety wyłącznie w systemowym keyringu** (fallback AES-GCM z Argon2id master-password tylko dla środowisk headless), **TOFU dla host keys** ze strict mismatch handling, **zero zdalnej telemetrii**, defensywne parsowanie outputu serwera (`devil`/`uapi`) i GitHub API. Threat model bazuje na STRIDE-light. Audyty stanu: `webox doctor` w `v0.1`, rozszerzone `webox doctor security` w `v0.2+`.
 
 Dodatkowa zasada dotycząca sekretów aplikacji: **Webox jest orchestratorem, nie pełnym vaultem**. GitHub Secrets są write-only targetem dla CI, lokalny secure store trzyma tylko wartości świadomie zarządzane przez Webox, a serwerowy `.env` pozostaje runtime representation. To rozróżnienie jest krytyczne, bo GitHub nie pozwala odczytać plaintextu sekretu po zapisie.
 
@@ -153,7 +153,7 @@ Limit z birthday paradox dla 96-bit nonce + `crypto/rand`: **~2³² wpisów** za
 ```
 ╭─ Webox ─────────────────────── ⚠ DEGRADED MODE ───╮
 │  Keyring unavailable. Using encrypted file fallback.│
-│  Run `webox doctor security` for details.           │
+│  Run `webox doctor` for details.                    │
 ╰─────────────────────────────────────────────────────╯
 ```
 
@@ -195,7 +195,7 @@ Limit z birthday paradox dla 96-bit nonce + `crypto/rand`: **~2³² wpisów** za
 - Release build **musi** mieć `GODEBUG=clobberfree=1` (nadpisuje zwolnione bloki, runtime overhead ~1%).
 - Sekret **nigdy** nie wchodzi do `fmt.Sprintf`, `log.*`, `errors.New` — sentinel `ErrInvalidCredentials` zamiast wartości.
 
-Patrz [AUDIT C4](./AUDIT.md#c4-securitymd-43--zerocopywipe-jako-wymy%C5%9Blona-biblioteka) i [IMPROVEMENT_PLAN §IMP-9](./IMPROVEMENT_PLAN.md#imp-9-securitymd-43--zerocopywipe-nie-gwarantuje-wymazania-w-go).
+Patrz [AUDIT C4](./AUDIT.md#c4-securitymd-43--zerocopywipe-jako-wymy%C5%9Blona-biblioteka) i [AUDIT §8 IMP-9](./AUDIT.md#8-uzupe%C5%82niaj%C4%85ce-znaleziska-po-drugim-przebiegu).
 
 ### 4.4 Rotacja sekretów
 
@@ -278,7 +278,7 @@ W v0.1 wybór *Accept and update known_hosts* w confirm dialogu **wymaga** drugi
 
 `webox doctor security --update-host-key <host>` jako świadomy, manualny krok dla skryptów CI lub headless workflow. Wymaga flagi `--force` lub interaktywnego wpisania frazy. Implementacja po dostarczeniu `webox doctor security` (post-MVP, patrz §7).
 
-Patrz [IMPROVEMENT_PLAN §IMP-4](./IMPROVEMENT_PLAN.md#imp-4-securitymd-54--resolution-host-key-mismatch-przez-webox-doctor-security-v02--ale-w-v01-nie-ma-alternatywy).
+Patrz [AUDIT §8 IMP-4](./AUDIT.md#8-uzupe%C5%82niaj%C4%85ce-znaleziska-po-drugim-przebiegu).
 
 ### 5.5 Algorytmy
 
@@ -395,7 +395,7 @@ Zasady dla zgłaszającego:
 
 ## 9. Logging i wycieki
 
-### 9.1 Co loggujemy lokalnie (opt-in, patrz [DESIGN.md §15](./DESIGN.md#15-telemetria-i-logi-diagnostyczne))
+### 9.1 Co loggujemy lokalnie (opt-in, patrz [DESIGN.md §15](./DESIGN.md#15-diagnostyka-doctor--redacted-logger))
 
 | Typ | Loggowane? | Forma |
 |---|---|---|
@@ -433,7 +433,7 @@ Warstwa loggingu używa filtra: regex match na typowe wzorce (`ghp_[A-Za-z0-9]{3
 ╰────────────────────────────────────────────────────────────────╯
 ```
 
-W status bar po `Ctrl+Y`: `Secret copied. Clear your clipboard after use.` (zamiast timera). Patrz [IMPROVEMENT_PLAN §IMP-8](./IMPROVEMENT_PLAN.md#imp-8-clipboard-clearing-best-effort--obietnica-niemo%C5%BCliwa-do-spe%C5%82nienia).
+W status bar po `Ctrl+Y`: `Secret copied. Clear your clipboard after use.` (zamiast timera). Patrz [AUDIT §8 IMP-8](./AUDIT.md#8-uzupe%C5%82niaj%C4%85ce-znaleziska-po-drugim-przebiegu).
 
 ### 9.4 Core dumps
 
@@ -522,8 +522,8 @@ Sekret `DEPLOY_PATH` używany w `deploy.yml` = wynik `provider.GetDeployPath(dom
 
 | Parametr | Wartość | Weryfikacja przez Webox |
 |---|---|---|
-| Ścieżka | `<deploy_path>/../.env` — jeden poziom **powyżej** katalogu `dist/` / `public/` | Tak — `ls -la` przez SSH po deploy, porównanie z `provider.GetDeployPath()`. |
-| Permisje | `0600` (właściciel: SSH user) | Tak — `stat --format="%a" .env` lub `ls -la`. Warn jeśli `>0600`. Fail deploy jeśli `0644` lub `0666`. |
+| Ścieżka | `<deploy_path>/../.env` — jeden poziom **powyżej** katalogu `dist/` / `public/` | Tak, ale mechanizm zależy od trybu deployu. GitHub Actions robi check w workflow; Direct SFTP robi check bezpośrednio w Webox. |
+| Permisje | `0600` (właściciel: SSH user) | GitHub Actions: krok `Verify .env permissions` failuje workflow. Direct SFTP: Webox robi `stat --format="%a %U"` po uploadzie, naprawia `chmod 600` jeśli może, a potem weryfikuje ponownie. |
 | Właściciel | SSH user | Tak — `stat --format="%U" .env`. |
 | `.env` nigdy w `public/`, `public_html/`, `www/`, `htdocs/` | Dostęp przez HTTP = pełna kompromitacja. | Tak — Webox sprawdza ścieżkę i rzuca `ErrEnvExposedInPublic` jeśli `.env` wylądowałby w web root. |
 
@@ -537,6 +537,17 @@ Wykrywanie web root per provider:
 | `cyberpanel` (post-MVP) | `~/<DOMAIN>/public_html/` (patrz [providers/cyberpanel.md §6](./providers/cyberpanel.md)) |
 
 Jeśli `GetDeployPath` zwraca ścieżkę **wewnątrz** web root, Webox umieszcza `.env` obok aplikacji, ale poza publicznym katalogiem.
+
+**GitHub Actions deploy:** ponieważ `.env` materializuje workflow na runnerze, kontrola permisji jest częścią wygenerowanego `deploy.yml`, a nie osobnym magicznym krokiem w TUI. Minimalny krok:
+
+```yaml
+- name: Verify .env permissions
+  run: |
+    ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+      'stat -c "%a %U" "${{ secrets.DEPLOY_PATH }}/../.env"' \
+      | grep -q '^600 ' || \
+      (echo "::error::.env has insecure permissions" && exit 1)
+```
 
 ### 10.5 Lokalny `.env` dewelopera
 

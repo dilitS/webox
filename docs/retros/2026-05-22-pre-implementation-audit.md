@@ -11,8 +11,8 @@ findings, and bootstrap the AI-agent implementation environment
 
 1. `c7c5dff docs: restructure documentation and initialize project structure`
 2. `a41afd7 docs(audit): publish pre-implementation audit with 39 findings`
-3. `f810fd5 docs(audit): apply P0 fixes from AUDIT.md (A1-A8) and add IMPROVEMENT_PLAN.md`
-4. `c79cc0f docs(scope): apply P0+P1 fixes from AUDIT and IMPROVEMENT_PLAN`
+3. `f810fd5 docs(audit): apply P0 fixes from AUDIT.md (A1-A8) and add second-pass findings`
+4. `c79cc0f docs(scope): apply P0+P1 fixes from AUDIT and second-pass findings`
 5. `73dd53e chore(tooling): add Makefile, .editorconfig, CHANGELOG.md and harden .gitignore`
 6. `2f21692 docs(agents): add AGENTS.md handbook and contextual .cursor/rules`
 7. `adf3e7c docs(agents): add eight workflow-oriented .cursor/skills`
@@ -26,7 +26,7 @@ findings, and bootstrap the AI-agent implementation environment
   *before* touching any file gave every later commit a numbered anchor
   (e.g. "Refs: AUDIT A1"). PR review next sprint can verify each line of
   code against the finding it closes.
-- **Two-stream audit (`AUDIT.md` + `IMPROVEMENT_PLAN.md`).** Splitting the
+- **Two-stream audit (`AUDIT.md` + second-pass findings).** Splitting the
   original 39 findings from 19 follow-ups kept the first pass focused on
   consistency/scope while the second pass tackled deeper crypto/security
   details (AES-GCM nonce, `WEBOX_MASTER_PASSWORD` risk, host-key
@@ -126,7 +126,7 @@ findings, and bootstrap the AI-agent implementation environment
 | Metric | Value |
 |---|---|
 | AUDIT findings | 39 (P0: 8, P1: 11, P2: 14, P3: 6) |
-| IMPROVEMENT_PLAN findings | 19 |
+| Folded second-pass findings (`IMP-*`) | 19 |
 | Open decisions | 5 |
 | Commits in this audit batch | 8 |
 | New files (cursor env + tooling) | 27 |
@@ -138,7 +138,7 @@ findings, and bootstrap the AI-agent implementation environment
 
 Before any production code lands:
 
-- [ ] Maintainer reviews and accepts `docs/AUDIT.md` + `docs/IMPROVEMENT_PLAN.md`.
+- [ ] Maintainer reviews and accepts `docs/AUDIT.md`, including §8 folded `IMP-*` findings.
 - [ ] Five open decisions in AUDIT closed (or explicitly deferred).
 - [ ] First `tdd-loop`-driven parser (devil `www add`) lands as the
       canary commit — proves the agent environment end-to-end.

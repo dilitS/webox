@@ -8,7 +8,7 @@
 
 **RESEARCH — implementacja zaplanowana na v0.3** (po cPanel w v0.2, jeśli ROADMAP §4 nie zostanie zmieniony). Ten dokument zawiera **wyłącznie notatki badawcze** i otwarte pytania. Wszystkie hipotezy `[TO BE VERIFIED]` wymagają potwierdzenia.
 
-> Oryginalny PRD zawierał implementację `directadmin.go` napisaną z głowy, z `DA_API_KEY` jako **string literal w kodzie** — to było jednocześnie błędem implementacyjnym (sekret w pliku źródłowym!) i nieweryfikowalną propozycją API. Usunięte. Patrz [CHANGES.md poprawki 6.8 + 6.9](../../CHANGES.md#1-poprawki-merytoryczne-z-tabeli-%C2%A76-briefu).
+> Oryginalny PRD zawierał implementację `directadmin.go` napisaną z głowy, z `DA_API_KEY` jako **string literal w kodzie** — to było jednocześnie błędem implementacyjnym (sekret w pliku źródłowym!) i nieweryfikowalną propozycją API. Usunięte. Patrz [CHANGES.md poprawki 6.8 + 6.9](../../CHANGES.md#1-poprawki-merytoryczne-z-tabeli-6-briefu).
 
 ## TL;DR
 
@@ -65,7 +65,7 @@ Pierwszy run profilu `directadmin`:
 1. Webox prosi o user + password.
 2. Webox woła `/api/login-keys` (lub legacy `CMD_API_LOGIN_KEYS`) z user/password → otrzymuje API key.
 3. API key zapisywany do keyringa pod `webox-api-<alias>`.
-4. User/password są **wycierane z pamięci** (`zerocopy.Wipe`).
+4. User/password są trzymane krótko w `memguard.LockedBuffer`, a po użyciu niszczone przez `Destroy()` zgodnie z ograniczeniami opisanymi w `SECURITY.md`.
 
 API key można rotować w `/settings → Provider → Rotate API key`.
 

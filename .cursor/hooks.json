@@ -24,19 +24,19 @@
     "afterFileEdit": [
       {
         "command": ".cursor/hooks/gofmt.sh",
-        "matcher": "Write|Edit|MultiEdit|StrReplace",
+        "matcher": "Write|Edit|MultiEdit|StrReplace|ApplyPatch",
         "timeout": 10,
         "failClosed": false
       },
       {
         "command": ".cursor/hooks/secret-scan-file.sh",
-        "matcher": "Write|Edit|MultiEdit|StrReplace",
+        "matcher": "Write|Edit|MultiEdit|StrReplace|ApplyPatch",
         "timeout": 5,
         "failClosed": false
       },
       {
         "command": ".cursor/hooks/scope-guard.sh",
-        "matcher": "Write|Edit|MultiEdit|StrReplace",
+        "matcher": "Write|Edit|MultiEdit|StrReplace|ApplyPatch",
         "timeout": 5,
         "failClosed": false
       }

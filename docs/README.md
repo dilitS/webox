@@ -1,6 +1,6 @@
 # Webox — Dokumentacja
 
-> Status: Draft · Ostatnia aktualizacja: 2026-05-22 · Właściciel: @maintainer
+> Status: Stable navigation guide · Ostatnia aktualizacja: 2026-05-22 · Właściciel: @maintainer
 
 ## TL;DR
 
@@ -36,6 +36,7 @@ Każdy plik odpowiada na inne pytanie.
 | Dlaczego wybraliśmy konkretne decyzje architektoniczne? | [adr/](./adr/) |
 | Jak działa referencyjny provider MVP? | [providers/smallhost.md](./providers/smallhost.md) |
 | Co wiemy o providerach post-MVP? | [providers/cpanel.md](./providers/cpanel.md), [providers/directadmin.md](./providers/directadmin.md), [providers/cyberpanel.md](./providers/cyberpanel.md) |
+| Jakie luki znaleziono przed implementacją i jak je zamknięto? | [AUDIT.md](./AUDIT.md) |
 | Jak oryginalny monolit został rozłożony na obecne docs? | [MIGRATION_NOTES.md](./MIGRATION_NOTES.md) |
 
 ## Status projektu

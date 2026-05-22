@@ -18,9 +18,6 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ### Added
 - `docs/AUDIT.md` — comprehensive pre-implementation audit with 39 findings
   (P0–P3) and 5 open decisions blocking the start of `v0.1` implementation.
-- `docs/IMPROVEMENT_PLAN.md` — 19 additional findings (IMP-1..19) beyond
-  AUDIT scope, including critical DAG-vs-LIFO mismatch (IMP-1) and missing
-  AES-GCM nonce specification (IMP-2).
 - `AGENTS.md` — operator handbook for AI coding agents (stack, guardrails,
   TDD workflow, scope policy, conventional commits, retrospective cadence).
 - `.cursor/skills/` — workflow skills (TDD, add-provider, ADR, audit-trace,
@@ -49,6 +46,17 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ### Changed
 - `docs/DESIGN.md` §10 — clarified MVP uses **LIFO stack** with
   `pending_cleanups.json`; DAG is `v0.3+` stretch (IMP-1).
+- `docs/AUDIT.md` §8 — folded the 19 second-pass `IMP-*` findings into the
+  durable audit record, then removed the temporary improvement plan file.
+- `README.md` — replaced inline data-URI hero with a committed SVG asset,
+  added pre-MVP installation/status section, removed dead placeholder links,
+  and clarified MVP vs STRETCH package boundaries.
+- `docs/adr/0001`, `PRD.md`, `AGENTS.md` — clarified that the CLI ban applies
+  to **operator commands**, while startup/debug/diagnostic flags remain allowed.
+- `docs/adr/0005` — corrected cold-cache dashboard math: 20 SSH-heavy project
+  fetches are pool-limited and warm progressively instead of completing in ~3 s.
+- `docs/adr/0004` — replaced stale `zerocopy.Wipe` language with `memguard`
+  and documented Go memory-safety limits.
 - `docs/DESIGN.md` §6 — replaced racey PID-based lockfile with
   `flock(2)` / `LockFileEx` via `github.com/gofrs/flock` (AUDIT A8).
 - `docs/DESIGN.md` §8 — replaced 60-line generic Go snippet with
@@ -113,6 +121,8 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   and collapsible FAQ.
 
 ### Removed
+- Temporary improvement-plan staging file; all still-relevant findings now live
+  in `docs/AUDIT.md §8` and the target documents they affected.
 - Premature claim that `webox` ships with `Ctrl+S` mute shortcut.
 - Auto-clipboard-clearing promise (replaced with user-facing warning).
 - DAG-based engine as MVP scope (deferred to v0.3+; LIFO is MVP).

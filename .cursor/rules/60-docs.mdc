@@ -45,7 +45,7 @@ Każdy ADR ma: kontekst (problem), decyzja (co), konsekwencje (trade-offy), alte
 
 Każdy behavior-affecting PR → wpis w `CHANGELOG.md [Unreleased]` w odpowiedniej sekcji (`Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security`).
 
-Tekst: 1-2 zdania **dlaczego**, nie **co**. Link do PR + AUDIT/IMPROVEMENT_PLAN finding gdy istotne.
+Tekst: 1-2 zdania **dlaczego**, nie **co**. Link do PR + `AUDIT.md` finding gdy istotne.
 
 ## Konwencja "TO BE VERIFIED"
 

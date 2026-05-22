@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)">
-    <img alt="Webox — shared hosting terminal cockpit" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDgwMCAyMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzdkNTZmNCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzNkYjRlMCIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSI4MDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjMGQxMTE3IiByeD0iMTIiLz48dGV4dCBmb250LWZhbWlseT0ibW9ub3NwYWNlLHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2xkIiBmb250LXNpemU9IjU2IiBmaWxsPSJ1cmwoI2cpIiB4PSI0MDAiIHk9IjkwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBhbGlnbm1lbnQtYmFzZWxpbmU9Im1pZGRsZSI+V0VCT1g8L3RleHQ+PHRleHQgZm9udC1mYW1pbHk9Im1vbm9zcGFjZSxzYW5zLXNlcmlmIiBmb250LXNpemU9IjIwIiBmaWxsPSIjOGM5OGMxIiB4PSI0MDAiIHk9IjEzNSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Y29ja3BpdDwvdGV4dD48L3N2Zz4=">
-  </picture>
+  <img alt="Webox — shared hosting terminal cockpit" src="docs/assets/webox-readme-hero.svg" width="860">
 </p>
 
 <p align="center">
@@ -11,15 +8,17 @@
 
 <p align="center">
   <a href="https://github.com/webox/webox/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-7d56f4" alt="License: MIT"></a>
-  <a href=""><img src="https://img.shields.io/badge/status-pre--MVP-d846ef" alt="Stage: pre-MVP"></a>
+  <a href="docs/ROADMAP.md"><img src="https://img.shields.io/badge/status-docs--first%20pre--MVP-d846ef" alt="Stage: docs-first pre-MVP"></a>
   <a href="https://pkg.go.dev/github.com/webox/webox"><img src="https://img.shields.io/badge/go-1.24%2B-00ADD8?logo=go" alt="Go 1.24+"></a>
   <a href="docs/ROADMAP.md"><img src="https://img.shields.io/badge/v0.1-in--design-ffb800" alt="v0.1 in design"></a>
 </p>
 
 ---
 
-Webox is a **terminal operator cockpit** for developers running projects on shared hosting.  
-One tool instead of bouncing between a hosting panel, SSH, GitHub, SSL settings, log files, and handwritten shell scripts.
+Webox is a **terminal operator cockpit** for developers running projects on shared hosting.
+One screen instead of bouncing between a hosting panel, SSH, GitHub, SSL settings, log files, and private shell scripts.
+
+> **Current phase:** docs-first / pre-MVP. The implementation starts after the audit gates are accepted. No production binary is published yet.
 
 ```text
  ╭─ Webox Cockpit ───────────────────────────────────────────────────────────────────╮
@@ -37,6 +36,19 @@ One tool instead of bouncing between a hosting panel, SSH, GitHub, SSL settings,
  │  q:quit  ↑↓:navigate  →:details  n:new  /:command  ?:help                         │
  ╰───────────────────────────────────────────────────────────────────────────────────╯
 ```
+
+## Install
+
+Webox is not released yet. The repository is currently in the **pre-MVP, docs-first** phase: architecture, security posture, testing strategy, and development guardrails are being locked before production code starts.
+
+Planned install paths for `v0.1`:
+
+```bash
+brew install webox/tap/webox   # planned
+go install github.com/webox/webox/cmd/webox@latest   # planned
+```
+
+Track release readiness in [`docs/ROADMAP.md`](docs/ROADMAP.md) and the pre-implementation audit in [`docs/AUDIT.md`](docs/AUDIT.md).
 
 ---
 
@@ -77,7 +89,7 @@ flowchart TB
     Cmd --> Secrets
 
     Providers --> SSH
-    SSH --> Host["Shared Hosting Server<br/>small.pl / cPanel / DirectAdmin"]
+    SSH --> Host["Shared Hosting Server<br/>small.pl (v0.1)<br/>cPanel / DirectAdmin later"]
     GitHub --> GHA["GitHub Actions<br/>CI/CD Pipeline"]
 
     Secrets --> Keyring
@@ -262,7 +274,7 @@ flowchart TB
 
     subgraph Server["Server"]
         DeployKey["Per-project deploy key<br/>authorized_keys with comment"]
-        EnvFile[".env — 0600 permissions<br/>Outside web root<br/>EnvDiff drift detection"]
+        EnvFile[".env — 0600 permissions<br/>Outside web root<br/>Env drift detection later"]
     end
 
     Keyring --> SSH
@@ -362,9 +374,9 @@ webox/
 ├── config/             # config.json model, atomic write, migration
 ├── secrets/            # Keyring integration, AES-GCM fallback, redactor
 ├── status/             # Stale-while-revalidate cache, health checks
-├── wizard/             # Project creation DAG engine, rollback stack
-├── env/                # .env parsing, diff, merge engine
-├── sound/              # (stretch) Optional terminal audio feedback
+├── wizard/             # LIFO rollback stack (DAG target architecture: v0.3+)
+├── env/                # (v0.2+) .env parsing, diff, merge engine
+├── sound/              # (stretch) optional terminal audio feedback
 ├── translations/       # en.json + pl.json (extensible)
 ├── testing/            # Mock SSH server, fixtures, golden files, cassettes
 ├── docs/               # PRD, DESIGN, UX, SECURITY, TESTING, ROADMAP, ADRs
@@ -401,7 +413,8 @@ Webox is **docs-first**. Every architectural decision is recorded before a singl
 | [**CONTRIBUTING**](docs/CONTRIBUTING.md) | Setup, conventions, adding a provider, translations, review |
 | [**ADRs**](docs/adr/) | Why TUI over CLI, why GHA for deploy, why keyring |
 | [**AUDIT**](docs/AUDIT.md) | Pre-implementation gap analysis — 39 findings |
-| [**IMPROVEMENT_PLAN**](docs/IMPROVEMENT_PLAN.md) | Additional findings + remediation beyond AUDIT |
+| [**AGENTS**](AGENTS.md) | Operator handbook for AI agents working on this repo |
+| [**RETROS**](docs/retros/) | Retrospectives from major audit / implementation phases |
 
 ---
 
@@ -461,7 +474,7 @@ Contributions are welcome — especially:
 - **Implementation PRs** that preserve the current design discipline
 
 Start with [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md).  
-Discussion happens in [GitHub Discussions]() and [Issues]().
+Discussion will happen in GitHub Discussions and Issues once the public repository is opened.
 
 ---
 

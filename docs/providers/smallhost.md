@@ -159,7 +159,7 @@ DNS może propagować do 48 h. Webox **nie czeka** synchronnie. Flow:
 
 Adapter wykrywa rate limit / propagation error w outpucie `devil ssl` i mapuje na `ErrDNSNotResolving` lub `ErrRateLimitLetsEncrypt`.
 
-Patrz [IMPROVEMENT_PLAN §IMP-15](../IMPROVEMENT_PLAN.md#imp-15-providerssmallhostmd-54--dns-readiness-probe-blokuje-wizard-na-48h-dla-custom-domain).
+Patrz [AUDIT §8 IMP-15](../AUDIT.md#8-uzupe%C5%82niaj%C4%85ce-znaleziska-po-drugim-przebiegu).
 
 ### 5.5 `devil www restart` — czas oczekiwania
 

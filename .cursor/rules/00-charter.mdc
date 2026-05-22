@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Webox — Charter
 
-Treat `AGENTS.md` (repo root) and `docs/AUDIT.md` + `docs/IMPROVEMENT_PLAN.md` as the source of truth. When in doubt: read those first, code second.
+Treat `AGENTS.md` (repo root) and `docs/AUDIT.md` (including §8 folded `IMP-*` findings) as the source of truth. When in doubt: read those first, code second.
 
 ## Non-negotiable
 

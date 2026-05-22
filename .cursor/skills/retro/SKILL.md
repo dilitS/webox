@@ -11,7 +11,7 @@ description: Run a short retrospective after completing a task, sprint, or PR â€
 |---|---|
 | **Task retro** | After every non-trivial task completion (parser, security fix, full provider method). |
 | **Sprint retro** | After every group of 5â€“10 related commits or every PR merge. |
-| **Audit retro** | After completing all P0/P1 items from AUDIT or IMPROVEMENT_PLAN. |
+| **Audit retro** | After completing all P0/P1 items from AUDIT or a second-pass audit sweep. |
 | **Release retro** | After every release (v0.1.0, v0.1.1, etc.). |
 
 ## Template

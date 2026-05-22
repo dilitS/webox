@@ -20,7 +20,14 @@ Cele produktu (z [PRD §3](../PRD.md#3-problem-kt%C3%B3ry-rozwi%C4%85zujemy)) wy
 
 ## Decyzja
 
-Wybieramy **TUI w Go + Bubble Tea + Lipgloss**. W MVP nie ma CLI flag dla zewnętrznych skryptów (poza `webox doctor`). Tryb non-interactive CLI → P2, v0.3+.
+Wybieramy **TUI w Go + Bubble Tea + Lipgloss**. W MVP nie ma operatorskich CLI commands dla zewnętrznych skryptów (`webox restart`, `webox create`, `webox provider add`, `webox import`). Wyjątki w `v0.1`:
+
+- `webox` — uruchamia TUI.
+- `webox doctor` i `webox doctor --json` — diagnostyka / automation health-check.
+- Startup/debug flags bez efektów operatorskich: `--debug`, `--lang=<code>`, `--no-cache`.
+- Zmienne środowiskowe dla trybów technicznych: `WEBOX_EXPERIMENTAL=1`, `WEBOX_LOG_LEVEL`, `WEBOX_MASTER_PASSWORD` (CI-only), `WEBOX_SECRETS_BACKEND`.
+
+Pełny tryb non-interactive CLI dla operacji (`webox restart <project> --json`, `webox create ...`) → P2, `v0.3+`.
 
 Dlaczego nie aplikacja webowa lokalna:
 
@@ -56,7 +63,7 @@ Bubble Tea wybrane spośród alternatyw:
 
 ### Negatywne
 
-- TUI wyklucza usera, który chce skryptować webox z bash. Workaround: `webox doctor --json` od dnia 1, pełen CLI flag surface w v0.3+.
+- TUI wyklucza usera, który chce skryptować operacje webox z bash. Workaround: `webox doctor --json` od dnia 1, pełen operatorski CLI surface w v0.3+.
 - Terminal jest ograniczony rozmiarem — wymaga adresowania w [UX §5](../UX.md#5-wymagania-terminala).
 - Renderowanie kolorów / emoji zależy od terminala — fallbacki.
 - Brak natywnego copy-paste w niektórych terminalach (Windows cmd) — `Ctrl+Y` dla `/env` może nie działać.

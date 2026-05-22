@@ -2,7 +2,7 @@
 
 > Status: Accepted · Data: 2026-05-22 · Właściciel: @maintainer
 >
-> Pokrewne ADR: [ADR-0001 TUI](./0001-tui-zamiast-cli.md), [ADR-0003 Provider Pattern](./0003-provider-pattern.md). Dokumenty: [DESIGN §8](../DESIGN.md#8-status-cache), [UX §4.2](../UX.md#42-dashboard--widok-g%C5%82%C3%B3wny-zalecane--100%C3%9730).
+> Pokrewne ADR: [ADR-0001 TUI](./0001-tui-zamiast-cli.md), [ADR-0003 Provider Pattern](./0003-provider-pattern.md). Dokumenty: [DESIGN §8](../DESIGN.md#8-tr%C3%B3jpoziomowy-status-cache-stale-while-revalidate), [UX §4.2](../UX.md#42-dashboard-20--bento-box-grid-system-12035--stretch).
 
 ## Kontekst
 
@@ -71,8 +71,8 @@ Tablica TTL'i z hard-cutoffem:
 
 ### Pozytywne
 
-- Pierwsze renderowanie dashboardu po starcie: <200 ms.
-- Po starcie cache cold → 20 równoległych fetchy w goroutynach → wypełniony w ~3 s.
+- Pierwsze renderowanie dashboardu po starcie: <200 ms dzięki renderowi z pustego / stale cache.
+- Cold cache nie blokuje na wszystkie projekty naraz. HTTP i GH fetch'e mogą startować równolegle, ale SSH-heavy checki są limitowane przez pool (`max_connections=3` per host). Dla 20 projektów realistyczny pełny warm-up to ~30-40 s; UI pokazuje statusy stopniowo, projekt po projekcie, bez zamrożenia interakcji.
 - Każdy kolejny render: instant (cache hit).
 - SWR daje wrażenie szybkiego UI bez maskowania problemów (offline → stary stan z badge'em `OFFLINE`).
 

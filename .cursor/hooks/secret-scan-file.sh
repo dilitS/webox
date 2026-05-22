@@ -17,7 +17,7 @@ if [[ -z "$file_path" || ! -f "$file_path" ]]; then
 fi
 
 case "$file_path" in
-  */.cursor/hooks/*|*/.cursor/skills/*|*/.cursor/rules/*|*/docs/SECURITY.md|*/AGENTS.md|*/CHANGELOG.md|*/docs/AUDIT.md|*/docs/IMPROVEMENT_PLAN.md)
+  */.cursor/hooks/*|*/.cursor/skills/*|*/.cursor/rules/*|*/docs/SECURITY.md|*/AGENTS.md|*/CHANGELOG.md|*/docs/AUDIT.md)
     log_debug "allowlisted file path (security/docs): $file_path"
     exit 0
     ;;

@@ -79,9 +79,11 @@ Plik szyfrowany wymaga:
 | `saltLen` | 16 bajtów (losowa per plik) |
 | Master password minimum length | 12 znaków |
 | Pamięć cache hasła w sesji | tak (in-memory, nie persystowane) |
-| Pamięć wyzerowana po użyciu | tak (`zerocopy.Wipe`) |
+| Pamięć wyzerowana po użyciu | tak, przez `awnumar/memguard.LockedBuffer.Destroy()` + unikanie konwersji sekretów do `string` |
 
 Te parametry są **konserwatywne** — Argon2id z 64 MB memory + 3 iterations daje ~250 ms derivation czasu na nowoczesnym CPU, co skutecznie utrudnia brute force offline.
+
+Uczciwe ograniczenie: w Go nie da się zagwarantować absolutnego wymazania każdego bajtu, jeśli sekret wcześniej przeszedł przez heap jako `string`/`[]byte`. `memguard` ogranicza ryzyko przez locked buffer i explicit destroy, ale polityka implementacyjna pozostaje ważniejsza: sekret pobieramy on-demand, trzymamy krótko, nie logujemy, nie formatujemy i nie kopiujemy bez potrzeby.
 
 ## Konsekwencje
 

@@ -94,7 +94,8 @@ Niebezpieczne — `LANG=de_DE` użytkownik zobaczyłby niemiecki (którego nie m
 
 - **Mockupy w `UX.md` muszą być po angielsku.** ✓ Wszystkie przepisane.
 - **Komunikaty błędów w `DESIGN.md` / `SECURITY.md`** — przykłady stringów EN. ✓
-- **PRD pisane po polsku** — to dokument *o projekcie*, nie *w projekcie*. Polski OK.
+- **PRD / DESIGN / SECURITY / TESTING mogą pozostać PL jako dokumenty strategiczne maintainera** do czasu publicznego launch, o ile nie są jedyną drogą onboardingu zewnętrznego contributora.
+- **Contributor surface musi być EN przed publicznym `v0.1`:** README, CONTRIBUTING, Provider Pattern quickstart (`DESIGN §3` albo osobny extract) i provider template muszą wystarczyć do napisania adaptera bez znajomości polskiego.
 - **CONTRIBUTING § Tłumaczenia** — wyjaśnia jak dodać język.
 
 ## Alternatywy rozważane

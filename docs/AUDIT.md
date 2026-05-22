@@ -1,12 +1,14 @@
 # Webox — Pre-implementation Audit
 
-> Status: Draft · Ostatnia aktualizacja: 2026-05-22 · Właściciel: @maintainer
+> Status: Resolved for v0.1 implementation entry · Ostatnia aktualizacja: 2026-05-22 · Właściciel: @maintainer
 >
 > Pokrewne dokumenty: [PRD.md](./PRD.md), [DESIGN.md](./DESIGN.md), [UX.md](./UX.md), [SECURITY.md](./SECURITY.md), [TESTING.md](./TESTING.md), [ROADMAP.md](./ROADMAP.md), [CHANGES.md](../CHANGES.md).
 
 ## TL;DR
 
-Pełny audyt dokumentacji przed wejściem w implementację. Cel: zidentyfikować luki logiczne, sprzeczności między dokumentami, błędy techniczne w przykładach kodu i scope creep, zanim którykolwiek z nich zatruje bazę kodu. Audyt zawiera **39 znalezisk** podzielonych na cztery priorytety oraz 5 decyzji otwartych. Wszystkie znaleziska oznaczone `P0` muszą zostać poprawione przed rozpoczęciem implementacji `v0.1`. Audyt jest świadomie publikowany jako osobny plik, żeby każda korekta była atomowa i recenzowalna w PR.
+Pełny audyt dokumentacji przed wejściem w implementację. Cel: zidentyfikować luki logiczne, sprzeczności między dokumentami, błędy techniczne w przykładach kodu i scope creep, zanim którykolwiek z nich zatruje bazę kodu. Audyt zawiera **39 pierwotnych znalezisk** podzielonych na cztery priorytety, **19 uzupełniających znalezisk** z drugiego przebiegu (`IMP-*`, §8) oraz 5 decyzji otwartych. Wszystkie znaleziska oznaczone `P0` muszą zostać poprawione przed rozpoczęciem implementacji `v0.1`. Audyt jest świadomie publikowany jako osobny plik, żeby każda korekta była atomowa i recenzowalna w PR.
+
+> **Uwaga statusowa:** sekcje A-D są historycznym zapisem problemów znalezionych przed implementacją. Nie traktuj samego opisu problemu jako otwartego zadania bez sprawdzenia docelowego dokumentu i `CHANGELOG.md`. Drugi przebieg audytu został wchłonięty do §8.
 
 ## Spis treści
 
@@ -17,6 +19,7 @@ Pełny audyt dokumentacji przed wejściem w implementację. Cel: zidentyfikować
 5. [Znaleziska P3 — niskie, redakcyjne i edge case'y](#5-znaleziska-p3--niskie-redakcyjne-i-edge-casey)
 6. [Decyzje otwarte do potwierdzenia](#6-decyzje-otwarte-do-potwierdzenia)
 7. [Plan korekt](#7-plan-korekt)
+8. [Uzupełniające znaleziska po drugim przebiegu](#8-uzupełniające-znaleziska-po-drugim-przebiegu)
 
 ---
 
@@ -394,3 +397,33 @@ Po wszystkich PR-ach: ten plik AUDIT.md przechodzi w status `Status: Resolved` l
 Plus **5 decyzji otwartych** (E1–E5).
 
 > Audit nie zamyka projektu — otwiera go do **kontrolowanej** implementacji. Każda korekta zostanie wprowadzona przez świadomy PR z linkiem do tej tabeli.
+
+---
+
+## 8. Uzupełniające znaleziska po drugim przebiegu
+
+Drugi przebieg audytu wykrył 19 dodatkowych punktów oznaczonych `IMP-*`.
+Tymczasowy plan poprawek został po weryfikacji usunięty; poniższa tabela jest
+trwałym śladem decyzji i miejscem, do którego należy linkować w przyszłych PR.
+
+| ID | Decyzja końcowa | Status |
+|---|---|---|
+| IMP-1 | MVP używa wyłącznie LIFO rollback stack; pełny DAG zostaje jako target architecture `v0.3+`. | Wchłonięte do `DESIGN.md §10`, `README.md`, `AGENTS.md`. |
+| IMP-2 | AES-GCM nonce musi być 96-bitowy i generowany przez `crypto/rand.Read` per wpis. | Wchłonięte do `SECURITY.md §4.2.1` i skill `secret-flow`. |
+| IMP-3 | `WEBOX_MASTER_PASSWORD` jest tylko dla ephemeral CI; workstation warning obowiązkowy. | Wchłonięte do `SECURITY.md §4.2.2` i skill `secret-flow`. |
+| IMP-4 | Host-key mismatch w `v0.1` rozwiązuje TUI phrase-confirm flow, nie post-MVP CLI. | Wchłonięte do `SECURITY.md §5.4` i `TESTING.md §5.3`. |
+| IMP-5 | EN-first UI zostaje, ale docs strategiczne mogą być PL; public contributor surface wymaga EN quickstart przed public launch. | Wchłonięte do `ADR-0006`, `ROADMAP.md` i README. |
+| IMP-6 | Zakaz dotyczy operatorskich CLI commands; startup/debug/diagnostic flags są dozwolone w ograniczonym zakresie. | Wchłonięte do `ADR-0001`, `PRD.md`, `AGENTS.md`. |
+| IMP-7 | Cold start dashboardu jest ograniczony przez SSH pool (`max=3`); realistycznie ~30-40 s dla 20 projektów SSH-heavy. | Wchłonięte do `ADR-0005`. |
+| IMP-8 | Webox nie obiecuje czyszczenia clipboardu; tylko ostrzega i wymaga świadomej akcji usera. | Wchłonięte do `SECURITY.md §9.3`. |
+| IMP-9 | `memguard.LockedBuffer` mityguje ryzyko pamięci, ale Go GC ogranicza gwarancje. | Wchłonięte do `SECURITY.md §4.3` i `ADR-0004`. |
+| IMP-10 | W GHA deploy `.env` permission check musi być częścią workflow; Direct SFTP sprawdza Webox. | Wchłonięte do `SECURITY.md §10.4` i `providers/smallhost.md §6`. |
+| IMP-11 | ProxyJump / bastion to `v0.2+`; w `v0.1` tylko bezpośredni SSH. | Wchłonięte do `DESIGN.md §3.3`, `§5`, `PRD.md §10.4`. |
+| IMP-12 | Po reconnect nie wolno “bezpiecznie ponawiać” non-idempotent command bez state checku. | Wchłonięte do `DESIGN.md §9`. |
+| IMP-13 | GitHub Secrets API jest write-only; DAG resume może co najwyżej nadpisać zapamiętaną wartość. | Wchłonięte do `DESIGN.md §10.2` i `SECURITY.md §10.3`. |
+| IMP-14 | Border pulsing wymaga benchmarków; brak obietnic “bez kosztu CPU”. | Wchłonięte do `DESIGN.md §16.1`. |
+| IMP-15 | Custom-domain SSL nie blokuje wizardu na DNS propagation; status `SSL_PENDING` + retry. | Wchłonięte do `providers/smallhost.md §5.4`. |
+| IMP-16 | Realne fixture `devil` mogą zestarzeć się; wymagany miesięczny live recapture przez maintainera. | Wchłonięte do `TESTING.md §3.3`. |
+| IMP-17 | Workflow deploy cache'uje `~/.npm`; dependency cache nie obejmuje zdalnego `node_modules`. | Wchłonięte do `providers/smallhost.md §6` i rule `70-shell-and-workflow`. |
+| IMP-18 | K6 community provider zależy od public contributor docs; termin liczony od `v0.1` lub EN contributor surface. | Wchłonięte do `PRD.md §8` i `ROADMAP.md §2.3`. |
+| IMP-19 | `gocyclo` limit = 20 z obowiązkowym uzasadnieniem `//nolint`. | Wchłonięte do `CONTRIBUTING.md §2.1`, `AGENTS.md`, `10-go-style.mdc`. |

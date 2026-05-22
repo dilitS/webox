@@ -8,10 +8,10 @@
 
 | ID | Problem w oryginale | Działanie | Docelowy plik |
 |----|---------------------|-----------|---------------|
-| 6.1 | Generyki na metodzie struktury (Go tego nie wspiera) — `StatusCache.GetOrFetch[T any]`. | Usunięto kod, opisano wzorzec funkcyjny jako funkcja pakietowa + tabela TTL i invalidacji eventowej. | [docs/DESIGN.md §8](docs/DESIGN.md#8-status-cache) |
-| 6.2 | Błąd składni JSON: `profiles: [` bez cudzysłowów. | Schema config przedstawiona jako **tabela pól** (pole / typ / wymagane / przykład), pełny przykład JSON odrębnie + zwalidowany ręcznie. | [docs/DESIGN.md §6](docs/DESIGN.md#6-model-danych) |
-| 6.3 | Maszyna stanów zdefiniowana dwa razy z różnymi listami. | **Jedna**, scalona lista stanów + diagram przejść. | [docs/DESIGN.md §12](docs/DESIGN.md#12-maszyna-stan%C3%B3w-tui) |
-| 6.4 | Niespójność timeout SSH (15 s vs 30 s). | Jednoznacznie: dial = 15 s, retry × 2, łączny worst case 51 s; komunikaty UI odzwierciedlają łączny czas. | [docs/DESIGN.md §9](docs/DESIGN.md#9-obs%C5%82uga-b%C5%82%C4%99d%C3%B3w-ssh) |
+| 6.1 | Generyki na metodzie struktury (Go tego nie wspiera) — `StatusCache.GetOrFetch[T any]`. | Usunięto kod, opisano wzorzec funkcyjny jako funkcja pakietowa + tabela TTL i invalidacji eventowej. | [docs/DESIGN.md §8](docs/DESIGN.md#8-tr%C3%B3jpoziomowy-status-cache-stale-while-revalidate) |
+| 6.2 | Błąd składni JSON: `profiles: [` bez cudzysłowów. | Schema config przedstawiona jako **tabela pól** (pole / typ / wymagane / przykład), pełny przykład JSON odrębnie + zwalidowany ręcznie. | [docs/DESIGN.md §6](docs/DESIGN.md#6-model-danych-i-atomowo%C5%9B%C4%87-zapisu-configjson) |
+| 6.3 | Maszyna stanów zdefiniowana dwa razy z różnymi listami. | **Jedna**, scalona lista stanów + diagram przejść. | [docs/DESIGN.md §12](docs/DESIGN.md#12-maszyna-stan%C3%B3w-tui-tabbed-cockpit-spec) |
+| 6.4 | Niespójność timeout SSH (15 s vs 30 s). | Jednoznacznie: dial = 15 s, retry × 2, łączny worst case 51 s; komunikaty UI odzwierciedlają łączny czas. | [docs/DESIGN.md §9](docs/DESIGN.md#9-obs%C5%82uga-b%C5%82%C4%99d%C3%B3w-sieciowych-i-reconnect) |
 | 6.5 | Konflikt `Ctrl+R` (refresh vs reveal `.env`). | `Ctrl+R` = kontekstowy refresh. Reveal w `/env` przeniesiony na lokalny klawisz `v` (poza globalnym mappingiem) + jednorazowe potwierdzenie. | [docs/UX.md §6](docs/UX.md#6-key-bindings), [docs/UX.md §9](docs/UX.md#9-maskowanie-sekret%C3%B3w-w-ui) |
 | 6.6 | Mockupy 80×24 nierealistyczne (~100×30 jest faktycznie potrzebne). | Określono **dwa progi**: minimalny 88×28 (z fallbackami: single-pane, ukryty help bar) i zalecany 100×30. Poniżej 88×28 — bramka startowa. | [docs/UX.md §5](docs/UX.md#5-wymagania-terminala) |
 | 6.7 | Sprzeczność „deploy tylko przez GH Actions" vs SFTP w `/storage` i `/env`. | Doprecyzowane: **deploy kodu** = GH Actions, **operacje administracyjne** (env, storage, restart) = SSH/SFTP. ADR-0002 wprost. | [docs/adr/0002-deploy-tylko-przez-github-actions.md](docs/adr/0002-deploy-tylko-przez-github-actions.md) |
@@ -29,10 +29,10 @@
 | 7.1 | Threat model + STRIDE-light | [docs/SECURITY.md §3](docs/SECURITY.md#3-threat-model) |
 | 7.2 | Migracje schematu config | [docs/DESIGN.md §6.4](docs/DESIGN.md#64-migracje-schematu) |
 | 7.3 | Strategia testów (unit / integration / e2e / CI) | [docs/TESTING.md](docs/TESTING.md) |
-| 7.4 | Telemetria / error reporting (opt-in, lokalny log) | [docs/DESIGN.md §15](docs/DESIGN.md#15-telemetria-i-logi-diagnostyczne) + [docs/SECURITY.md §7](docs/SECURITY.md#7-audyt-sekret%C3%B3w-i-tryb-doctor) |
+| 7.4 | Telemetria / error reporting (opt-in, lokalny log) | [docs/DESIGN.md §15](docs/DESIGN.md#15-diagnostyka-doctor--redacted-logger) + [docs/SECURITY.md §7](docs/SECURITY.md#7-audyt-sekret%C3%B3w-i-tryb-doctor) |
 | 7.5 | Import istniejących projektów | [docs/PRD.md §7](docs/PRD.md#7-import-istniej%C4%85cych-projekt%C3%B3w) + [docs/UX.md §11.4](docs/UX.md#114-flow-d-import-istniej%C4%85cego-projektu) |
-| 7.6 | Konflikt z ręcznymi zmianami w panelu | [docs/DESIGN.md §11](docs/DESIGN.md#11-konflikty-z-r%C4%99cznymi-zmianami-w-panelu) |
-| 7.7 | Auto-update binarki | [docs/DESIGN.md §14](docs/DESIGN.md#14-auto-update) |
+| 7.6 | Konflikt z ręcznymi zmianami w panelu | [docs/DESIGN.md §11](docs/DESIGN.md#11-detekcja-rozbie%C5%BCno%C5%9Bci-konfiguracji-drift--stale-detection) |
+| 7.7 | Auto-update binarki | [docs/DESIGN.md §14](docs/DESIGN.md#14-dystrybucja-i-mechanizm-sprawdzania-wersji) |
 | 7.8 | Competitive landscape | [docs/PRD.md §5](docs/PRD.md#5-konkurencja-i-landscape) |
 | 7.9 | Non-goals | [docs/PRD.md §9](docs/PRD.md#9-non-goals) |
 | 7.10 | Środowiska bez keyringu (Linux headless, WSL bez D-Bus) | [docs/SECURITY.md §4.2](docs/SECURITY.md#42-fallback-dla-%C5%9Brodowisk-headless) |

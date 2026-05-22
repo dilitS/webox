@@ -1,0 +1,38 @@
+<svg width="1000" height="260" viewBox="0 0 1000 260" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Webox cockpit</title>
+  <desc id="desc">A dark terminal-style hero banner for Webox, a shared hosting terminal cockpit.</desc>
+  <defs>
+    <linearGradient id="brand" x1="160" y1="0" x2="840" y2="260" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7D56F4"/>
+      <stop offset="0.55" stop-color="#3DB4E0"/>
+      <stop offset="1" stop-color="#04B575"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.49 0 0 0 0 0.34 0 0 0 0 0.96 0 0 0 0.45 0"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="1000" height="260" rx="26" fill="#0D1117"/>
+  <rect x="24" y="24" width="952" height="212" rx="18" fill="#13141F" stroke="#2A2E45"/>
+  <circle cx="58" cy="52" r="6" fill="#FF5F56"/>
+  <circle cx="80" cy="52" r="6" fill="#FFBD2E"/>
+  <circle cx="102" cy="52" r="6" fill="#27C93F"/>
+  <text x="500" y="116" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="66" font-weight="800" fill="url(#brand)" filter="url(#glow)">WEBOX</text>
+  <text x="500" y="157" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="22" fill="#C9D1D9">shared hosting terminal cockpit</text>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="16">
+    <text x="84" y="199" fill="#8C98C1">small.pl</text>
+    <text x="170" y="199" fill="#4E5A85">’</text>
+    <text x="203" y="199" fill="#8C98C1">SSH</text>
+    <text x="252" y="199" fill="#4E5A85">’</text>
+    <text x="285" y="199" fill="#8C98C1">GitHub Actions</text>
+    <text x="431" y="199" fill="#4E5A85">’</text>
+    <text x="464" y="199" fill="#8C98C1">deploy</text>
+    <text x="535" y="199" fill="#4E5A85">’</text>
+    <text x="568" y="199" fill="#04B575">online</text>
+    <text x="766" y="199" fill="#FFB800">docs-first / pre-MVP</text>
+  </g>
+</svg>

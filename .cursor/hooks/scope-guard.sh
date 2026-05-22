@@ -37,7 +37,7 @@ for stretch in "${STRETCH_PATHS[@]}"; do
     *"/$stretch"*|*"$stretch"*)
       log_debug "scope violation suspected: $file_path matches $stretch"
       printf '{"additional_context":%s}\n' \
-        "$(json_escape "🛑 SCOPE GUARD: '$file_path' looks like a STRETCH-scope path matching '$stretch'. Per docs/AUDIT.md A6 and docs/IMPROVEMENT_PLAN.md, these features are out of MVP (v0.1). Either: (a) move work to a v0.2+ milestone branch, or (b) open an ADR proposing scope promotion BEFORE writing code. See .cursor/skills/audit-trace/SKILL.md for the full traceability matrix.")"
+        "$(json_escape "🛑 SCOPE GUARD: '$file_path' looks like a STRETCH-scope path matching '$stretch'. Per docs/AUDIT.md A6 and §8 folded IMP-* findings, these features are out of MVP (v0.1). Either: (a) move work to a v0.2+ milestone branch, or (b) open an ADR proposing scope promotion BEFORE writing code. See .cursor/skills/audit-trace/SKILL.md for the full traceability matrix.")"
       exit 0
       ;;
   esac

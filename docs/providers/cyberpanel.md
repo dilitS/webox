@@ -8,7 +8,7 @@
 
 **RESEARCH — implementacja zaplanowana na v0.3 lub później**, w zależności od dojrzałości oficjalnego API. CyberPanel ma najwięcej luk w dokumentacji spośród czterech rozważanych providerów. Ten dokument zawiera **wyłącznie notatki badawcze**. Wszystkie hipotezy `[TO BE VERIFIED]`.
 
-> Oryginalny PRD zawierał implementację `cyberpanel.go` z command'ami w stylu `python3 /usr/local/CyberPanel/createDomain.py ...` napisanymi z głowy — niezweryfikowane z dokumentacją vendora. Usunięte. Patrz [CHANGES.md poprawka 6.9](../../CHANGES.md#1-poprawki-merytoryczne-z-tabeli-%C2%A76-briefu).
+> Oryginalny PRD zawierał implementację `cyberpanel.go` z command'ami w stylu `python3 /usr/local/CyberPanel/createDomain.py ...` napisanymi z głowy — niezweryfikowane z dokumentacją vendora. Usunięte. Patrz [CHANGES.md poprawka 6.9](../../CHANGES.md#1-poprawki-merytoryczne-z-tabeli-6-briefu).
 
 ## TL;DR
 

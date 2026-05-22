@@ -254,4 +254,4 @@ go func() {
 - [SECURITY.md §4.2](../../docs/SECURITY.md#42-fallback-dla-środowisk-headless) — keyring + fallback.
 - [SECURITY.md §4.2.1](../../docs/SECURITY.md#421-generowanie-nonce-krytyczne-dla-aes-gcm) — AES-GCM nonce rules.
 - [SECURITY.md §9.2](../../docs/SECURITY.md#92-redaktor-sekret%C3%B3w) — redactor patterns.
-- [IMPROVEMENT_PLAN §IMP-2, IMP-3, IMP-9](../../docs/IMPROVEMENT_PLAN.md) — secret-related findings.
+- [AUDIT §8 IMP-2, IMP-3, IMP-9](../../docs/AUDIT.md#8-uzupe%C5%82niaj%C4%85ce-znaleziska-po-drugim-przebiegu) — secret-related findings.
