@@ -9,8 +9,11 @@
 # - tabs (Make requires them) — gofmt/golangci-lint handle Go style.
 # - `make help` prints every target with its one-line summary.
 
-# Tool versions are pinned in tools/tools.go via `go run`. To bump,
-# edit tools.go AND run `make tools-tidy`.
+# Tool versions are pinned in tools/go.mod (Go 1.24 `tool` directive in
+# an isolated modfile so they don't constrain the main module's go
+# version). All `make` targets invoke them via `go tool -modfile=...`.
+# To bump, run `cd tools && go get -tool <pkg>@<version>` then
+# `make tools-tidy`.
 
 SHELL          := /bin/bash
 .SHELLFLAGS    := -eu -o pipefail -c
@@ -32,6 +35,15 @@ DIST_DIR       := dist
 COVER_FILE     := coverage.out
 COVER_HTML     := coverage.html
 COVER_MIN      := 70
+TOOLS_MODFILE  := tools/go.mod
+# Some dev tools (golangci-lint v2.12+) require a newer Go than the main
+# module's `go 1.24`. Auto-toolchain doesn't kick in when -modfile=
+# points at a different module, so we extract the tools' `go` directive
+# and pin GOTOOLCHAIN explicitly. Result: every contributor — and CI —
+# uses the exact same Go version for linting/formatting (reproducible),
+# auto-fetched on first run if not already cached.
+TOOLS_GO       := $(shell awk '$$1=="go"{print "go"$$2; exit}' $(TOOLS_MODFILE) 2>/dev/null)
+TOOL           := GOTOOLCHAIN=$(TOOLS_GO) $(GO) tool -modfile=$(TOOLS_MODFILE)
 
 COLOR_RESET    := \033[0m
 COLOR_BOLD     := \033[1m
@@ -62,7 +74,7 @@ install: ## Install webox into $GOPATH/bin via `go install`.
 
 .PHONY: snapshot
 snapshot: ## GoReleaser snapshot build (every OS/arch matrix) into dist/.
-	goreleaser release --snapshot --clean
+	$(TOOL) goreleaser release --snapshot --clean
 
 .PHONY: clean
 clean: ## Remove build artifacts and coverage output.
@@ -109,16 +121,12 @@ cover-check: test ## Fail if total coverage is below COVER_MIN (default 70).
 
 .PHONY: lint
 lint: ## Run golangci-lint v2 (covers gofmt, vet, staticcheck, gosec, …).
-	@if ! command -v golangci-lint >/dev/null 2>&1; then \
-		printf "$(COLOR_RED)golangci-lint not found.$(COLOR_RESET) Install: https://golangci-lint.run/usage/install/\n"; \
-		exit 1; \
-	fi
-	golangci-lint run ./...
+	$(TOOL) golangci-lint run ./...
 
 .PHONY: fmt
 fmt: ## Run gofumpt + goimports on all packages.
-	@$(GO) run mvdan.cc/gofumpt@latest -l -w .
-	@$(GO) run golang.org/x/tools/cmd/goimports@latest -l -w .
+	@$(TOOL) gofumpt -l -w .
+	@$(TOOL) goimports -l -w .
 
 .PHONY: vet
 vet: ## Run go vet.
@@ -126,11 +134,7 @@ vet: ## Run go vet.
 
 .PHONY: vulncheck
 vulncheck: ## Run govulncheck against current dependencies.
-	$(GO) run golang.org/x/vuln/cmd/govulncheck@latest ./...
-
-.PHONY: staticcheck
-staticcheck: ## Run staticcheck (also part of golangci-lint, but useful standalone).
-	$(GO) run honnef.co/go/tools/cmd/staticcheck@latest ./...
+	$(TOOL) govulncheck ./...
 
 # ── Doctor / Smoke ─────────────────────────────────────────────────────
 
@@ -154,9 +158,22 @@ tidy: ## go mod tidy + verify.
 	$(GO) mod verify
 
 .PHONY: tools-tidy
-tools-tidy: ## Sync development tool versions (tools/tools.go).
+tools-tidy: ## Sync development tool versions (tools/go.mod) + main go.mod.
 	$(GO) mod tidy
-	$(GO) generate ./tools/...
+	cd tools && $(GO) mod tidy
+
+.PHONY: tools-install
+tools-install: ## Install dev tools (from tools/go.mod) into $$(go env GOBIN) for direct CLI use.
+	@printf "$(COLOR_CYAN)Installing dev tools to $$($(GO) env GOBIN)…$(COLOR_RESET)\n"
+	@cd tools && for t in github.com/golangci/golangci-lint/v2/cmd/golangci-lint \
+	                       golang.org/x/vuln/cmd/govulncheck \
+	                       mvdan.cc/gofumpt \
+	                       golang.org/x/tools/cmd/goimports \
+	                       github.com/goreleaser/goreleaser/v2; do \
+	  printf "  $(COLOR_BOLD)%s$(COLOR_RESET)\n" "$$t"; \
+	  $(GO) install "$$t" || exit 1; \
+	done
+	@printf "$(COLOR_GREEN)✓ tools installed$(COLOR_RESET)\n"
 
 # ── Documentation / Audit ──────────────────────────────────────────────
 
@@ -184,7 +201,7 @@ i18n-check: ## Verify translations/ have identical key sets.
 
 .PHONY: release-dry-run
 release-dry-run: ## GoReleaser dry-run for a release candidate.
-	goreleaser release --snapshot --skip=publish --clean
+	$(TOOL) goreleaser release --snapshot --skip=publish --clean
 
 # ── Dev workflow / automation ──────────────────────────────────────────
 
