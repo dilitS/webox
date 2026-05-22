@@ -13,3 +13,32 @@ var ErrInvalidJSON = errors.New("config: invalid JSON")
 // preserves the underlying validator's pointer/path so doctor and TUI can
 // render actionable messages without parsing it back.
 var ErrSchemaViolation = errors.New("config: schema violation")
+
+// ErrCorruptedConfig wraps any failure that prevents Load from turning
+// the on-disk file into a *Config: I/O failure, malformed JSON, struct
+// decoding failure. The companion message points at `webox doctor` so
+// users have an actionable next step (DESIGN §6.2, sprint-01 TASK-01.2).
+var ErrCorruptedConfig = errors.New("config: corrupted file (run `webox doctor` to inspect)")
+
+// ErrSchemaMismatch is returned when the file is well-formed JSON but
+// either violates the embedded schema or carries a schema_version newer
+// than the binary supports (DESIGN §6.4: downgrades are not supported).
+var ErrSchemaMismatch = errors.New("config: schema mismatch")
+
+// ErrMigrationFailed is returned when Load tries to forward-migrate a
+// schema_version older than [Current] but the migrator chain reports an
+// error. Migration framework lands with TASK-01.4; in v0.1 this path is
+// reachable only via a stubbed migrator that signals "no v0 migrator
+// registered".
+var ErrMigrationFailed = errors.New("config: schema migration failed")
+
+// errNilConfig is returned by the migrate stub when it is called with a
+// nil receiver. It is wrapped by [ErrMigrationFailed] in [Load], but
+// kept private so callers don't grow a habit of switching on it.
+var errNilConfig = errors.New("nil config")
+
+// errNoMigrator is returned by the migrate stub when a forward
+// migration is required but no migrator is registered for the source
+// version. Wrapped by [ErrMigrationFailed]; the migration framework
+// (TASK-01.4) will replace this stub with a real, ordered chain.
+var errNoMigrator = errors.New("no migrator registered for source schema_version")
