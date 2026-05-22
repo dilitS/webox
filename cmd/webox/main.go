@@ -4,10 +4,12 @@
 // deployments to shared hosting (small.pl/Devil in MVP, additional
 // providers in v0.2+). Operator workflows live behind the Bubble Tea
 // TUI; only `webox doctor` and a small set of startup/debug flags
-// are exposed as non-interactive commands per ADR-0001.
-//
-// This is a TASK-00.1 placeholder; the real flag parsing and command
-// dispatch land in TASK-00.5 (cmd/webox skeleton + internal/version).
+// (`--version`, `--help`, `--debug`) are exposed as non-interactive
+// commands per ADR-0001.
 package main
 
-func main() {}
+import "os"
+
+func main() {
+	os.Exit(Run(os.Args[1:], os.Stdout, os.Stderr))
+}

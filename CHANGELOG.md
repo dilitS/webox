@@ -92,6 +92,8 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 - `.gitignore` — broadened to cover Go build artifacts, runtime state
   (`webox.log`, `pending_cleanups.json`, `secrets.enc`), and editor noise.
 - `go.mod` (`module github.com/webox/webox`, `go 1.24`) and the canonical package layout per docs/DESIGN.md §2.1: `cmd/webox`, `tui`/`tui/views`, `providers`/`smallhost`/`mock`, `ssh`, `services`, `config`, `secrets`, `status`, `wizard`, `env` (STRETCH stub), `i18n`, `assets`, `testing`, `internal/log`, `internal/version` — each with a godoc-style `doc.go` (TASK-00.1 + TASK-00.6).
+- `internal/version` exports `String()`/`Format(v, c, d)` — pure helper plus ldflags-fed package vars (`Version`/`Commit`/`Date`). 8 table-driven cases (TASK-00.5).
+- `cmd/webox` parses `--version`, `--help`/`-h`, `--debug` per ADR-0001 with manual `os.Args` parsing; `Run([]string, stdout, stderr) int` is the testable seam (`main` is a thin wrapper). Unknown args exit 2 with a hint to `--help`. Coverage 100% on `Run`/`parseArgs` (TASK-00.5).
 
 ### Changed
 - `docs/ROADMAP.md` — replaced single-line estimate with P50/P70/P90 table
