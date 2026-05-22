@@ -15,7 +15,17 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ## [Unreleased]
 
+### Changed
+- `docs/sprints/sprint-00-bootstrap.md` — marked all 46 acceptance-criteria
+  checkboxes and 4 pre-flight items as done; populated `## Outcome` with
+  decisions (module path, `tools/go.mod` over `tools.go`, signs placeholder,
+  versioned `.githooks/`), surprises, and shipped metrics. Fixes the
+  `make next-task` drift: the script now correctly advances to TASK-01.1.
+
 ### Added
+- `docs/retros/2026-05-22-sprint-00.md` — Sprint 00 (Bootstrap)
+  retrospective: 10/10 tasks closed, 23 commits to `main`, coverage 96.4%,
+  with explicit lessons for AC-discipline and `goreleaser` schema gotchas.
 - `scripts/` — full dev-loop automation: `dev-watch.sh` (TDD with
   auto-detected gow / fswatch+entr / inotifywait / polling fallback),
   `sprint-status.sh`, `next-task.sh`, `new-task.sh`, `start-sprint.sh`,
