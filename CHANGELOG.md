@@ -28,9 +28,17 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   matching tasks.
 - `.cursor/rules/` — contextual rules wired to file patterns
   (`alwaysApply: false` + glob-based `description`).
-- `.cursor/hooks/` — `beforeSubmitPrompt` / `afterFileEdit` guards
-  (secret scanner, gofmt + go vet, conventional-commit validator,
-  scope-creep ASCII banner enforcement).
+- `.cursor/hooks/` + `.cursor/hooks.json` — `beforeSubmitPrompt`,
+  `beforeShellExecution` and `afterFileEdit` guards:
+  `secret-scan-prompt.sh` (ask on token in prompt),
+  `secret-scan-shell.sh` (deny on secret in shell argv),
+  `secret-scan-file.sh` (post-write context warning),
+  `gofmt.sh` (auto `goimports` / `gofmt -s -w` on Go files),
+  `commit-validator.sh` (Conventional Commits 1.0.0 enforcement),
+  `scope-guard.sh` (STRETCH-path tripwires per AUDIT A6).
+- `docs/retros/` — institutionalised retrospective notes. First entry:
+  `2026-05-22-pre-implementation-audit.md` documenting the full audit +
+  environment bootstrap effort.
 - `Makefile` — canonical task interface (`make build`, `make test`,
   `make lint`, `make vulncheck`, `make doctor`, etc.).
 - `.editorconfig` — repo-wide formatting baseline (LF, UTF-8, gofmt
