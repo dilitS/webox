@@ -260,7 +260,7 @@ changelog: ## Append entry to CHANGELOG.md Unreleased. Required: KIND=added|fixe
 # ── CI bundle ──────────────────────────────────────────────────────────
 
 .PHONY: ci
-ci: tidy lint vet vulncheck test cover-check ## Run the exact CI bundle locally.
+ci: tidy lint vet vulncheck test cover-check build ## Run the exact CI bundle locally.
 	@printf "$(COLOR_GREEN)✓ CI bundle passed.$(COLOR_RESET)\n"
 
 .PHONY: ci-fast

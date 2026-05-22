@@ -1,0 +1,250 @@
+name: CI
+
+# Webox CI pipeline.
+#
+# Source of truth for which checks block merge:
+#   docs/sprints/sprint-00-bootstrap.md TASK-00.4 + AGENTS.md §2.3.
+# All third-party actions are pinned to a full commit SHA per
+# `.cursor/rules/70-shell-and-workflow.mdc` (supply-chain hardening).
+# Bumping: prefer Dependabot updates (.github/dependabot.yml) — it preserves
+# the SHA-pin convention by rewriting `# vX.Y.Z` comments alongside the SHA.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+
+# Least-privilege default. Individual jobs may opt into write scopes if
+# strictly necessary — none of the current jobs do.
+permissions:
+  contents: read
+
+# Cancel superseded PR runs to keep CI minutes bounded; let `push` to main
+# always run to completion so release-trigger jobs (added later) never get
+# preempted.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Disable analytics on every Go invocation; CI must never phone home.
+  GOTELEMETRY: off
+
+jobs:
+  lint:
+    name: Lint (golangci-lint v2 + go vet)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+
+      - name: Cache golangci-lint analysis cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.cache/golangci-lint
+          key: golangci-lint-${{ runner.os }}-${{ hashFiles('.golangci.yml', 'tools/go.sum') }}
+          restore-keys: |
+            golangci-lint-${{ runner.os }}-
+
+      - name: Run golangci-lint
+        run: make lint
+
+      - name: Run go vet
+        run: make vet
+
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+
+      - name: Verify modules
+        run: go mod verify
+
+      - name: Run tests with race + coverage
+        run: make test
+
+      - name: Enforce coverage threshold
+        run: make cover-check
+
+      - name: Upload coverage profile
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-${{ github.sha }}
+          path: coverage.out
+          if-no-files-found: error
+          retention-days: 14
+
+  vulncheck:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+
+      - name: Run govulncheck
+        run: make vulncheck
+
+  build:
+    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: arm64
+          - runner: macos-latest
+            goos: darwin
+            goarch: amd64
+          - runner: macos-latest
+            goos: darwin
+            goarch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+
+      # Keep TASK-00.4 focused on CI. GoReleaser-owned release packaging lands
+      # in TASK-00.8; for now we enforce the promised cross-build matrix with
+      # plain `go build`.
+      - name: Cross-compile webox
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          MODULE: github.com/webox/webox
+          VERSION: v0.0.0-ci
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          out_dir="dist/webox_${GOOS}_${GOARCH}"
+          out_bin="$out_dir/webox"
+          mkdir -p "$out_dir"
+          go build -trimpath \
+            -ldflags "-s -w \
+              -X ${MODULE}/internal/version.Version=${VERSION} \
+              -X ${MODULE}/internal/version.Commit=${short_sha} \
+              -X ${MODULE}/internal/version.Date=${build_date}" \
+            -o "$out_bin" \
+            ./cmd/webox
+          test -f "$out_bin"
+
+      - name: Smoke test native binary
+        if: |
+          (matrix.goos == 'linux' && runner.os == 'Linux' && matrix.goarch == 'amd64' && runner.arch == 'X64') ||
+          (matrix.goos == 'darwin' && runner.os == 'macOS' && matrix.goarch == 'amd64' && runner.arch == 'X64') ||
+          (matrix.goos == 'darwin' && runner.os == 'macOS' && matrix.goarch == 'arm64' && runner.arch == 'ARM64') ||
+          (matrix.goos == 'linux' && runner.os == 'Linux' && matrix.goarch == 'arm64' && runner.arch == 'ARM64')
+        run: |
+          out_bin="dist/webox_${{ matrix.goos }}_${{ matrix.goarch }}/webox"
+          "$out_bin" --version
+          "$out_bin" --help
+
+      - name: Smoke test unknown flag exit code 2 on native binary
+        if: |
+          (matrix.goos == 'linux' && runner.os == 'Linux' && matrix.goarch == 'amd64' && runner.arch == 'X64') ||
+          (matrix.goos == 'darwin' && runner.os == 'macOS' && matrix.goarch == 'amd64' && runner.arch == 'X64') ||
+          (matrix.goos == 'darwin' && runner.os == 'macOS' && matrix.goarch == 'arm64' && runner.arch == 'ARM64') ||
+          (matrix.goos == 'linux' && runner.os == 'Linux' && matrix.goarch == 'arm64' && runner.arch == 'ARM64')
+        shell: bash
+        run: |
+          set +e
+          out_bin="dist/webox_${{ matrix.goos }}_${{ matrix.goarch }}/webox"
+          "$out_bin" --not-a-flag
+          rc=$?
+          if [ "$rc" -ne 2 ]; then
+            echo "::error::expected exit 2 for unknown flag, got $rc"
+            exit 1
+          fi
+
+  ci-summary:
+    name: CI summary
+    runs-on: ubuntu-latest
+    needs: [lint, test, vulncheck, build]
+    if: always()
+    timeout-minutes: 2
+    steps:
+      - name: Verify required checks passed
+        env:
+          LINT_RESULT: ${{ needs.lint.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          VULN_RESULT: ${{ needs.vulncheck.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: |
+          set -euo pipefail
+          fail=0
+          for kv in "lint:$LINT_RESULT" "test:$TEST_RESULT" \
+                   "vulncheck:$VULN_RESULT" "build:$BUILD_RESULT"; do
+            name="${kv%%:*}"
+            result="${kv##*:}"
+            if [ "$result" != "success" ]; then
+              echo "::error::$name failed (result=$result)"
+              fail=1
+            else
+              echo "✓ $name"
+            fi
+          done
+          exit "$fail"

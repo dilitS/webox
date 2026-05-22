@@ -13,8 +13,7 @@ jobs:
     name: Apply path-based labels
     runs-on: ubuntu-latest
     steps:
-      # NOTE: Pin to commit SHA in Sprint 00, TASK-00.4 (see rules/70-shell-and-workflow.mdc).
-      - uses: actions/labeler@v5
+      - uses: actions/labeler@f27b608878404679385c85cfa523b85ccb86e213 # v6.1.0
         with:
           configuration-path: .github/labeler.yml
           sync-labels: true

@@ -7,6 +7,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/webox/webox/actions/workflows/ci.yml"><img src="https://github.com/webox/webox/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
   <a href="https://github.com/webox/webox/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-7d56f4" alt="License: MIT"></a>
   <a href="docs/ROADMAP.md"><img src="https://img.shields.io/badge/status-docs--first%20pre--MVP-d846ef" alt="Stage: docs-first pre-MVP"></a>
   <a href="https://pkg.go.dev/github.com/webox/webox"><img src="https://img.shields.io/badge/go-1.24%2B-00ADD8?logo=go" alt="Go 1.24+"></a>
