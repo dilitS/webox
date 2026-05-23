@@ -15,6 +15,27 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ## [Unreleased]
 
+### Added
+- `ssh/errors.go`, `ssh/types.go`, `ssh/client_config.go` (TASK-02.1) —
+  foundation for the Sprint 02 connection pool. Ships five sentinel
+  errors (`ErrPoolBusy`, `ErrHostKeyUnknown`, `ErrHostKeyMismatch`,
+  `ErrReconnectExhausted`, `ErrHostKeyDBRequired`), the `Target` /
+  `ExecResult` / `Clock` / `Dialer` / `HostKeyDB` contracts, and a
+  `BuildClientConfig` builder that declares the algorithm whitelist
+  from `docs/SECURITY.md §5.5` (ed25519, rsa-sha2-512, rsa-sha2-256,
+  ecdsa-sha2-nistp256; `ssh-rsa` only when
+  `LegacyAlgorithmCompat=true`; `ssh-dss` never) and wraps a
+  `HostKeyCallback` that maps `knownhosts.KeyError` outcomes onto
+  distinguishable unknown / mismatch sentinels. Coverage: 100%.
+
+### Security
+- `ssh.BuildClientConfig` refuses to construct a `ClientConfig` without
+  a `HostKeyDB`, returning the typed `ErrHostKeyDBRequired` sentinel
+  instead of falling back to `cryptossh.InsecureIgnoreHostKey`. This
+  enforces the "strict block on host-key mismatch" guardrail from
+  `AGENTS.md §2.1` end-to-end — there is no code path that produces a
+  working `ssh.Client` without an explicit known_hosts implementation.
+
 ### Security
 - `secrets.FallbackBackend` (TASK-01.7) now stores credentials in an
   AES-GCM-256 encrypted file keyed by Argon2id (`time=3, memory=64MB,
