@@ -477,11 +477,13 @@ Refs: AUDIT A1
 | **AES-GCM nonce z `time.Now()`** | `nonce := make([]byte,12); binary.BigEndian.PutUint64(nonce, uint64(time.Now().UnixNano()))` | `if _, err := rand.Read(nonce); err != nil { panic(err) }`. |
 | **PID-based lockfile** | Sprawdzanie czy `os.FindProcess(pid)` zwraca proces | `flock(2)` via `gofrs/flock`. PID jest re-wykorzystywany. |
 | **Generic method na struct** | `func (c *Cache) Get[T any]() T {}` | Funkcja pakietowa `GetOrFetch[T any](c *Cache, ...)`. Go 1.24 wciąż nie wspiera. |
+| **`go get` cicho podbija `go` directive** | `go get <dep>@latest` i commit z `go 1.25.0` mimo że projekt miał zostać na `go 1.24` | Po **każdym** dodaniu depa przeczytaj `go.mod`, sprawdź transitive `go.mod` nowych modułów i pinuj ostatnią wersję kompatybilną z naszym floor (`go 1.24`). |
 | **Hardcoded provider name w business logic** | `if profile.Type == "smallhost" { ... }` | `provider := registry.New(profile); provider.CreateSubdomain(...)`. |
 | **`os.Rename` na różnych filesystem** | Próba rename z `/tmp/` do `~/.config/` (różne mount). | Tmp file **w tym samym katalogu** co target. |
 | **Sekret w `fmt.Errorf("...%s...", password)`** | Error message zawiera plaintext sekret. | `fmt.Errorf("auth failed: %w", ErrInvalidCredentials)`. |
 | **`rsync --delete` bez `--exclude`** | Usuwa `public/uploads/`, `.env` na zdalnym. | Zawsze excludes (patrz `providers/smallhost.md §6`). |
 | **GitHub Actions `uses: actions/checkout@v4`** | Tag może być przepisany przez supply-chain attack. | `uses: actions/checkout@<full-40-char-SHA>`. |
+| **`t.Parallel()` w testach stubujących package-level globals** | Test podmienia `dispatchDoctor`, `newRunner`, `nowFn` i jednocześnie inne testy lecą równolegle | Takie testy uruchamiaj **sekwencyjnie** albo chowaj seam za instancją / mutexem. `go test -race` ma być zielony bez wyjątków. |
 | **Bubble Tea side effect w `Update`** | `case KeyMsg: go fetchData()` (raw goroutine) | `case KeyMsg: return m, fetchDataCmd(ctx)` (return `tea.Cmd`). |
 
 ### 7.2 Linter zignorowany przez `//nolint` bez powodu

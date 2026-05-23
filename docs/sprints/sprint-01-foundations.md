@@ -237,28 +237,52 @@ Po sprincie 01:
 - **Estymata:** L
 - **Zależności:** TASK-01.6 (interface)
 - **Acceptance Criteria:**
-  - [ ] `secrets/fallback.go` implementuje `Backend`.
-  - [ ] Storage: `$XDG_CONFIG_HOME/webox/secrets.enc` (perms 0600).
-  - [ ] Format: `version(1B) | salt(16B) | nonce(12B) | ciphertext+tag`.
-  - [ ] KDF: **Argon2id** (`time=3, memory=64MB, threads=4, keyLen=32`).
-  - [ ] Nonce: **`crypto/rand.Read` → panic on error** (fix dla `AUDIT §8 IMP-2`).
-  - [ ] Password input:
-    - Default: prompt z `golang.org/x/term.ReadPassword` (no echo).
-    - CI: `WEBOX_MASTER_PASSWORD` env var z **warning na STDERR** (fix dla `AUDIT §8 IMP-3`).
-  - [ ] Wszystkie sekrety w pamięci: `memguard.LockedBuffer`, `defer buf.Destroy()`.
-  - [ ] Tabela testów:
-    - round-trip (set → get)
+  - [x] `secrets/fallback.go` implementuje `Backend`.
+  - [x] Storage: `$XDG_CONFIG_HOME/webox/secrets.enc` (perms 0600); ścieżka
+    wskazywana przez wywołującego (TUI/`cmd/webox`), nie wymuszana przez pakiet
+    — pakiet tylko egzekwuje `0600` na pliku i `0700` na rodzicu.
+  - [x] Format: `version(1B) | salt(16B) | nonce(12B) | ciphertext+tag`.
+  - [x] KDF: **Argon2id** (`time=3, memory=64MB, parallelism=2, keyLen=32`).
+    Wartość `parallelism=2` jest spójna z `docs/SECURITY.md §4.2`,
+    `docs/adr/0004` i `AGENTS.md §1.2` (poprzedni szkic AC nosił
+    `threads=4` przez kopię błędu z draftu PRD; SECURITY/ADR wygrywają per
+    `.cursor/rules/00-charter.mdc` decision policy).
+  - [x] Nonce: **`crypto/rand.Read` → panic on error** (fix dla `AUDIT §8 IMP-2`).
+  - [x] Password input:
+    - Default: prompt z `golang.org/x/term.ReadPassword` (no echo) —
+      `secrets.ReadMasterPassword` w `secrets/password.go`.
+    - CI: `WEBOX_MASTER_PASSWORD` env var z **warning na STDERR** gdy
+      heurystyka wykryje workstation (CI markers vs `DISPLAY`/`SSH_CLIENT`/
+      `XDG_SESSION_TYPE` — fix dla `AUDIT §8 IMP-3`).
+  - [x] Wszystkie sekrety w pamięci: `memguard.LockedBuffer`, `Close()` /
+    `defer buf.Destroy()`. Klucz AES, klucz po rotacji i bufor hasła
+    trzymane w `LockedBuffer`, zerowane explicit po użyciu.
+  - [x] Tabela testów:
+    - round-trip set→get fresh + persistence across re-open
     - wrong password → `ErrAuthFailed`
-    - corrupt file → `ErrCorruptedSecrets`
-    - rotate password (re-encrypt all)
-    - **CSPRNG fail:** mock `crypto/rand` returning error → assert `panic` (test via `defer recover`)
+    - corrupt file (truncated + unknown version + plaintext-not-JSON + wrong schema) → `ErrCorruptedSecrets`
+    - rotate password (re-encrypt all, old password rejected, salt rotated, persist-failure rollback)
+    - **CSPRNG fail:** swap package-level `randReader`, assert panic via `defer recover`
     - nonce uniqueness: 1000 zapisów → 1000 różnych nonce
-  - [ ] Race-safe (`sync.Mutex` na file ops + `flock`).
-  - [ ] Coverage ≥ 85%.
+    - master password too short → `ErrMasterPasswordTooShort`
+    - locked backend (zero value lub po `Close`) → `ErrFallbackLocked` dla Get/Set/Delete/Rotate
+    - 16 goroutyn `Set` współbieżnie — race detector + finalna weryfikacja stanu
+  - [x] Race-safe (`sync.Mutex` na file ops + `flock(2)` per write na `<path>.lock`).
+    Windows lock to stub `ErrSecretsLocked` (port `LockFileEx` ↦ v0.2+, zgodnie z `R-013` i z `config/lock_windows.go`).
+  - [x] Coverage ≥ 85% (`secrets` = 87.0% with `-race`).
 - **Pliki:**
   - `secrets/fallback.go` (new)
-  - `secrets/fallback_test.go` (new)
   - `secrets/fallback_crypto.go` (new, helper)
+  - `secrets/fallback_io.go` (new, atomic write helpers)
+  - `secrets/fallback_test.go` (new)
+  - `secrets/fallback_branches_test.go` (new — białe-skrzynkowe testy dla branchy persist-failure, lock contention, ctx cancel, forged-vault edge cases)
+  - `secrets/password.go` (new)
+  - `secrets/password_test.go` (new)
+  - `secrets/lock_unix.go` (new) + `secrets/lock_windows.go` (new stub)
+  - `secrets/errors.go` (edit — `ErrFallbackLocked`, `ErrAuthFailed`, `ErrCorruptedSecrets`, `ErrMasterPasswordTooShort`, `ErrKeyringUnavailable` zamiast `ErrFallbackUnavailable`)
+  - `secrets/backend.go` (edit — usunięty placeholder `FallbackBackend`, interface only)
+  - `secrets/keyring.go` (edit — `Detect()` zwraca `nil, ErrKeyringUnavailable` zamiast nieużywalnego locked-placeholder; konsument w `cmd/webox` musi rozwiązać hasło i wywołać `NewFallback`)
+  - `secrets/keyring_test.go` (edit — usunięty `TestFallbackBackendPlaceholder`, tabela `Detect` zaktualizowana o nowy kontrakt)
 - **Docs:** [`SECURITY.md §4.2.1, §4.2.2`](../SECURITY.md), [`AUDIT §8 IMP-2, IMP-3`](../AUDIT.md), [`ADR-0004`](../adr/0004-przechowywanie-sekretow-keyring.md)
 - **Notatki:**
   - **NAJWAŻNIEJSZY task sprintu z perspektywy bezpieczeństwa.** Nie skacz w to bez TDD.
@@ -272,25 +296,43 @@ Po sprincie 01:
 - **Estymata:** S
 - **Zależności:** TASK-01.6, TASK-01.7
 - **Acceptance Criteria:**
-  - [ ] `cmd/webox/doctor.go` (lub `services/doctor/`).
-  - [ ] Checki:
-    - Go version (już compile-time, ale info).
-    - `$XDG_CONFIG_HOME/webox` writeable.
-    - Keyring backend (`os` / `fallback` / `none`) + warning jeśli `none`.
-    - `secrets.enc` perms (0600 lub `os.Setenv` warn).
-    - Stub dla SSH agent (sprawdza `SSH_AUTH_SOCK`).
-  - [ ] Output: tekstowy z kolorami (`fatih/color`), exit code 0 (OK), 1 (warnings), 2 (errors).
-  - [ ] JSON mode: `webox doctor --json` (do CI integration).
-  - [ ] Tabela testów (ze stub backendami).
+  - [x] `cmd/webox/doctor.go` + `services/doctor/`.
+  - [x] Checki:
+    - Go version (już compile-time, ale info) — `system.go_version`.
+    - `$XDG_CONFIG_HOME/webox` writeable — `system.config_dir_writable`
+      robi `MkdirAll(0700)` + temp-file probe + cleanup.
+    - Keyring backend (`os` / `fallback` / `none`) — `security.secrets_backend`
+      klasyfikuje `secrets.Detect()` jako:
+      - `os` = keyring działa (`StatusOK`)
+      - `fallback` = `ErrKeyringUnavailable` (`StatusWarn`)
+      - `none` = `ErrBrokenKeyring` (`StatusWarn`) lub unexpected detect error (`StatusFail`)
+    - `secrets.enc` perms — `security.secrets_file_perms` sprawdza `0600`,
+      a dodatkowy check `security.master_password_env` ostrzega gdy
+      `WEBOX_MASTER_PASSWORD` jest ustawione na workstation (to realizuje
+      intencję szkicu AC „lub env warn” i zamyka `AUDIT IMP-3` także po stronie doctora).
+    - Stub dla SSH agent — `system.ssh_agent_socket` sprawdza `SSH_AUTH_SOCK`
+      i weryfikuje, że path istnieje oraz jest socketem.
+  - [x] Output: tekstowy z kolorami (`fatih/color`), exit code 0 (OK), 1 (warnings), 2 (errors).
+    ANSI tylko gdy `stdout` jest TTY; `--json` zawsze bez kolorów.
+  - [x] JSON mode: `webox doctor --json` (do CI integration).
+  - [x] Tabela testów (ze stub backendami i stub runnerem w `cmd/webox`).
 - **Pliki:**
+  - `services/doctor/doc.go` (new)
+  - `services/doctor/check.go` (new — `type Check interface { Run(ctx) Result }`)
   - `services/doctor/doctor.go` (new)
-  - `services/doctor/check.go` (new — `type Check interface { Run() Result }`)
   - `services/doctor/doctor_test.go` (new)
-  - `cmd/webox/main.go` (edit, route na subcommand)
-- **Docs:** [`SECURITY.md §10.4`](../SECURITY.md), [`PRD.md F11`](../PRD.md)
+  - `cmd/webox/doctor.go` (new)
+  - `cmd/webox/run.go` (edit — `doctor` / `doctor --json` parse + dispatch)
+  - `cmd/webox/run_test.go` (edit — CLI dispatch tests ze stubowanym doctor runnerem)
+  - `go.mod`, `go.sum` (edit — `github.com/fatih/color` v1.18.0)
+- **Docs:** [`DESIGN.md §15.1, §15.3`](../DESIGN.md#15-diagnostyka-doctor--redacted-logger), [`SECURITY.md §7`](../SECURITY.md#7-audyt-sekret%C3%B3w-i-tryb-doctor), [`PRD.md F11`](../PRD.md#6-ficzery--z-priorytetami), [`ADR-0001`](../adr/0001-tui-zamiast-cli.md)
 - **Notatki:**
   - **MVP scope: tylko `webox doctor`**. `webox doctor security` → `v0.2+`.
-  - Architektura: każdy check zwraca `Result{Severity, Message, Hint}`. Łatwo dodać nowe później.
+  - Architektura: każdy check zwraca `Result{Severity, Status, Message, Hint}`.
+    Łatwo dodać nowe później; `Report` agreguje `Summary` i mapuje exit code.
+  - Dependency wyjątek: `fatih/color` dodane celowo, bo było explicit w AC.
+    Wybrana wersja `v1.18.0`, bo to najnowszy release kompatybilny z naszym
+    `go 1.24` floor (nowszy `v1.19.0` wymusza `go 1.25`).
 
 ---
 
@@ -298,11 +340,39 @@ Po sprincie 01:
 
 ### TASK-01.9 — `i18n` skeleton (S)
 
-Jeśli zostanie czas: stub `i18n/i18n.go` z `func T(key string, args ...any) string`. Tylko PL/EN, 5 stringów (doctor messages). Pełna implementacja → Sprint 07.
+- **Estymata:** S
+- **Zależności:** TASK-01.8
+- **Acceptance Criteria:**
+  - [x] `i18n/i18n.go` dodaje stub `func T(key string, args ...any) string`.
+  - [x] Minimalny `Catalog` wspiera `en` + `pl`.
+  - [x] Zaszyte 5 stringów związanych z `doctor`.
+  - [x] Unknown key fail-soft → zwraca klucz zamiast pustego stringa.
+  - [x] Testy dla fallback language + formatting.
+- **Pliki:**
+  - `i18n/i18n.go` (new)
+  - `i18n/i18n_test.go` (new)
+- **Docs:** [`ADR-0006`](../adr/0006-jezyk-interfejsu-en-domyslny.md), [`UX.md §10`](../UX.md#10-internacjonalizacja)
+- **Notatki:**
+  - To tylko stub, nie loader z `translations/*.json`.
+  - Pełne tłumaczenia ekranów core i `make i18n-check` zostają w Sprincie 07.
 
 ### TASK-01.10 — Telemetry stubs (S)
 
-`internal/telemetry/telemetry.go` z `Disabled` defaultem (zgodnie z `SECURITY §15`). Tylko interface, no impl.
+- **Estymata:** S
+- **Zależności:** —
+- **Acceptance Criteria:**
+  - [x] `internal/telemetry/telemetry.go` dodaje `Sink` interface i `Event`.
+  - [x] `Disabled` default = no-op sink (`Enabled() == false`, `Record()` nic nie robi).
+  - [x] Brak impl zdalnej telemetrii, brak side-effectów sieciowych.
+  - [x] Krótki test kontraktu no-op.
+- **Pliki:**
+  - `internal/telemetry/doc.go` (new)
+  - `internal/telemetry/telemetry.go` (new)
+  - `internal/telemetry/telemetry_test.go` (new)
+- **Docs:** [`PRD.md §12.4`](../PRD.md#124-telemetria--analytics), [`ROADMAP.md §6`](../ROADMAP.md#6-czego-nie-robimy), [`README.md`](../../README.md)
+- **Notatki:**
+  - Sprint plan miał błędne odwołanie do `SECURITY §15` — taka sekcja nie istnieje.
+    Źródłem prawdy dla „zero remote telemetry” są PRD / ROADMAP / README / AGENTS.
 
 ---
 
@@ -321,25 +391,38 @@ Jeśli zostanie czas: stub `i18n/i18n.go` z `func T(key string, args ...any) str
 
 ## Outcome (wypełnij po sprincie)
 
-- ✅ Done: TASK-01.1, ...
-- ⏭️ Carry-over: TASK-01.X → Sprint 02
-- 📌 Decyzje: <ADR jeśli powstał (np. memguard ↔ alternatywa)>
-- 🧠 Surprises: ...
+- ✅ Done: TASK-01.1, TASK-01.2, TASK-01.3, TASK-01.4, TASK-01.5,
+  TASK-01.6, TASK-01.7, TASK-01.8, TASK-01.9, TASK-01.10
+- ⏭️ Carry-over: brak
+- 📌 Decyzje:
+  - `webox doctor` zostaje lekkim subcommandem w ręcznym parserze `cmd/webox`;
+    bez Cobra, bez rozszerzania CLI surface poza wyjątek z ADR-0001.
+  - `github.com/fatih/color` pinned do `v1.18.0`, bo `v1.19.0` wymusza
+    `go 1.25` i łamie nasz `go 1.24` floor.
+  - Optional taski dostały jawne AC, żeby sprint marker mógł zamknąć sprint na 100%.
+- 🧠 Surprises:
+  - szkic taska 01.10 linkował do nieistniejącego `SECURITY §15`;
+    trzeba było poprawić źródło prawdy do `PRD §12.4` / `ROADMAP §6`.
+  - testy `cmd/webox` z package-level seamami były zielone lokalnie, ale
+    `make ci` złapało race przez `t.Parallel()`; harness trzeba było
+    zserializować.
 - 📊 Metryki:
-  - Coverage `config/`: %
-  - Coverage `secrets/`: %
-  - Coverage `internal/log/`: %
-  - Linijek kodu (prod): ~X
-  - Linijek testów: ~Y
-  - Czas faktyczny vs estymata: ratio
+  - Coverage `config/`: 84.8%
+  - Coverage `secrets/`: 87.0%
+  - Coverage `internal/log/`: 100.0%
+  - Coverage `cmd/webox`: 86.1%
+  - Coverage `services/doctor`: 71.8%
+  - Global coverage (`make ci`): 84.3%
+  - Closing diff vs `origin/main`: 17 files, +1643 / -79
+  - Czas faktyczny vs estymata: ~1.1× (z optionalami, ale bez carry-over)
 - 🔒 Security validation:
-  - [ ] `govulncheck ./...` clean
-  - [ ] `gosec ./...` no high severity
-  - [ ] Manual review TASK-01.7 (crypto code) — chain-of-custody w retro
-- ➡️ Następny sprint: `sprint-02-ssh-cache.md` (planning slot: …)
+  - [x] `govulncheck ./...` clean
+  - [x] `gosec ./...` no high severity (`golangci-lint v2` clean)
+  - [x] Manual review TASK-01.7 (crypto code) — chain-of-custody w retro / PR #8
+- ➡️ Następny sprint: [`sprint-02-ssh-cache.md`](./sprint-02-ssh-cache.md)
 
 ---
 
 ## Retro link (po sprincie)
 
-`docs/retros/YYYY-MM-DD-sprint-01.md` — wypełnia skill `retro` z naciskiem na **security retro** (czy coś przeoczyliśmy w `TASK-01.7`?).
+[`docs/retros/2026-05-23-sprint-01.md`](../retros/2026-05-23-sprint-01.md)

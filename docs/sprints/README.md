@@ -228,9 +228,9 @@ Wszystkie powtarzalne kroki są skryptowane. Główne komendy z `Makefile`:
 
 | Sprint | Temat | Status | Plan | Retro |
 |--------|-------|--------|------|-------|
-| 00 | Bootstrap (repo, CI, tooling) | 📅 Planned | [sprint-00-bootstrap.md](sprint-00-bootstrap.md) | — |
-| 01 | Foundations (config + secrets) | 📅 Planned | [sprint-01-foundations.md](sprint-01-foundations.md) | — |
-| 02 | SSH + status cache | 📝 Outlined | — | — |
+| 00 | Bootstrap (repo, CI, tooling) | ✅ Done | [sprint-00-bootstrap.md](sprint-00-bootstrap.md) | [2026-05-22-sprint-00.md](../retros/2026-05-22-sprint-00.md) |
+| 01 | Foundations (config + secrets) | ✅ Done | [sprint-01-foundations.md](sprint-01-foundations.md) | [2026-05-23-sprint-01.md](../retros/2026-05-23-sprint-01.md) |
+| 02 | SSH + status cache | 📅 Planned | [sprint-02-ssh-cache.md](sprint-02-ssh-cache.md) | — |
 | 03 | Provider abstraction + `small.pl` skeleton | 📝 Outlined | — | — |
 | 04 | TUI shell (MVU, navigation, dashboard) | 📝 Outlined | — | — |
 | 05 | Wizard tworzenia projektu (LIFO rollback) | 📝 Outlined | — | — |
