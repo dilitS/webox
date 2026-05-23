@@ -1,6 +1,6 @@
 module github.com/dilitS/webox
 
-go 1.24
+go 1.24.0
 
 require (
 	github.com/awnumar/memguard v0.23.0
@@ -8,6 +8,7 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/crypto v0.41.0
+	golang.org/x/sync v0.17.0
 	golang.org/x/term v0.34.0
 )
 

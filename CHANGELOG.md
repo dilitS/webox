@@ -16,6 +16,13 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `status/cache.go` (TASK-02.5) — generic package-level
+  `GetOrFetch[T]` implementing the in-memory SWR contract from
+  DESIGN §8 / ADR-0005: fresh hit returns immediately, stale hit returns
+  buffered data while refreshing in the background, cold miss blocks on
+  fetch, and `singleflight` dedupes concurrent misses per key. Adds
+  direct dependency `golang.org/x/sync v0.17.0` (latest compatible with
+  Go 1.24 metadata; newer v0.20.0 requires Go 1.25).
 - `ssh/exec.go` + `ssh/keepalive.go` (TASK-02.4) — pooled `Exec`
   helper returning `ExecResult{Stdout, Stderr, ExitCode, Duration}`,
   per-client `keepalive@openssh.com` global request loop (default

@@ -143,14 +143,14 @@ Po sprincie 02:
 - **Estymata:** L
 - **Zależności:** —
 - **Acceptance Criteria:**
-  - [ ] `status/cache.go` z `GetOrFetch[T]` jako funkcją pakietową (nie method).
-  - [ ] Semantyka:
+  - [x] `status/cache.go` z `GetOrFetch[T]` jako funkcją pakietową (nie method).
+  - [x] Semantyka:
     - cache hit fresh → natychmiast,
     - cache stale → zwrot stale + refresh w tle,
     - cache miss → blokujący fetch.
-  - [ ] `singleflight` zapewnia 1 inflight fetch per key.
-  - [ ] Czas (`now`) injectable.
-  - [ ] Testy:
+  - [x] `singleflight` zapewnia 1 inflight fetch per key.
+  - [x] Czas (`now`) injectable.
+  - [x] Testy:
     - hit / stale / miss,
     - singleflight on same key,
     - cancellation,
@@ -162,6 +162,9 @@ Po sprincie 02:
 - **Docs:** [`DESIGN.md §8`](../DESIGN.md#8-tr%C3%B3jpoziomowy-status-cache-stale-while-revalidate), [`ADR-0005`](../adr/0005-cache-statusow-projektow.md)
 - **Notatki:**
   - TDD twarde. To core logic pod dashboard i drift detection.
+  - Dodano `golang.org/x/sync v0.17.0` zamiast latest (`v0.20.0` wymaga
+    Go 1.25). `go.mod` nadal musi zostać utrzymany na `go 1.24`.
+  - Coverage `status/` po TASK-02.5 = **87.8%**.
 
 ---
 
