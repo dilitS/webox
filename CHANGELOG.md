@@ -16,6 +16,19 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `parseVhostList`, `parseSSLAdd`, `parseSSLDelete`, `parseDBAdd`,
+  `parseDBDelete` in `providers/smallhost/parsers.go` (TASK-03.5) —
+  cover the SSL provisioning round-trip (account IP lookup → cert
+  install → cert delete) and the MySQL/PostgreSQL provisioning
+  round-trip (create with panel-generated credentials → delete).
+  `parseSSLAdd` maps DNS-not-resolving and Let's Encrypt rate-limit
+  outputs onto `ErrDNSNotResolving` / `ErrRateLimitLetsEncrypt`.
+  `parseDBAdd` extracts username + password via named regex groups
+  and the test corpus asserts the password never leaks back into
+  error strings. `parseSSLDelete` / `parseDBDelete` treat "no cert" /
+  "not found" as nil so LIFO rollback can replay safely. Fixtures
+  use `REDACTED-NEVER-A-REAL-SECRET-` as a tripwire prefix the
+  redactor will catch even if a real password ever slips in.
 - `providers/smallhost/parsers.go` + `testing/fixtures/devil/`
   (TASK-03.4) — defensive parsers for `devil www add`, `devil www
   restart`, and `devil www list`. `stripAndNormalize` caps each

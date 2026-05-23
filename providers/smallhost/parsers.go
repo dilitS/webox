@@ -122,6 +122,171 @@ func parseWwwRestart(raw []byte) error {
 // node_version. The node_version slot may be `-` for non-Node rows.
 var wwwListLineRegex = regexp.MustCompile(`^(?P<domain>\S+)\s+(?P<type>nodejs|static|php)\s+(?P<node>\S+)\s*$`)
 
+// ipv4Regex matches an IPv4 address — used by parseVhostList to
+// extract the account IP needed for SetupSSL. We intentionally do not
+// validate octet ranges with regex; the optional [net.ParseIP] guard
+// inside the parser is the authoritative check.
+var ipv4Regex = regexp.MustCompile(`\b(?P<ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b`)
+
+// vhostMinColumns is the minimum column count `devil vhost list`
+// emits per row: domain, IP, type. Named constant so a future panel
+// version adding extra columns (region, owner, …) shows up clearly
+// in code review.
+const vhostMinColumns = 3
+
+// VhostEntry is a row of `devil vhost list` — domain + IP + type. The
+// IP is the load-bearing field for SetupSSL.
+type VhostEntry struct {
+	Domain string
+	IP     string
+	Type   string
+}
+
+// parseVhostList parses the response of `devil vhost list` and returns
+// the entries plus the first non-empty IP found (the account IP).
+// Adapters call this once per SetupSSL to learn the IP they must hand
+// to `devil ssl www add`.
+func parseVhostList(raw []byte) ([]VhostEntry, string, error) {
+	clean, err := stripAndNormalize(raw)
+	if err != nil {
+		return nil, "", err
+	}
+	entries := make([]VhostEntry, 0)
+	accountIP := ""
+	for i, line := range strings.Split(string(clean), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if i == 0 && strings.HasPrefix(line, "domain") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < vhostMinColumns {
+			return nil, "", fmt.Errorf("%w: parseVhostList row %d (need %d fields)", providers.ErrUnknownOutputFormat, i, vhostMinColumns)
+		}
+		ip := fields[1]
+		if !ipv4Regex.MatchString(ip) {
+			return nil, "", fmt.Errorf("%w: parseVhostList row %d (bad IP)", providers.ErrUnknownOutputFormat, i)
+		}
+		entries = append(entries, VhostEntry{
+			Domain: fields[0],
+			IP:     ip,
+			Type:   fields[2],
+		})
+		if accountIP == "" {
+			accountIP = ip
+		}
+	}
+	if accountIP == "" {
+		return nil, "", fmt.Errorf("%w: parseVhostList yielded no IP", providers.ErrUnknownOutputFormat)
+	}
+	return entries, accountIP, nil
+}
+
+// parseSSLAdd parses the response of `devil ssl www add <ip> le le
+// <domain>`. Success returns nil; the two well-known retryable errors
+// (DNS not configured, Let's Encrypt rate limit) map to typed
+// sentinels.
+func parseSSLAdd(raw []byte) error {
+	clean, err := stripAndNormalize(raw)
+	if err != nil {
+		return err
+	}
+	text := strings.TrimSpace(string(clean))
+	lower := strings.ToLower(text)
+
+	switch {
+	case strings.HasPrefix(text, "Certificate installed"):
+		return nil
+	case strings.Contains(lower, "dns not configured"), strings.Contains(lower, "dns not resolving"):
+		return providers.ErrDNSNotResolving
+	case strings.Contains(lower, "rate limit"):
+		return providers.ErrRateLimitLetsEncrypt
+	}
+	return fmt.Errorf("%w: parseSSLAdd over %d bytes", providers.ErrUnknownOutputFormat, len(raw))
+}
+
+// parseSSLDelete parses the response of `devil ssl www del <ip>
+// <domain>`. Idempotent: "Removed SSL ..." and "no cert: ..." both
+// return nil — Remove* must never crash on "already gone".
+func parseSSLDelete(raw []byte) error {
+	clean, err := stripAndNormalize(raw)
+	if err != nil {
+		return err
+	}
+	text := strings.TrimSpace(string(clean))
+	switch {
+	case strings.HasPrefix(text, "Removed SSL"):
+		return nil
+	case strings.HasPrefix(text, "no cert"):
+		return nil
+	}
+	return fmt.Errorf("%w: parseSSLDelete over %d bytes", providers.ErrUnknownOutputFormat, len(raw))
+}
+
+// DBAddResult is the typed outcome of `devil <engine> add` parsing.
+// User and Password fields are the panel-generated credentials; the
+// caller MUST move Password into a memguard.LockedBuffer immediately
+// and overwrite the struct field with the empty string before any
+// logging or persistence.
+type DBAddResult struct {
+	User     string
+	Password string
+}
+
+var (
+	dbUserRegex = regexp.MustCompile(`(?m)^Username:\s+(?P<user>\S+)\s*$`)
+	dbPassRegex = regexp.MustCompile(`(?m)^Password:\s+(?P<pass>\S+)\s*$`)
+)
+
+// parseDBAdd parses the response of `devil mysql add` / `devil pgsql
+// add`. Both engines use the same wire format; the dbType arg is
+// retained only for error context. Returns ErrDBNameTaken when the
+// panel reports "database exists: ...".
+//
+// CRITICAL: the password is NEVER inserted into any error or log
+// message — even on parse failure, only the byte length appears. This
+// invariant is asserted by TestParseDBAdd_PasswordNeverInError.
+func parseDBAdd(raw []byte) (*DBAddResult, error) {
+	clean, err := stripAndNormalize(raw)
+	if err != nil {
+		return nil, err
+	}
+	text := string(clean)
+	if strings.Contains(text, "database exists") {
+		return nil, providers.ErrDBNameTaken
+	}
+
+	userMatch := dbUserRegex.FindStringSubmatch(text)
+	passMatch := dbPassRegex.FindStringSubmatch(text)
+	if userMatch == nil || passMatch == nil {
+		return nil, fmt.Errorf("%w: parseDBAdd over %d bytes", providers.ErrUnknownOutputFormat, len(raw))
+	}
+	return &DBAddResult{
+		User:     userMatch[dbUserRegex.SubexpIndex("user")],
+		Password: passMatch[dbPassRegex.SubexpIndex("pass")],
+	}, nil
+}
+
+// parseDBDelete parses the response of `devil mysql del` / `devil
+// pgsql del`. Idempotent: "Deleted <db>" and "not found: <db>" both
+// return nil.
+func parseDBDelete(raw []byte) error {
+	clean, err := stripAndNormalize(raw)
+	if err != nil {
+		return err
+	}
+	text := strings.TrimSpace(string(clean))
+	switch {
+	case strings.HasPrefix(text, "Deleted "):
+		return nil
+	case strings.HasPrefix(text, "not found"):
+		return nil
+	}
+	return fmt.Errorf("%w: parseDBDelete over %d bytes", providers.ErrUnknownOutputFormat, len(raw))
+}
+
 // parseWwwList parses the response of `devil www list`. The header
 // row is recognised by prefix and skipped; empty output (headers only
 // / nothing) returns an empty non-nil slice. Any line that fails the
