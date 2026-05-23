@@ -16,6 +16,15 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `providers/smallhost/config.go` + `methods.go` (TASK-03.2) — adapter
+  constructor and typed [`Properties`] bag for small.pl / Devil. The
+  factory rejects unsupported `restart_method`, parses `ssh_pool_max`
+  (range `[1,16]`, default 3), and `ssh_algorithms_legacy_compat`
+  (default false). Registration happens in `init()` via the new
+  registry. Method stubs implementing `HostingProvider` return a
+  `providers.ErrUnknownOutputFormat`-wrapped sentinel until TASK-03.6
+  replaces them; this keeps the interface contract testable now
+  without leaking half-finished SSH wiring into later tasks.
 - `providers/provider.go`, `providers/errors.go`, `providers/registry.go`
   (TASK-03.1) — canonical `HostingProvider` contract, sentinel errors
   (`ErrInvalidProviderConfig`, `ErrUnknownProvider`,
