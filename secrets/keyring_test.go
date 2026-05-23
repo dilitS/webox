@@ -14,7 +14,6 @@ func TestDetectWithClient(t *testing.T) {
 		name       string
 		mock       *mockKeyringClient
 		wantOS     bool
-		wantFB     bool
 		wantErr    error
 		wantDelete bool
 	}{
@@ -25,11 +24,11 @@ func TestDetectWithClient(t *testing.T) {
 			wantDelete: true,
 		},
 		{
-			name: "unsupported platform chooses fallback",
+			name: "unsupported platform surfaces keyring unavailable",
 			mock: &mockKeyringClient{
 				setErr: keyring.ErrUnsupportedPlatform,
 			},
-			wantFB: true,
+			wantErr: ErrKeyringUnavailable,
 		},
 		{
 			name: "not found after successful set is broken keyring",
@@ -40,18 +39,18 @@ func TestDetectWithClient(t *testing.T) {
 			wantDelete: true,
 		},
 		{
-			name: "transient set error chooses fallback",
+			name: "transient set error surfaces keyring unavailable",
 			mock: &mockKeyringClient{
 				setErr: errors.New("dbus unavailable"),
 			},
-			wantFB: true,
+			wantErr: ErrKeyringUnavailable,
 		},
 		{
-			name: "transient get error cleans probe then chooses fallback",
+			name: "transient get error cleans probe then surfaces keyring unavailable",
 			mock: &mockKeyringClient{
 				getErr: errors.New("dbus timeout"),
 			},
-			wantFB:     true,
+			wantErr:    ErrKeyringUnavailable,
 			wantDelete: true,
 		},
 	}
@@ -75,11 +74,6 @@ func TestDetectWithClient(t *testing.T) {
 			if tt.wantOS {
 				if _, ok := backend.(*osKeyringBackend); !ok {
 					t.Fatalf("detectWithClient() backend = %T, want *osKeyringBackend", backend)
-				}
-			}
-			if tt.wantFB {
-				if _, ok := backend.(*FallbackBackend); !ok {
-					t.Fatalf("detectWithClient() backend = %T, want *FallbackBackend", backend)
 				}
 			}
 			if tt.mock.deletedProbe != tt.wantDelete {
@@ -200,20 +194,5 @@ func TestDetectWithGoKeyringMock(t *testing.T) {
 	}
 	if _, ok := backend.(*osKeyringBackend); !ok {
 		t.Fatalf("Detect() backend = %T, want *osKeyringBackend", backend)
-	}
-}
-
-func TestFallbackBackendPlaceholder(t *testing.T) {
-	t.Parallel()
-
-	var backend Backend = &FallbackBackend{}
-	if _, err := backend.Get("missing"); !errors.Is(err, ErrFallbackUnavailable) {
-		t.Fatalf("FallbackBackend.Get() = %v, want ErrFallbackUnavailable", err)
-	}
-	if err := backend.Set("missing", []byte("value")); !errors.Is(err, ErrFallbackUnavailable) {
-		t.Fatalf("FallbackBackend.Set() = %v, want ErrFallbackUnavailable", err)
-	}
-	if err := backend.Delete("missing"); !errors.Is(err, ErrFallbackUnavailable) {
-		t.Fatalf("FallbackBackend.Delete() = %v, want ErrFallbackUnavailable", err)
 	}
 }

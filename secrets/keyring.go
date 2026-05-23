@@ -56,9 +56,9 @@ func detectWithClient(client keyringClient) (Backend, error) {
 
 	if err := client.Set(keyringService, probeKey, token); err != nil {
 		if errors.Is(err, keyring.ErrUnsupportedPlatform) {
-			return &FallbackBackend{}, nil
+			return nil, fmt.Errorf("%w: platform reports keyring unsupported", ErrKeyringUnavailable)
 		}
-		return &FallbackBackend{}, nil
+		return nil, fmt.Errorf("%w: probe Set failed: %w", ErrKeyringUnavailable, err)
 	}
 
 	cleanup := func() {
@@ -70,7 +70,7 @@ func detectWithClient(client keyringClient) (Backend, error) {
 		if errors.Is(err, keyring.ErrNotFound) {
 			return nil, fmt.Errorf("%w: probe read after successful write returned not found", ErrBrokenKeyring)
 		}
-		return &FallbackBackend{}, nil
+		return nil, fmt.Errorf("%w: probe Get failed: %w", ErrKeyringUnavailable, err)
 	}
 	cleanup()
 

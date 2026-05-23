@@ -237,28 +237,52 @@ Po sprincie 01:
 - **Estymata:** L
 - **Zależności:** TASK-01.6 (interface)
 - **Acceptance Criteria:**
-  - [ ] `secrets/fallback.go` implementuje `Backend`.
-  - [ ] Storage: `$XDG_CONFIG_HOME/webox/secrets.enc` (perms 0600).
-  - [ ] Format: `version(1B) | salt(16B) | nonce(12B) | ciphertext+tag`.
-  - [ ] KDF: **Argon2id** (`time=3, memory=64MB, threads=4, keyLen=32`).
-  - [ ] Nonce: **`crypto/rand.Read` → panic on error** (fix dla `AUDIT §8 IMP-2`).
-  - [ ] Password input:
-    - Default: prompt z `golang.org/x/term.ReadPassword` (no echo).
-    - CI: `WEBOX_MASTER_PASSWORD` env var z **warning na STDERR** (fix dla `AUDIT §8 IMP-3`).
-  - [ ] Wszystkie sekrety w pamięci: `memguard.LockedBuffer`, `defer buf.Destroy()`.
-  - [ ] Tabela testów:
-    - round-trip (set → get)
+  - [x] `secrets/fallback.go` implementuje `Backend`.
+  - [x] Storage: `$XDG_CONFIG_HOME/webox/secrets.enc` (perms 0600); ścieżka
+    wskazywana przez wywołującego (TUI/`cmd/webox`), nie wymuszana przez pakiet
+    — pakiet tylko egzekwuje `0600` na pliku i `0700` na rodzicu.
+  - [x] Format: `version(1B) | salt(16B) | nonce(12B) | ciphertext+tag`.
+  - [x] KDF: **Argon2id** (`time=3, memory=64MB, parallelism=2, keyLen=32`).
+    Wartość `parallelism=2` jest spójna z `docs/SECURITY.md §4.2`,
+    `docs/adr/0004` i `AGENTS.md §1.2` (poprzedni szkic AC nosił
+    `threads=4` przez kopię błędu z draftu PRD; SECURITY/ADR wygrywają per
+    `.cursor/rules/00-charter.mdc` decision policy).
+  - [x] Nonce: **`crypto/rand.Read` → panic on error** (fix dla `AUDIT §8 IMP-2`).
+  - [x] Password input:
+    - Default: prompt z `golang.org/x/term.ReadPassword` (no echo) —
+      `secrets.ReadMasterPassword` w `secrets/password.go`.
+    - CI: `WEBOX_MASTER_PASSWORD` env var z **warning na STDERR** gdy
+      heurystyka wykryje workstation (CI markers vs `DISPLAY`/`SSH_CLIENT`/
+      `XDG_SESSION_TYPE` — fix dla `AUDIT §8 IMP-3`).
+  - [x] Wszystkie sekrety w pamięci: `memguard.LockedBuffer`, `Close()` /
+    `defer buf.Destroy()`. Klucz AES, klucz po rotacji i bufor hasła
+    trzymane w `LockedBuffer`, zerowane explicit po użyciu.
+  - [x] Tabela testów:
+    - round-trip set→get fresh + persistence across re-open
     - wrong password → `ErrAuthFailed`
-    - corrupt file → `ErrCorruptedSecrets`
-    - rotate password (re-encrypt all)
-    - **CSPRNG fail:** mock `crypto/rand` returning error → assert `panic` (test via `defer recover`)
+    - corrupt file (truncated + unknown version + plaintext-not-JSON + wrong schema) → `ErrCorruptedSecrets`
+    - rotate password (re-encrypt all, old password rejected, salt rotated, persist-failure rollback)
+    - **CSPRNG fail:** swap package-level `randReader`, assert panic via `defer recover`
     - nonce uniqueness: 1000 zapisów → 1000 różnych nonce
-  - [ ] Race-safe (`sync.Mutex` na file ops + `flock`).
-  - [ ] Coverage ≥ 85%.
+    - master password too short → `ErrMasterPasswordTooShort`
+    - locked backend (zero value lub po `Close`) → `ErrFallbackLocked` dla Get/Set/Delete/Rotate
+    - 16 goroutyn `Set` współbieżnie — race detector + finalna weryfikacja stanu
+  - [x] Race-safe (`sync.Mutex` na file ops + `flock(2)` per write na `<path>.lock`).
+    Windows lock to stub `ErrSecretsLocked` (port `LockFileEx` ↦ v0.2+, zgodnie z `R-013` i z `config/lock_windows.go`).
+  - [x] Coverage ≥ 85% (`secrets` = 87.0% with `-race`).
 - **Pliki:**
   - `secrets/fallback.go` (new)
-  - `secrets/fallback_test.go` (new)
   - `secrets/fallback_crypto.go` (new, helper)
+  - `secrets/fallback_io.go` (new, atomic write helpers)
+  - `secrets/fallback_test.go` (new)
+  - `secrets/fallback_branches_test.go` (new — białe-skrzynkowe testy dla branchy persist-failure, lock contention, ctx cancel, forged-vault edge cases)
+  - `secrets/password.go` (new)
+  - `secrets/password_test.go` (new)
+  - `secrets/lock_unix.go` (new) + `secrets/lock_windows.go` (new stub)
+  - `secrets/errors.go` (edit — `ErrFallbackLocked`, `ErrAuthFailed`, `ErrCorruptedSecrets`, `ErrMasterPasswordTooShort`, `ErrKeyringUnavailable` zamiast `ErrFallbackUnavailable`)
+  - `secrets/backend.go` (edit — usunięty placeholder `FallbackBackend`, interface only)
+  - `secrets/keyring.go` (edit — `Detect()` zwraca `nil, ErrKeyringUnavailable` zamiast nieużywalnego locked-placeholder; konsument w `cmd/webox` musi rozwiązać hasło i wywołać `NewFallback`)
+  - `secrets/keyring_test.go` (edit — usunięty `TestFallbackBackendPlaceholder`, tabela `Detect` zaktualizowana o nowy kontrakt)
 - **Docs:** [`SECURITY.md §4.2.1, §4.2.2`](../SECURITY.md), [`AUDIT §8 IMP-2, IMP-3`](../AUDIT.md), [`ADR-0004`](../adr/0004-przechowywanie-sekretow-keyring.md)
 - **Notatki:**
   - **NAJWAŻNIEJSZY task sprintu z perspektywy bezpieczeństwa.** Nie skacz w to bez TDD.

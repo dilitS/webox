@@ -15,6 +15,77 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ## [Unreleased]
 
+### Security
+- `secrets.FallbackBackend` (TASK-01.7) now stores credentials in an
+  AES-GCM-256 encrypted file keyed by Argon2id (`time=3, memory=64MB,
+  parallelism=2, keyLen=32`), so headless Linux / Docker / WSL /
+  FreeBSD environments without an OS keyring can still run Webox
+  without ever writing plaintext secrets to disk. Per
+  `docs/SECURITY.md §4.2.1` and `AUDIT §8 IMP-2`, every write generates
+  a fresh 96-bit nonce via `crypto/rand.Read` and any CSPRNG failure
+  panics rather than degrading silently (test
+  `TestFallbackBackend_CSPRNGFailurePanics`). In-memory keys live
+  in `memguard.LockedBuffer` and are zeroed by `Close()` /
+  `RotatePassword`. File format is the
+  `version(1B) | salt(16B) | nonce(12B) | ciphertext+tag` blob
+  documented in the sprint plan.
+- `secrets.ReadMasterPassword` (TASK-01.7) reads the fallback master
+  password through `golang.org/x/term.ReadPassword` (no echo) and
+  honours `WEBOX_MASTER_PASSWORD` for ephemeral CI runners. Per
+  `docs/SECURITY.md §4.2.2` and `AUDIT §8 IMP-3`, presence of the env
+  var on a workstation host (CI markers absent, `DISPLAY`/`SSH_CLIENT`/
+  `XDG_SESSION_TYPE` present) emits a single warning to STDERR so
+  contributors notice the `/proc/<pid>/environ` exposure surface.
+
+### Added
+- `secrets/fallback.go`, `secrets/fallback_crypto.go`,
+  `secrets/fallback_io.go` — full `FallbackBackend` with `NewFallback`,
+  `Get`/`Set`/`Delete`/`Close`/`RotatePassword`, atomic write through
+  `<path>.tmp.<pid>.<rand>` + `fsync` + `rename` + parent-dir
+  `fsync`, intra-process `sync.Mutex` and cross-process `flock(2)` on
+  `<path>.lock`. Zero-value backend returns the new
+  `ErrFallbackLocked` for every operation so callers must construct
+  through `NewFallback`.
+- `secrets/password.go` + `secrets/password_test.go` — master-password
+  resolution helper covered by table-driven CI-vs-workstation
+  heuristic tests, env-var path, and a non-terminal stdin pipe path.
+- `secrets/lock_unix.go` + `secrets/lock_windows.go` — `flock(2)`
+  helper with exponential backoff, deadline-aware retries, context
+  cancellation, and an `ErrSecretsLocked` sentinel. Windows is a
+  compile stub awaiting `LockFileEx` (release-blocked v0.2+, mirroring
+  `config/lock_windows.go`).
+- `secrets/fallback_test.go` + `secrets/fallback_branches_test.go` —
+  TDD suite exercising round-trip, persistence across re-open, wrong
+  password (`ErrAuthFailed`), corrupted/forged file branches
+  (`ErrCorruptedSecrets`), 1000-write nonce uniqueness, password
+  rotation with persist-failure rollback, file permissions, 16-way
+  concurrent `Set`, `RotatePassword` on locked / too-short input, and
+  the CSPRNG panic seam.
+- `secrets.MasterPasswordMinLen` (12, per ADR-0004) and the
+  `MasterPasswordEnv` constant exported for downstream `cmd/webox`
+  consumers.
+- Dependencies: `github.com/awnumar/memguard v0.23.0` (Apache-2.0;
+  locked buffers, pure Go), `golang.org/x/crypto v0.41.0` (Argon2id),
+  `golang.org/x/term v0.34.0` (no-echo terminal read). All three are
+  the libraries declared in `AGENTS.md §1.2`; main module stays on
+  `go 1.24` (downstream crypto is the last release that doesn't push
+  the toolchain past 1.24).
+
+### Changed
+- `secrets/backend.go` no longer ships a placeholder `FallbackBackend`
+  — the type and its methods now live in `secrets/fallback.go`. The
+  interface itself is unchanged.
+- `secrets.Detect()` returns `nil, ErrKeyringUnavailable` on any of
+  the previously-fallback paths (unsupported platform, probe Set
+  failure, probe Get failure other than `ErrNotFound`). The TASK-01.6
+  behaviour of returning an unusable locked `&FallbackBackend{}`
+  placeholder was a transitional shim; the real wiring asks the
+  caller to construct `NewFallback` with a resolved password.
+- `secrets/errors.go` retires `ErrFallbackUnavailable` in favour of
+  `ErrFallbackLocked` (zero-value backend), `ErrAuthFailed`,
+  `ErrCorruptedSecrets`, `ErrMasterPasswordTooShort`, and
+  `ErrKeyringUnavailable` (Detect path).
+
 ### Fixed
 - `tools/go.mod` now pins dev tooling to Go 1.26.3 instead of 1.26.2 so
   `govulncheck` no longer runs on vulnerable `net@go1.26.2`
