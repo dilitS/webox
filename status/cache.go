@@ -2,6 +2,7 @@ package status
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -11,6 +12,11 @@ import (
 )
 
 const defaultBackgroundTimeout = 30 * time.Second
+
+// ErrTypeMismatch is returned when the same cache key is reused for a
+// different value type. Keys are intentionally domain-prefixed to make
+// this a programmer error rather than a recoverable runtime condition.
+var ErrTypeMismatch = errors.New("status: cache entry has unexpected type")
 
 // Options configures a Cache.
 type Options struct {
@@ -68,7 +74,7 @@ func GetOrFetch[T any](
 	ttl time.Duration,
 	fetch func(context.Context) (T, error),
 	ctx context.Context,
-) (T, bool, error) {
+) (value T, isStale bool, err error) {
 	if cache == nil {
 		cache = NewCache(Options{})
 	}
@@ -152,8 +158,8 @@ func fetchBlocking[T any](
 	ttl time.Duration,
 	fetch func(context.Context) (T, error),
 	ctx context.Context,
-) (T, bool, error) {
-	value, err := doFetch(cache, key, ttl, fetch, ctx)
+) (value T, isStale bool, err error) {
+	value, err = doFetch(cache, key, ttl, fetch, ctx)
 	return value, false, err
 }
 
@@ -198,7 +204,7 @@ func cast[T any](value any, key string) (T, error) {
 	typed, ok := value.(T)
 	if !ok {
 		var zero T
-		return zero, fmt.Errorf("status: cache entry %q has unexpected type %T", key, value)
+		return zero, fmt.Errorf("%w: key=%q type=%T", ErrTypeMismatch, key, value)
 	}
 	return typed, nil
 }

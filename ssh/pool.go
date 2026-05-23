@@ -15,6 +15,7 @@ const (
 	defaultIdleTimeout    = 60 * time.Second
 	defaultAcquireTimeout = 5 * time.Second
 	defaultKeepalive      = 15 * time.Second
+	cleanupDivisor        = 2
 )
 
 var errPoolClosed = errors.New("ssh: pool closed")
@@ -84,7 +85,7 @@ func (p *Pool) Acquire(ctx context.Context, target Target) (*cryptossh.Client, e
 	}
 
 	for {
-		client, wait, dial, err := p.reserveOrWait(ctx, target)
+		client, wait, dial, err := p.reserveOrWait(target)
 		if err != nil {
 			return nil, err
 		}
@@ -189,7 +190,7 @@ func (p *Pool) Close() {
 	}
 }
 
-func (p *Pool) reserveOrWait(ctx context.Context, target Target) (*cryptossh.Client, <-chan struct{}, bool, error) {
+func (p *Pool) reserveOrWait(target Target) (client *cryptossh.Client, wait <-chan struct{}, shouldDial bool, err error) {
 	p.mu.Lock()
 
 	if p.closed {
@@ -213,7 +214,7 @@ func (p *Pool) reserveOrWait(ctx context.Context, target Target) (*cryptossh.Cli
 		closeClients(expired)
 		return nil, nil, true, nil
 	}
-	wait := host.notify
+	wait = host.notify
 	p.mu.Unlock()
 	closeClients(expired)
 	return nil, wait, false, nil
@@ -287,9 +288,8 @@ func (p *Pool) cleanupLoop() {
 // it directly; production normally relies on the background cleanup
 // loop.
 func (p *Pool) ReapIdle() {
-	var expired []*cryptossh.Client
-
 	p.mu.Lock()
+	expired := make([]*cryptossh.Client, 0, len(p.hosts))
 	now := p.opts.Clock.Now()
 	for _, host := range p.hosts {
 		expired = append(expired, p.reapHostLocked(host, now)...)
@@ -338,7 +338,7 @@ func normalizePoolOptions(opts PoolOptions) PoolOptions {
 		opts.AcquireTimeout = defaultAcquireTimeout
 	}
 	if opts.CleanupInterval <= 0 {
-		opts.CleanupInterval = opts.IdleTimeout / 2
+		opts.CleanupInterval = opts.IdleTimeout / cleanupDivisor
 		if opts.CleanupInterval <= 0 {
 			opts.CleanupInterval = time.Second
 		}

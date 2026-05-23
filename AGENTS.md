@@ -10,7 +10,7 @@
 
 ## TL;DR
 
-Webox to **monolit w Go 1.24+** z TUI opartym o Bubble Tea/Lipgloss, GoReleaser do dystrybucji, `golangci-lint v2` jako linter, **MVP scope = small.pl/Devil only**. Implementacja jest **docs-first** — jakikolwiek kod sprzeczny z `docs/` zostaje odrzucony w review. **TDD jest obowiązkowe** dla: parserów outputu providerów, redaktora sekretów, status cache, walidatorów, maszyny stanów TUI. Sekrety **nigdy** nie wchodzą do logów ani plików tekstowych poza `keyring`/`secrets.enc`. Commity są **Conventional Commits 1.0.0** bez gitmoji. Każda znacząca zmiana → wpis w `CHANGELOG.md` sekcji `[Unreleased]`.
+Webox to **monolit w Go 1.25+** z TUI opartym o Bubble Tea/Lipgloss, GoReleaser do dystrybucji, `golangci-lint v2` jako linter, **MVP scope = small.pl/Devil only**. Implementacja jest **docs-first** — jakikolwiek kod sprzeczny z `docs/` zostaje odrzucony w review. **TDD jest obowiązkowe** dla: parserów outputu providerów, redaktora sekretów, status cache, walidatorów, maszyny stanów TUI. Sekrety **nigdy** nie wchodzą do logów ani plików tekstowych poza `keyring`/`secrets.enc`. Commity są **Conventional Commits 1.0.0** bez gitmoji. Każda znacząca zmiana → wpis w `CHANGELOG.md` sekcji `[Unreleased]`.
 
 ---
 
@@ -34,7 +34,7 @@ Webox to **monolit w Go 1.24+** z TUI opartym o Bubble Tea/Lipgloss, GoReleaser 
 
 | Element | Wersja / Wybór | Uzasadnienie |
 |---|---|---|
-| Język | **Go 1.24+** | `go 1.24` w `go.mod`. CI matrix testuje 1.24 + 1.25-rc gdy dostępne. |
+| Język | **Go 1.25+** | `go 1.25.0` w `go.mod`. Podbite w Sprint 02, bo `golang.org/x/crypto/ssh` fixy z `govulncheck` wymagają `x/crypto v0.52.0`, a ten deklaruje Go 1.25. |
 | Module system | Go modules | `go.mod` + `go.sum`; `vendor/` nie commitujemy. |
 | Build tool | `go build` + Makefile | `make build`, `make test`, `make lint`. |
 | Linter | `golangci-lint v2.x+` | Config: `.golangci.yml` z `version: "2"`. Nazwy v2: `gas→gosec`, `goerr113→err113`, `gomnd→mnd`. |
@@ -477,7 +477,7 @@ Refs: AUDIT A1
 | **AES-GCM nonce z `time.Now()`** | `nonce := make([]byte,12); binary.BigEndian.PutUint64(nonce, uint64(time.Now().UnixNano()))` | `if _, err := rand.Read(nonce); err != nil { panic(err) }`. |
 | **PID-based lockfile** | Sprawdzanie czy `os.FindProcess(pid)` zwraca proces | `flock(2)` via `gofrs/flock`. PID jest re-wykorzystywany. |
 | **Generic method na struct** | `func (c *Cache) Get[T any]() T {}` | Funkcja pakietowa `GetOrFetch[T any](c *Cache, ...)`. Go 1.24 wciąż nie wspiera. |
-| **`go get` cicho podbija `go` directive** | `go get <dep>@latest` i commit z `go 1.25.0` mimo że projekt miał zostać na `go 1.24` | Po **każdym** dodaniu depa przeczytaj `go.mod`, sprawdź transitive `go.mod` nowych modułów i pinuj ostatnią wersję kompatybilną z naszym floor (`go 1.24`). |
+| **`go get` cicho podbija `go` directive** | `go get <dep>@latest` i nieświadomy commit z wyższym `go` directive | Po **każdym** dodaniu depa przeczytaj `go.mod`, sprawdź transitive `go.mod` nowych modułów i pinuj ostatnią wersję kompatybilną z aktualnym floorem (`go 1.25.0`). Wyjątek: jeśli `govulncheck` wskazuje realnie wywoływany kod i fix wymaga wyższego flooru, podbij floor świadomie, opisz dlaczego w PR + CHANGELOG i zaktualizuj docs. |
 | **Hardcoded provider name w business logic** | `if profile.Type == "smallhost" { ... }` | `provider := registry.New(profile); provider.CreateSubdomain(...)`. |
 | **`os.Rename` na różnych filesystem** | Próba rename z `/tmp/` do `~/.config/` (różne mount). | Tmp file **w tym samym katalogu** co target. |
 | **Sekret w `fmt.Errorf("...%s...", password)`** | Error message zawiera plaintext sekret. | `fmt.Errorf("auth failed: %w", ErrInvalidCredentials)`. |

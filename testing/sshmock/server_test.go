@@ -156,7 +156,7 @@ func TestServer_DelayCanDriveClientTimeout(t *testing.T) {
 	}
 }
 
-func runCommand(client *cryptossh.Client, command string) (stdout string, stderr string, exitCode int, err error) {
+func runCommand(client *cryptossh.Client, command string) (stdout, stderr string, exitCode int, err error) {
 	session, err := client.NewSession()
 	if err != nil {
 		return "", "", -1, err

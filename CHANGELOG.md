@@ -34,8 +34,8 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   DESIGN §8 / ADR-0005: fresh hit returns immediately, stale hit returns
   buffered data while refreshing in the background, cold miss blocks on
   fetch, and `singleflight` dedupes concurrent misses per key. Adds
-  direct dependency `golang.org/x/sync v0.17.0` (latest compatible with
-  Go 1.24 metadata; newer v0.20.0 requires Go 1.25).
+  direct dependency `golang.org/x/sync v0.20.0` after the Sprint 02
+  SSH security update raised the main module to Go 1.25.
 - `ssh/exec.go` + `ssh/keepalive.go` (TASK-02.4) — pooled `Exec`
   helper returning `ExecResult{Stdout, Stderr, ExitCode, Duration}`,
   per-client `keepalive@openssh.com` global request loop (default
@@ -67,6 +67,12 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   distinguishable unknown / mismatch sentinels. Coverage: 100%.
 
 ### Security
+- Main module toolchain floor is now `go 1.25.0` so Webox can use
+  `golang.org/x/crypto v0.52.0`, the first `x/crypto/ssh` release that
+  fixes all `govulncheck` findings triggered by the new SSH client /
+  server code paths in Sprint 02. Keeping Go 1.24 would leave reachable
+  SSH vulnerabilities in `ssh.NetDialer`, `ssh.Exec`, keepalive, and
+  `testing/sshmock`.
 - `ssh.BuildClientConfig` refuses to construct a `ClientConfig` without
   a `HostKeyDB`, returning the typed `ErrHostKeyDBRequired` sentinel
   instead of falling back to `cryptossh.InsecureIgnoreHostKey`. This

@@ -32,12 +32,12 @@ func (d NetDialer) Dial(ctx context.Context, target Target, config *cryptossh.Cl
 	return cryptossh.NewClient(clientConn, chans, reqs), nil
 }
 
-func splitHostPort(addr string) (string, int, error) {
+func splitHostPort(addr string) (host string, port int, err error) {
 	host, portRaw, err := net.SplitHostPort(addr)
 	if err != nil {
 		return "", 0, err
 	}
-	port, err := strconv.Atoi(portRaw)
+	port, err = strconv.Atoi(portRaw)
 	if err != nil {
 		return "", 0, err
 	}

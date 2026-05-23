@@ -221,7 +221,7 @@ func targetForServer(server *sshmock.Server) Target {
 	return Target{Host: host, Port: port, User: "webox-test"}
 }
 
-func splitHostPortForTest(addr string) (string, int) {
+func splitHostPortForTest(addr string) (host string, port int) {
 	host, port, err := splitHostPort(addr)
 	if err != nil {
 		panic(err)

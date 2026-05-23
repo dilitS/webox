@@ -26,7 +26,7 @@ Webox jest open-source (MIT). Każdy PR przechodzi przez `golangci-lint`, testy 
 
 | Narzędzie | Wersja minimalna | Cel |
 |---|---|---|
-| Go | 1.24+ (target: 1.24 LTS-style; CI matrix testuje też 1.25 RC gdy dostępne) | Build. `CGO_ENABLED=0` dla release. |
+| Go | 1.25+ (podniesione w Sprint 02 dla `golang.org/x/crypto/ssh` fixes z `govulncheck`) | Build. `CGO_ENABLED=0` dla release. |
 | `git` | 2.30+ | Oczywiste. |
 | `gh` CLI | 2.30+ | Praca z PR-ami z konsoli. |
 | `make` | dowolny | Skróty zadań (`make test`, `make lint`). |

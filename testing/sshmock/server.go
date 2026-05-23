@@ -15,6 +15,13 @@ import (
 	cryptossh "golang.org/x/crypto/ssh"
 )
 
+const (
+	defaultClientTimeout = 2 * time.Second
+	unknownExitCode      = 127
+)
+
+var errPublicKeyRejected = errors.New("sshmock: public key rejected")
+
 // CommandResult describes the deterministic outcome returned when a
 // client executes a command through a session channel.
 type CommandResult struct {
@@ -98,8 +105,9 @@ func (s *Server) ClientConfig() *cryptossh.ClientConfig {
 		Auth: []cryptossh.AuthMethod{
 			cryptossh.PublicKeys(s.clientSigner),
 		},
+		//nolint:gosec // test helper: production host-key verification is covered in ssh/client_config_test.go.
 		HostKeyCallback: cryptossh.InsecureIgnoreHostKey(),
-		Timeout:         2 * time.Second,
+		Timeout:         defaultClientTimeout,
 	}
 }
 
@@ -143,7 +151,7 @@ func (s *Server) serve() {
 			if bytes.Equal(key.Marshal(), s.clientPub.Marshal()) {
 				return nil, nil
 			}
-			return nil, errors.New("sshmock: public key rejected")
+			return nil, errPublicKeyRejected
 		},
 		ServerVersion: "SSH-2.0-webox-sshmock",
 	}
@@ -169,7 +177,7 @@ func (s *Server) handleConn(conn net.Conn, config *cryptossh.ServerConfig) {
 		_ = conn.Close()
 		return
 	}
-	defer serverConn.Close()
+	defer func() { _ = serverConn.Close() }()
 
 	go s.handleGlobalRequests(requests)
 	for newChannel := range channels {
@@ -186,7 +194,7 @@ func (s *Server) handleConn(conn net.Conn, config *cryptossh.ServerConfig) {
 }
 
 func (s *Server) handleSession(serverConn *cryptossh.ServerConn, channel cryptossh.Channel, requests <-chan *cryptossh.Request) {
-	defer channel.Close()
+	defer func() { _ = channel.Close() }()
 
 	for req := range requests {
 		switch req.Type {
@@ -210,7 +218,7 @@ func (s *Server) runCommand(serverConn *cryptossh.ServerConn, channel cryptossh.
 	if !ok {
 		result = CommandResult{
 			Stderr:   fmt.Sprintf("sshmock: unknown command %q\n", command),
-			ExitCode: 127,
+			ExitCode: unknownExitCode,
 		}
 	}
 

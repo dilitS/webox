@@ -27,6 +27,8 @@ const (
 // Event names the operations that invalidate status-cache prefixes.
 type Event string
 
+// Event values map domain operations to deterministic cache-prefix
+// invalidations.
 const (
 	EventRestart           Event = "Restart"
 	EventDeploy            Event = "Deploy"

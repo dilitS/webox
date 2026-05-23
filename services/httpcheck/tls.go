@@ -39,7 +39,7 @@ func ProbeTLS(ctx context.Context, address string, opts TLSOptions) (TLSResult, 
 		}
 		return TLSResult{}, err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	state := conn.ConnectionState()
 	if len(state.PeerCertificates) == 0 {

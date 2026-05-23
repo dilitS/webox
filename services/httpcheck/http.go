@@ -31,7 +31,7 @@ func ProbeHTTP(ctx context.Context, url string, opts HTTPOptions) (HTTPResult, e
 	defer cancel()
 
 	start := opts.Now()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return HTTPResult{}, err
 	}
@@ -39,7 +39,7 @@ func ProbeHTTP(ctx context.Context, url string, opts HTTPOptions) (HTTPResult, e
 	if err != nil {
 		return HTTPResult{}, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return HTTPResult{
 		URL:        url,

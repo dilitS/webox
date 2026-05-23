@@ -26,7 +26,7 @@ func Exec(ctx context.Context, pool *Pool, target Target, command string) (ExecR
 	if err != nil {
 		return ExecResult{Duration: time.Since(start)}, err
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	var stdout, stderr bytes.Buffer
 	session.Stdout = &stdout

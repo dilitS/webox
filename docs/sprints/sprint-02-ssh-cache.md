@@ -162,8 +162,10 @@ Po sprincie 02:
 - **Docs:** [`DESIGN.md §8`](../DESIGN.md#8-tr%C3%B3jpoziomowy-status-cache-stale-while-revalidate), [`ADR-0005`](../adr/0005-cache-statusow-projektow.md)
 - **Notatki:**
   - TDD twarde. To core logic pod dashboard i drift detection.
-  - Dodano `golang.org/x/sync v0.17.0` zamiast latest (`v0.20.0` wymaga
-    Go 1.25). `go.mod` nadal musi zostać utrzymany na `go 1.24`.
+  - Dodano `golang.org/x/sync v0.20.0`. Sprint 02 podbił main module do
+    `go 1.25.0`, bo nowe wywołania `golang.org/x/crypto/ssh` uruchomiły
+    realne `govulncheck` findings, a pełny fix wymaga `x/crypto v0.52.0`
+    (Go 1.25).
   - Coverage `status/` po TASK-02.5 = **87.8%**.
 
 ---
