@@ -23,12 +23,14 @@ type StatusFetcher func(context.Context, []config.Project, *status.Cache) ([]Pro
 // Options configures a TUI model without using package globals.
 type Options struct {
 	ConfigPath      string
+	PendingPath     string
 	Cache           *status.Cache
 	FetchStatuses   StatusFetcher
 	RefreshInterval time.Duration
 	InitialWidth    int
 	InitialHeight   int
 	NewContext      func() (context.Context, context.CancelFunc)
+	WizardRunner    WizardRunner
 }
 
 // Model contains all mutable TUI state. It is copied by value by Update,
@@ -53,6 +55,12 @@ type Model struct {
 	cancel          context.CancelFunc
 	spinner         spinner.Model
 	styles          theme.Styles
+
+	initForm     initWizardForm
+	projectForm  projectWizardForm
+	wizardRunner WizardRunner
+	wizardStack  *wizardStackSlot
+	pendingPath  string
 }
 
 // New creates a pure initial model. I/O starts only when Init returns a Cmd.
@@ -71,6 +79,9 @@ func New(opts Options) Model {
 			return context.WithCancel(context.Background())
 		}
 	}
+	if opts.WizardRunner == nil {
+		opts.WizardRunner = DefaultWizardRunner()
+	}
 	ctx, cancel := opts.NewContext()
 	spin := spinner.New()
 	spin.Spinner = spinner.Dot
@@ -82,6 +93,7 @@ func New(opts Options) Model {
 		height:          fallbackInt(opts.InitialHeight, defaultTerminalHeight),
 		statuses:        make(map[string]ProjectStatus),
 		configPath:      opts.ConfigPath,
+		pendingPath:     opts.PendingPath,
 		cache:           opts.Cache,
 		fetchStatuses:   opts.FetchStatuses,
 		refreshInterval: opts.RefreshInterval,
@@ -89,6 +101,8 @@ func New(opts Options) Model {
 		cancel:          cancel,
 		spinner:         spin,
 		styles:          theme.NewStyles(theme.Default()),
+		wizardRunner:    opts.WizardRunner,
+		initForm:        newInitWizardForm(),
 	}
 }
 

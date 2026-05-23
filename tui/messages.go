@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/dilitS/webox/config"
+	"github.com/dilitS/webox/wizard"
 )
 
 // ConfigLoadedMsg carries local config metadata into Update. Missing is
@@ -59,3 +60,54 @@ type StatusRefreshFailedMsg struct {
 
 // RefreshTickMsg drives periodic SWR-backed status refresh.
 type RefreshTickMsg time.Time
+
+// ProfileSavedMsg is dispatched after the init-wizard persists the
+// first profile. Triggers the transition to the dashboard.
+type ProfileSavedMsg struct {
+	Config *config.Config
+}
+
+// ProfileSaveFailedMsg surfaces a save failure to the init-wizard
+// review screen without leaving the form.
+type ProfileSaveFailedMsg struct {
+	Err error
+}
+
+// ProjectWizardPreflightMsg carries the provider preflight result.
+// `Err` is non-nil when the provider rejected the probe; the wizard
+// surfaces the failure inside the Domain step rather than aborting
+// to Dashboard.
+type ProjectWizardPreflightMsg struct {
+	ProfileAlias string
+	Err          error
+}
+
+// ProjectWizardDomainCheckedMsg is the response to the duplicate
+// subdomain probe (`ListSubdomains`). `Available` is false when the
+// panel already has the domain.
+type ProjectWizardDomainCheckedMsg struct {
+	Domain    string
+	Available bool
+	Err       error
+}
+
+// ProjectWizardExecutedMsg carries the [wizard.Execute] outcome
+// (success or [wizard.ExecutionFailedError]). The wizard view
+// transitions to Done on success or Failure on error.
+type ProjectWizardExecutedMsg struct {
+	Plan        wizard.ProvisionPlan
+	Report      *wizard.ProvisionReport
+	Err         error
+	ProjectID   string
+	ProjectCfg  *config.Config
+	SaveErr     error
+	Credentials *wizard.DatabaseCredentials
+}
+
+// ProjectWizardRolledBackMsg is the [Stack.Rollback] outcome
+// dispatched after the operator chooses rollback from the failure
+// remediation menu.
+type ProjectWizardRolledBackMsg struct {
+	Results []wizard.CleanupResult
+	Err     error
+}

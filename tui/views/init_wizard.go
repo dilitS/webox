@@ -11,13 +11,66 @@ const (
 	initWizardPanelGutter = 6
 )
 
-// RenderInitWizard renders the read-only first-run shell for Sprint 04.
+// Init wizard step indices mirror tui.InitWizardStep so the view does
+// not import the tui package (cycle). Keep these in sync with
+// docs/UX.md §4.1 / §11.1.
+const (
+	initStepWelcome = iota
+	initStepAlias
+	initStepHost
+	initStepPort
+	initStepUser
+	initStepReview
+	initStepDone
+)
+
+// RenderInitWizard renders the read-only first-run shell for the
+// init wizard. Step 0 (Welcome) keeps the Sprint 04 silhouette; the
+// form steps render the live input value, helper text, and any
+// validation error.
 func RenderInitWizard(s Screen) string {
 	width := clamp(s.Width, initWizardMinWidth, initWizardMaxWidth)
-	body := strings.Join([]string{
-		"Step 1/2: System & Agent Environment",
+	body := renderInitStep(s, width-initWizardPanelGutter)
+
+	return s.Styles.ActivePanel.
+		Width(width).
+		Render(fmt.Sprintf("Webox - first run setup\n\n%s", body))
+}
+
+func renderInitStep(s Screen, panelWidth int) string {
+	switch s.InitForm.Step {
+	case initStepAlias:
+		return renderInitField(s, panelWidth, "Profile alias",
+			"Step 2/6: pick a short name for this hosting profile (e.g. main, work, prod).",
+			s.InitForm.Alias,
+			"Must match ^[a-z0-9-]{1,32}$.")
+	case initStepHost:
+		return renderInitField(s, panelWidth, "SSH host",
+			"Step 3/6: hostname of the hosting account (e.g. s1.small.pl).",
+			s.InitForm.Host,
+			"Use the host you log into via SSH today.")
+	case initStepPort:
+		return renderInitField(s, panelWidth, "SSH port",
+			"Step 4/6: SSH port (default 22).",
+			s.InitForm.Port,
+			"Integer in [1,65535]; press Enter to accept 22.")
+	case initStepUser:
+		return renderInitField(s, panelWidth, "SSH user",
+			"Step 5/6: SSH account name on the panel.",
+			s.InitForm.User,
+			"Must match ^[a-z0-9_-]{1,32}$.")
+	case initStepReview:
+		return renderInitReview(s, panelWidth)
+	default:
+		return renderInitWelcome(s, panelWidth)
+	}
+}
+
+func renderInitWelcome(s Screen, panelWidth int) string {
+	lines := []string{
+		"Step 1/6: System & Agent Environment",
 		"",
-		s.Styles.Panel.Width(width - initWizardPanelGutter).Render(strings.Join([]string{
+		s.Styles.Panel.Width(panelWidth).Render(strings.Join([]string{
 			"System Pre-requisites",
 			"",
 			"Git Engine:       pending doctor check",
@@ -25,19 +78,64 @@ func RenderInitWizard(s Screen) string {
 			"Keyring Backend: pending doctor check",
 		}, "\n")),
 		"",
-		s.Styles.Panel.Width(width - initWizardPanelGutter).Render(strings.Join([]string{
+		s.Styles.Panel.Width(panelWidth).Render(strings.Join([]string{
 			"Default SSH Keypair",
 			"",
 			"Path: ~/.ssh/id_ed25519_webox",
-			"Fingerprint: not generated in Sprint 04",
+			"Fingerprint: deferred to v0.2 (auto-inject flow)",
 			"",
-			"[ Show Public Key ]     [ Auto-inject to Host ]",
+			"Sprint 05 captures the profile only; keypair work lands in v0.2.",
 		}, "\n")),
 		"",
-		"[ Tab ] Navigate   [ Enter ] Confirm   [ Esc ] Quit",
-	}, "\n")
+		"[ Enter ] Continue   [ Esc ] Quit",
+	}
+	return strings.Join(lines, "\n")
+}
 
-	return s.Styles.ActivePanel.
-		Width(width).
-		Render(fmt.Sprintf("Webox - first run setup\n\n%s", body))
+func renderInitField(s Screen, panelWidth int, title, helper, value, hint string) string {
+	rendered := value
+	if rendered == "" {
+		rendered = s.Styles.Muted.Render("<type here>")
+	}
+	body := []string{
+		title,
+		"",
+		helper,
+		"",
+		s.Styles.Panel.Width(panelWidth).Render(rendered + " _"),
+		"",
+		s.Styles.Muted.Render(hint),
+	}
+	if s.InitForm.Err != "" {
+		body = append(body, "", s.Styles.Alert.Render(s.InitForm.Err))
+	}
+	body = append(body, "", "[ Enter ] Next   [ Shift+Tab ] Back   [ Esc ] Back/Quit")
+	return strings.Join(body, "\n")
+}
+
+func renderInitReview(s Screen, panelWidth int) string {
+	form := s.InitForm
+	body := []string{
+		"Step 6/6: Review profile",
+		"",
+		s.Styles.Panel.Width(panelWidth).Render(strings.Join([]string{
+			"Alias: " + form.Alias,
+			"Type:  smallhost",
+			"Host:  " + form.Host,
+			"Port:  " + form.Port,
+			"User:  " + form.User,
+			"Restart: devil",
+		}, "\n")),
+		"",
+		s.Styles.Muted.Render("No secrets stored in config.json (per AGENTS.md §2.1)."),
+	}
+	if form.Err != "" {
+		body = append(body, "", s.Styles.Alert.Render(form.Err))
+	}
+	if form.Saving {
+		body = append(body, "", "Saving profile...")
+	} else {
+		body = append(body, "", "[ Enter ] Save & continue   [ Shift+Tab ] Back   [ Esc ] Back")
+	}
+	return strings.Join(body, "\n")
 }
