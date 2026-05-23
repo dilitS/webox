@@ -16,6 +16,14 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `providers/smallhost/paths.go` (TASK-03.3) — pure path helpers
+  (`GetDeployPath`, `GetLogPath`, `EnvPath`, `StoragePath`) plus
+  `ValidateDomain` / `ValidateUser` with the `ErrInvalidDomain` /
+  `ErrInvalidUser` sentinels. The validators reject leading/trailing
+  dashes, uppercase, NUL/CR/LF/space, `..`, `/`, `\` and any label
+  longer than 63 characters before the value reaches a path or
+  command string. Helpers fail closed by returning "" for invalid
+  domain or user so the rsync target never collapses to `/`.
 - `providers/smallhost/config.go` + `methods.go` (TASK-03.2) — adapter
   constructor and typed [`Properties`] bag for small.pl / Devil. The
   factory rejects unsupported `restart_method`, parses `ssh_pool_max`

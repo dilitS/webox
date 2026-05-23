@@ -38,12 +38,6 @@ func (p *Provider) RestartNodeApp(_ context.Context, _ string) error {
 	return fmt.Errorf("%w: %w", providers.ErrUnknownOutputFormat, errNotImplemented)
 }
 
-// GetDeployPath is implemented in TASK-03.3.
-func (p *Provider) GetDeployPath(_ string) string { return "" }
-
-// GetLogPath is implemented in TASK-03.3.
-func (p *Provider) GetLogPath(_ string) string { return "" }
-
 // CheckStatus is implemented in TASK-03.6.
 func (p *Provider) CheckStatus(_ context.Context) (*providers.ProviderStatus, error) {
 	return nil, fmt.Errorf("%w: %w", providers.ErrUnknownOutputFormat, errNotImplemented)
