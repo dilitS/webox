@@ -16,6 +16,20 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `providers/provider.go`, `providers/errors.go`, `providers/registry.go`
+  (TASK-03.1) — canonical `HostingProvider` contract, sentinel errors
+  (`ErrInvalidProviderConfig`, `ErrUnknownProvider`,
+  `ErrProviderAlreadyRegistered`, `ErrUnknownOutputFormat`,
+  `ErrOutputTooLarge`, `ErrSubdomainExists`,
+  `ErrNodeVersionUnsupported`, `ErrAppNotFound`, `ErrAppNotNode`,
+  `ErrDNSNotResolving`, `ErrRateLimitLetsEncrypt`, `ErrDBNameTaken`,
+  `ErrCLINotFound`), and a sync-guarded factory registry with
+  `Register` / `Unregister` / `Names` / `New`. `New` normalises Port
+  to 22 and Properties to non-nil before invoking the factory, runs
+  registry lookup before validation so a typo in `type` surfaces as
+  `ErrUnknownProvider` instead of being masked by validation noise,
+  and propagates factory errors via `%w` while keeping the provider
+  name in the message. Coverage: 100%.
 - `docs/sprints/sprint-03-provider-smallhost.md` — rolling-wave plan for
   Sprint 03 (provider contracts, `smallhost` constructor, path helpers,
   Devil parser fixtures, and smallhost method skeleton over `ssh.Exec`).
