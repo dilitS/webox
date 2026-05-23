@@ -83,7 +83,7 @@ func TestUpdateProjectDetailDisabledTabsSetAlert(t *testing.T) {
 	m, _ = applyMsg(t, m, ConfigLoadedMsg{Config: fixtureConfig()})
 	m, _ = applyMsg(t, m, key(tea.KeyRight, ""))
 
-	for _, pressed := range []string{"2", "3", "4"} {
+	for _, pressed := range []string{"2", "3"} {
 		pressed := pressed
 		t.Run(pressed, func(t *testing.T) {
 			got, _ := applyMsg(t, m, key(tea.KeyRunes, pressed))
@@ -94,6 +94,28 @@ func TestUpdateProjectDetailDisabledTabsSetAlert(t *testing.T) {
 				t.Fatalf("key %q changed state to %s", pressed, got.State())
 			}
 		})
+	}
+}
+
+// TestUpdateProjectDetailLogsTabActivates verifies Sprint 09's
+// TASK-09.3 acceptance: pressing `4` on project detail enters the
+// live-log tab instead of raising the "v0.2" disabled-tab alert.
+func TestUpdateProjectDetailLogsTabActivates(t *testing.T) {
+	t.Parallel()
+
+	m := New(Options{})
+	m, _ = applyMsg(t, m, ConfigLoadedMsg{Config: fixtureConfig()})
+	m, _ = applyMsg(t, m, key(tea.KeyRight, ""))
+
+	got, _ := applyMsg(t, m, key(tea.KeyRunes, "4"))
+	if got.ActiveTab() != TabLogs {
+		t.Fatalf("ActiveTab = %s, want %s after pressing '4'", got.ActiveTab(), TabLogs)
+	}
+	if got.State() != StateProjectDetail {
+		t.Fatalf("state = %s, want StateProjectDetail (tab nav must not exit detail)", got.State())
+	}
+	if got.Alert() != "" {
+		t.Fatalf("Alert = %q, want empty (Logs tab is enabled in MVP)", got.Alert())
 	}
 }
 

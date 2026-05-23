@@ -62,38 +62,38 @@ func TestOverviewTileEmptyDomainShowsSelectionHint(t *testing.T) {
 	}
 }
 
-func TestPlaceholderTilesAdvertiseSprintNumbers(t *testing.T) {
+func TestPlaceholderTilesShowMeaningfulFallbackCopy(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name        string
-		tile        bento.BentoTile
-		header      string
-		sprintHints []string
+		name   string
+		tile   bento.BentoTile
+		header string
+		hints  []string
 	}{
 		{
-			name:        "metrics placeholder",
-			tile:        bento.NewMetricsPlaceholderTile(),
-			header:      "[Header Metrics]",
-			sprintHints: []string{"Sprint 09"},
+			name:   "metrics placeholder (pre first poll)",
+			tile:   bento.NewMetricsPlaceholderTile(),
+			header: "[Header Metrics]",
+			hints:  []string{"CPU / RAM / Disk pulse", "Awaiting first SSH poll"},
 		},
 		{
-			name:        "logs placeholder",
-			tile:        bento.NewLogsPlaceholderTile(),
-			header:      "[Live Micro-Logs]",
-			sprintHints: []string{"Sprint 09"},
+			name:   "logs placeholder (no project selected)",
+			tile:   bento.NewLogsPlaceholderTile(),
+			header: "[Live Micro-Logs]",
+			hints:  []string{"Select a project to start streaming"},
 		},
 		{
-			name:        "cicd placeholder",
-			tile:        bento.NewCICDPlaceholderTile(),
-			header:      "[CI/CD Pipeline]",
-			sprintHints: []string{"Sprint 10"},
+			name:   "cicd placeholder (live wiring in Sprint 10)",
+			tile:   bento.NewCICDPlaceholderTile(),
+			header: "[CI/CD Pipeline]",
+			hints:  []string{"Sprint 10"},
 		},
 		{
-			name:        "topology placeholder",
-			tile:        bento.NewTopologyPlaceholderTile(),
-			header:      "[Topology]",
-			sprintHints: []string{"Sprint 11"},
+			name:   "topology placeholder (live wiring in Sprint 11)",
+			tile:   bento.NewTopologyPlaceholderTile(),
+			header: "[Topology]",
+			hints:  []string{"Sprint 11"},
 		},
 	}
 
@@ -105,36 +105,97 @@ func TestPlaceholderTilesAdvertiseSprintNumbers(t *testing.T) {
 			if !strings.Contains(out, tc.header) {
 				t.Fatalf("placeholder missing header %q\n%s", tc.header, out)
 			}
-			for _, hint := range tc.sprintHints {
+			for _, hint := range tc.hints {
 				if !strings.Contains(out, hint) {
-					t.Fatalf("placeholder missing sprint hint %q\n%s", hint, out)
+					t.Fatalf("placeholder missing hint %q\n%s", hint, out)
 				}
 			}
 		})
 	}
 }
 
-func TestTileIDsAreStableAndUnique(t *testing.T) {
+func TestHeaderMetricsTileRendersLiveAndStaleIndicator(t *testing.T) {
+	t.Parallel()
+
+	live := bento.NewHeaderMetricsTile(bento.HeaderMetricsSnapshot{
+		ProfileAlias: "main",
+		UptimeLabel:  "24d 11h",
+		LoadLabel:    "0.12, 0.28, 0.31",
+		RAMLabel:     "3.4G/8.0G (42%)",
+		RTTLabel:     "18ms",
+	}).Render(bento.ModeUltra, true)
+	for _, needle := range []string{"[Header Metrics]", "[LIVE]", "main", "Uptime: 24d 11h", "Load: 0.12", "RAM: 3.4G", "Ping: 18ms"} {
+		if !strings.Contains(live, needle) {
+			t.Fatalf("live header missing %q\n%s", needle, live)
+		}
+	}
+
+	stale := bento.NewHeaderMetricsTile(bento.HeaderMetricsSnapshot{ProfileAlias: "main", Stale: true}).
+		Render(bento.ModeUltra, true)
+	if !strings.Contains(stale, "[STALE]") {
+		t.Fatalf("stale tile missing [STALE] marker\n%s", stale)
+	}
+}
+
+func TestMicroLogsTileShowsTailWithLevelMarkers(t *testing.T) {
+	t.Parallel()
+
+	out := bento.NewMicroLogsTile("app.example.com", []bento.MicroLogLine{
+		{Level: "INFO", Text: "starting worker pool=4"},
+		{Level: "WARN", Text: "queue depth 87%", Redacted: false},
+		{Level: "ERROR", Text: "db connect failed", Redacted: true},
+	}).Render(bento.ModeUltra, false)
+
+	for _, needle := range []string{"[Live Micro-Logs]", "Stream: app.example.com", "starting worker pool=4", "queue depth", "db connect failed", "(redacted)"} {
+		if !strings.Contains(out, needle) {
+			t.Fatalf("micro-logs missing %q\n%s", needle, out)
+		}
+	}
+	if !strings.Contains(out, "✗") {
+		t.Fatalf("ERROR rows should use ✗ marker\n%s", out)
+	}
+}
+
+func TestMicroLogsTileEmptyShowsWaitingHint(t *testing.T) {
+	t.Parallel()
+
+	out := bento.NewMicroLogsTile("demo", nil).Render(bento.ModeUltra, false)
+	if !strings.Contains(out, "waiting for first line") {
+		t.Fatalf("empty micro-logs should advertise waiting state\n%s", out)
+	}
+}
+
+func TestTileIDsAreStableAndUniquePerSlot(t *testing.T) {
 	t.Parallel()
 
 	tiles := []bento.BentoTile{
 		bento.NewProjectsTile(nil),
 		bento.NewOverviewTile("", nil),
 		bento.NewMetricsPlaceholderTile(),
+		bento.NewHeaderMetricsTile(bento.HeaderMetricsSnapshot{}),
 		bento.NewCICDPlaceholderTile(),
 		bento.NewLogsPlaceholderTile(),
+		bento.NewMicroLogsTile("", nil),
 		bento.NewTopologyPlaceholderTile(),
 	}
 
-	seen := map[string]bool{}
+	// IDs are unique per slot — placeholder + live wiring share the
+	// slot's identity by design (the renderer swaps them in place).
+	bySlot := map[bento.Slot]map[string]bool{}
 	for _, tile := range tiles {
 		id := tile.ID()
 		if id == "" {
 			t.Errorf("tile %T has empty ID", tile)
 		}
-		if seen[id] {
-			t.Errorf("duplicate tile ID %q", id)
+		slot := tile.Slot()
+		if bySlot[slot] == nil {
+			bySlot[slot] = map[string]bool{}
 		}
-		seen[id] = true
+		// Allow placeholder ↔ live sharing one ID per slot, but
+		// reject duplicates with different IDs in the same slot.
+		bySlot[slot][id] = true
+		if len(bySlot[slot]) > 1 {
+			t.Errorf("slot %v has multiple distinct tile IDs: %v", slot, bySlot[slot])
+		}
 	}
 }

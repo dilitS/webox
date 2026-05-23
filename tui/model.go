@@ -74,10 +74,36 @@ type Model struct {
 	resumeForm     resumeWizardForm
 	actionForm     projectActionForm
 	importForm     importPreviewForm
+	liveLogs       liveLogsForm
 	wizardRunner   WizardRunner
 	wizardStack    *wizardStackSlot
 	pendingPath    string
 	layoutOverride string
+}
+
+// liveLogsForm captures the per-session state of the Sprint 09 live-log
+// tab. The buffer is owned by [components.RingBuffer] so producers
+// (services/sshtail) can push concurrently while the renderer reads via
+// `Snapshot()`. AutoScroll mirrors the operator's "follow" preference;
+// when false, the renderer keeps the buffer pinned to ScrollOffset.
+type liveLogsForm struct {
+	ProjectID    string
+	Domain       string
+	LogPath      string
+	AutoScroll   bool
+	Buffer       *components.RingBuffer[LiveLogLine]
+	ScrollOffset int
+	StreamErr    string
+	Connected    bool
+}
+
+// LiveLogLine is the in-memory record stored in the live-log ring
+// buffer. It mirrors `services/sshtail.Line` minus the Timestamp field
+// (the view layer renders relative offsets, not absolute timestamps).
+type LiveLogLine struct {
+	Level    string
+	Text     string
+	Redacted bool
 }
 
 // importPreviewForm holds in-memory state for the read-only import

@@ -1,18 +1,18 @@
 Webox Cockpit v0.1                                                                                                                               [BENTO Ultra+] 
-╭────────────────────────────────────╮╭────────────────────────╮╭────────────────────────╮                                                                      
-│ [Projects]                         ││ [Overview]             ││ [Header Metrics]       │                                                                      
-│ > sui.demo.smallhost.pl [ONLINE]   ││ sui.demo.smallhost.pl  ││ CPU / RAM / Disk pulse │                                                                      
-│   legacy.demo.smallhost.pl [STALE] ││ Status: ONLINE         ││ Live wiring: Sprint 09 │                                                                      
-╰────────────────────────────────────╯│ HTTP: 200 OK           │╰────────────────────────╯                                                                      
+╭────────────────────────────────────╮╭────────────────────────╮╭──────────────────────────╮                                                                    
+│ [Projects]                         ││ [Overview]             ││ [Header Metrics]         │                                                                    
+│ > sui.demo.smallhost.pl [ONLINE]   ││ sui.demo.smallhost.pl  ││ CPU / RAM / Disk pulse   │                                                                    
+│   legacy.demo.smallhost.pl [STALE] ││ Status: ONLINE         ││ Awaiting first SSH poll… │                                                                    
+╰────────────────────────────────────╯│ HTTP: 200 OK           │╰──────────────────────────╯                                                                    
                                       │ SSL: 27 days remaining │                                                                                                
                                       │ Node: v24.15.0         │                                                                                                
                                       │ Repo: dilitS/sui       │                                                                                                
                                       │ Last deploy: 2h ago    │                                                                                                
                                       ╰────────────────────────╯                                                                                                
-╭────────────────────────╮╭────────────────────────────────╮╭──────────────────────────╮                                                                        
-│ [CI/CD Pipeline]       ││ [Live Micro-Logs]              ││ [Topology]               │                                                                        
-│ GitHub Actions stream  ││ SSH tail with secret redaction ││ Service dependency graph │                                                                        
-│ Live wiring: Sprint 10 ││ Live wiring: Sprint 09         ││ Live wiring: Sprint 11   │                                                                        
-╰────────────────────────╯╰────────────────────────────────╯╰──────────────────────────╯                                                                        
+╭────────────────────────╮╭──────────────────────────────────────╮╭──────────────────────────╮                                                                  
+│ [CI/CD Pipeline]       ││ [Live Micro-Logs]                    ││ [Topology]               │                                                                  
+│ GitHub Actions stream  ││ SSH tail with secret redaction       ││ Service dependency graph │                                                                  
+│ Live wiring: Sprint 10 ││ Select a project to start streaming. ││ Live wiring: Sprint 11   │                                                                  
+╰────────────────────────╯╰──────────────────────────────────────╯╰──────────────────────────╯                                                                  
 ───────────────────────────────────────────────────────────────                                                                                                 
  [Deep-dive strip] Reserved for service timelines (Sprint 11+)                                                                                                  

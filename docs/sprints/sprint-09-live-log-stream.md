@@ -1,6 +1,6 @@
 # Sprint 09 — Live Log Stream + Header Bar Server Metrics
 
-> **Daty:** TBD → TBD (planowane 2-3 tygodnie solo) · **Czas:** ~45-65h skupienia
+> **Status:** ✅ Completed 2026-05-23 (PR #14) · **Daty:** 2026-05-23 (rdzeń) · production wiring jako follow-up
 >
 > **Cel:** dostarczyć dwa premium kafelki Bento Ultra: **Live Log Stream** (Tab `[4] Logs` w project detail oraz Bento `Live Micro-Logs` na dashboardzie) i **Header Bar Server Metrics** (uptime, load avg, RAM %, RTT, SSL day-warnings). Bazujemy na `ssh.Pool` ze Sprintu 02 i `internal/log/redact.go` ze Sprintu 01. **Bezwzględny wymóg bezpieczeństwa:** każda linia logu z serwera przepuszczona przez redactor **przed** dodaniem do ring buffera — sekret nigdy nie trafia do bufora, nawet tymczasowo.
 
@@ -166,23 +166,107 @@ Nic nowego nie powinno być potrzebne. Jeśli pojawi się potrzeba — wymaga AD
 
 ---
 
-## Outcome (wypełnij po sprincie)
+## Outcome (2026-05-23)
 
-- ✅ Done: ...
-- ⏭️ Carry-over: ...
-- 📌 Decyzje: ...
-- 🧠 Surprises: ...
-- 📊 Metryki:
-  - Coverage `services/sshtail/`: ?
-  - Coverage `services/sshmetrics/`: ?
-  - Coverage `tui/components/`: ?
-  - Coverage `tui/bento/tiles/`: ?
-  - Perf: linii/s sustained: ?, CPU%: ?
-- 🔒 Security validation:
-  - [ ] Redactor corpus 100% recall na 8+ secret families.
-  - [ ] `go test -race ./services/sshtail ./services/sshmetrics ./tui/...` green.
-  - [ ] `goleak.VerifyNone` w teście context cancel scenario.
-- ➡️ Następny sprint: `sprint-10-cicd-panel.md`
+**Status:** ✅ Completed (branch `feat/s09-live-logs`, PR #14)
+
+- ✅ **Done:**
+  - `services/sshtail/` — `Executor`-backed streamer z context-aware
+    cancel, pre-buffer `internal/log.Redact`, sentinels
+    (`ErrLogPathInvalid`, `ErrSessionClosed`, `ErrReconnectFailed`,
+    `ErrStreamerClosed`), exponential backoff 2/4/8s, `shellEscape` +
+    `validateLogPath` defense-in-depth.
+  - `tui/components/ringbuffer.go` — generic, thread-safe FIFO z
+    circular overwrite (Push / Snapshot / Tail / Len / Cap).
+  - `tui/components/ansi.go` — `ANSIStrip` (SGR + OSC + residual) i
+    `ParseLogLevel` z fall-throughem: ANSI colour → strukturalne
+    prefixy → JSON `"level"` → word-boundary scan → `LevelInfo`.
+  - `services/sshmetrics/` — parsery uptime (Linux + FreeBSD + macOS +
+    minute/hour-only) i `free -m`, `Poller.Poll` z `status.Cache` SWR
+    (TTL 5s, klucz `ssh:metrics:<alias>`), graceful degradation gdy
+    `free` brakuje (FreeBSD), `FormatUptime/RAM/LoadAvg/RTT` helpers.
+  - `tui/bento/`:
+    - `NewHeaderMetricsTile` (snapshot-based, `[LIVE]`/`[STALE]`),
+    - `NewMicroLogsTile` (top-N redacted lines z marker-per-level),
+    - placeholdery (`NewMetricsPlaceholderTile`,
+      `NewLogsPlaceholderTile`) jako fallback przed pierwszą próbą
+      pobrania.
+  - `tui/views/live_logs.go` + Tab `[4] Logs` aktywne; integracja
+    `tui/live_logs.go` (state machine: `enterLiveLogsTab`,
+    `updateLiveLogsKey` z `f`/`c`/`Esc`/`↑↓`).
+  - `LiveLogLine` + `liveLogsForm` + `liveLogsSnapshot` jako pure
+    view-layer projekcja (`Snapshot()` na ring bufferze gwarantuje
+    immutable read path).
+  - `internal/log/redact.go` rozszerzony o JWT, generic
+    `key=value`/`key: value`, `mysql/psql -p<password>`. Property
+    test (200 sampli, 5 secret families) — 0% leakage.
+  - Goleak (`services/sshtail/leak_test.go`) na cancel-to-shutdown
+    i exhausted-reconnect scenarios.
+  - Benchmarki: `RingBuffer.Push` ≈ 6 ns/op (budżet ≤100 ns), Redact
+    log-line PAT ≈ 18 µs/op (budżet ≤50 µs).
+  - Snapshot Sprint 09 (`docs/screenshots/sprint-09-live-logs-120x35.txt`).
+
+- ⏭️ **Carry-over (świadomy scope cut):**
+  - Production SSH `Executor` wiring w `cmd/webox/main.go` + faktyczne
+    odpalenie `sshtail.Stream` przy `enterLiveLogsTab`. Tab UI działa
+    end-to-end ze sztucznymi pushami; tła streaming wymaga adaptera
+    `ssh.Pool` → `Executor` + dyspatch `tea.Cmd` w `update.go`.
+    To 1-2h pracy które zostawiam jako follow-up, żeby Sprint 10
+    (CI/CD panel) miał czysty start.
+  - `header_metrics` tile zarejestrowany jako wymienialny placeholder;
+    auto-poll przez `services/sshmetrics.Poller` wymaga tej samej
+    integracji co live logs (executor pool).
+  - Integration test "1000 linii/s przez 30s + CPU <5%" → wymaga
+    fizycznego/sshmock streamingowego targetu; pominięte w MVP,
+    benchmarki + leak test pokrywają ścieżkę regresyjną.
+
+- 📌 **Decyzje:**
+  - **Executor seam zamiast bezpośredniego `ssh.Pool`** — testy
+    sshtail/sshmetrics nie potrzebują boot'a SSH servera, kontrakt
+    jest 1-method interface (`Open` / `Run`). Production composition
+    łączy `ssh.Pool` z tym interfacem w `cmd/webox`.
+  - **Redactor pre-buffer** zachowany jako single source of truth;
+    `Line.Raw` zawsze już zredagowany, `Redacted bool` informuje czy
+    regex coś dostał.
+  - **`LiveLogLine` w `tui/` package, nie w `services/sshtail`** —
+    view-layer chce minimalnej projekcji (Level/Text/Redacted) bez
+    timestampu; sshtail.Line bogatszy.
+  - **Tab `[4]` rozróżniony per-state w `updateProjectDetailKey`** —
+    osobny `updateLiveLogsKey` zapewnia że klawisze tabowe (`r`/`s`/`v`)
+    nie konfliktują z keybindings live-logu (`f`/`c`).
+
+- 🧠 **Surprises:**
+  - `gocritic regexpSimplify` zgłaszał `day[s]?` jako uproszczalne do
+    `days?` — drobny lint refactor, ale pokazuje że v2 linter ma sporo
+    nowych reguł vs v1.
+  - `golangci-lint` v2 ma `badRegexp` regułę która flaguje `[@-~]`
+    jako "suspicious char range" — musiałem rozwinąć terminator class
+    w `ansi.go` explicitly (per ECMA-48).
+  - `DetailTab.Enabled()` test w `wizard_form_test.go` zakładał MVP
+    scope = tylko Overview; aktualizacja matrix mówi już że Logs jest
+    enabled w v0.1.
+
+- 📊 **Metryki:**
+  - Coverage `services/sshtail/`: **93.2%**
+  - Coverage `services/sshmetrics/`: **89.1%**
+  - Coverage `tui/components/`: **90.6%**
+  - Coverage `tui/bento/`: **86.0%**
+  - Coverage `tui/views/`: **83.4%**
+  - Coverage `internal/log/`: **100%**
+  - Aggregate: **83.6%** (≥70% gate).
+  - Perf: RingBuffer.Push **6 ns/op**, Redact PAT line **18 µs/op**.
+
+- 🔒 **Security validation:**
+  - [x] Redactor corpus 13 secret families + property test (200
+    random samples × 5 templates) — 0 leakage.
+  - [x] `go test -race ./services/sshtail ./services/sshmetrics ./tui/...`
+    green.
+  - [x] `goleak.VerifyNone` w obu scenariuszach (cancel, exhausted
+    reconnect).
+  - [x] `shellEscape` + `validateLogPath` blokują traversal /
+    metacharacters (`..`, `\n`, `\x00`).
+
+- ➡️ **Następny sprint:** `sprint-10-cicd-panel.md`
 
 ---
 

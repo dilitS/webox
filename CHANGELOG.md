@@ -16,6 +16,72 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- **Sprint 09 — Live Log Stream foundations + Header Bar Server Metrics.**
+  - `services/sshtail/` — context-cancellable `tail -f` streamer with a
+    1-method `Executor` seam (production wires it to `ssh.Pool`; tests
+    inject canned byte streams without booting a mock SSH server).
+    Pre-buffer redaction via `internal/log.Redact` is the
+    non-negotiable security contract: every emitted `Line.Raw` is
+    already sanitised, `Redacted` flags whether a regex matched.
+    Sentinels: `ErrLogPathInvalid`, `ErrSessionClosed`,
+    `ErrReconnectFailed`, `ErrStreamerClosed`. Exponential backoff
+    (2s/4s/8s) and `shellEscape` + `validateLogPath` for log-path
+    sanitisation (rejects `..`, NULs, newlines).
+  - `services/sshmetrics/` — `Poller.Poll` with parsers for `uptime`
+    (Linux days+H:M, Linux days+min, Linux H:M, FreeBSD, macOS
+    `up D+H:M`) and `free -m`. `Metrics` projection (Uptime / Memory /
+    RTT) cached via `status.Cache` SWR (TTL 5s, key
+    `ssh:metrics:<alias>`). Graceful degradation when `free` is
+    missing (FreeBSD): zeroed RAM rather than failing the whole poll.
+    `FormatUptime`/`FormatRAM`/`FormatLoadAvg`/`FormatRTT` helpers.
+  - `tui/components/` — generic thread-safe `RingBuffer[T]` (Push /
+    Snapshot / Tail / Len / Cap, circular overwrite, default capacity
+    1000, snapshot returns independent copy). `ANSIStrip` (SGR + OSC +
+    residual) and `ParseLogLevel` with ordered fall-through
+    (ANSI colour → bracketed prefix → `level:` / `level=` → JSON
+    `"level":"…"` → word-boundary scan → `LevelInfo`). Benchmarks:
+    `RingBuffer.Push` ≈ 6 ns/op, Redact 200-char PAT line ≈ 18 µs/op
+    (both well under Sprint 09's perf budget).
+  - `tui/bento/` — two new live tiles backed by snapshots so the
+    layout engine stays free of `services/` imports:
+    `NewHeaderMetricsTile` (`HeaderMetricsSnapshot` →
+    `[LIVE]`/`[STALE]` badge + Uptime/Load/RAM/Ping row) and
+    `NewMicroLogsTile` (`MicroLogLine` → marker-per-level micro tail
+    with `(redacted)` annotation). Placeholders kept as the
+    "no data yet" fallback for both slots.
+  - `tui/` — `TabLogs` promoted to MVP (`Enabled()` returns true);
+    `enterLiveLogsTab` lazily allocates the ring buffer per project,
+    `updateLiveLogsKey` honours `f` (toggle auto-scroll), `c` (clear
+    buffer), `↑/↓` (pause auto-scroll + scroll), `Esc/1/←` (back to
+    Overview). New view `tui/views/live_logs.go` renders the tab with
+    `Active File · Stream · Connected · Buffer N/N` strip,
+    level-coloured rows, and the Sprint 09 keybinding hints.
+  - `internal/log/redact.go` — three new patterns: JWT (anchored on
+    `eyJ…` header), generic `key=value`/`key: value` for `password`,
+    `passwd`, `token`, `secret`, `api[_-]?key`, `access[_-]?key` in
+    CLI args / env / JSON, and `mysql/mysqldump/psql -p<password>`
+    (anchored on the binary name to avoid touching unrelated tools).
+    Corpus expanded to 13 secret families with a 200-sample property
+    test (0% leakage, well under the 5% acceptance margin).
+  - `tui/cockpit_snapshot_test.go` — new `TestSprint09Snapshots`
+    produces `docs/screenshots/sprint-09-live-logs-120x35.txt`
+    (opt-in via `WEBOX_SNAPSHOT=1`) so reviewers can diff the
+    live-log tab visually without an SSH session.
+
+### Security
+- **Goroutine leak coverage for the SSH tail pipeline.**
+  `services/sshtail/leak_test.go` runs `goleak.VerifyNone` on the
+  cancel-to-shutdown happy path *and* the exhausted-reconnect failure
+  path. Both must clean up within 500 ms (CI jitter buffer over the
+  100 ms perf-budget cap).
+- **Redactor corpus uplift.** Sprint 09 added test coverage for
+  GitHub PATs (`ghp_`/`github_pat_`/`ghs_`), OpenAI keys (`sk-`),
+  AWS access keys, JWTs, OpenSSH/RSA private key blocks, MySQL/Postgres
+  URIs with embedded credentials, generic `key=value` secrets, and
+  MySQL/PSQL `-p<password>` CLI flags. Recall validated against a 200-
+  sample randomised property test.
+
+### Added
 - **Sprint 08 — Bento Ultra Layout Engine + premium components.**
   - `tui/bento/` adaptive layout engine with `BentoTile` interface,
     `Slot` enum, `Registry`, and a stateless `Engine` that renders four

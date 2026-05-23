@@ -16,6 +16,9 @@ func (m Model) View() string {
 	case StateDashboard:
 		return m.renderDashboard(screen)
 	case StateProjectDetail:
+		if m.activeTab == TabLogs {
+			return views.RenderLiveLogs(screen)
+		}
 		return views.RenderProjectDetail(screen)
 	case StateProjectWizard:
 		return views.RenderProjectWizard(screen)
@@ -154,6 +157,55 @@ func (m Model) screen() views.Screen {
 		ResumeForm:    resumeFormSnapshot(m.resumeForm),
 		ActionForm:    actionFormSnapshot(m.actionForm),
 		ImportForm:    importFormSnapshot(m),
+		LiveLogs:      liveLogsSnapshot(m),
+	}
+}
+
+// liveLogsSnapshot is the pure view-layer projection of [liveLogsForm].
+// The buffer is read via Snapshot() so consumers cannot mutate the
+// streamer's underlying ring while rendering.
+func liveLogsSnapshot(m Model) views.LiveLogsSnapshot {
+	snap := views.LiveLogsSnapshot{
+		Domain:     m.liveLogs.Domain,
+		LogPath:    m.liveLogs.LogPath,
+		AutoScroll: m.liveLogs.AutoScroll,
+		Connected:  m.liveLogs.Connected,
+		Err:        m.liveLogs.StreamErr,
+	}
+	if m.liveLogs.Buffer != nil {
+		snap.BufferCap = m.liveLogs.Buffer.Cap()
+		snap.BufferUsed = m.liveLogs.Buffer.Len()
+		raw := m.liveLogs.Buffer.Tail(liveLogsTailCap(m.BentoMode()))
+		for _, line := range raw {
+			snap.Lines = append(snap.Lines, views.LiveLogLineSnapshot{
+				Level:    line.Level,
+				Text:     line.Text,
+				Redacted: line.Redacted,
+			})
+		}
+	}
+	return snap
+}
+
+// Live-log tail-cap thresholds. Numbers come from `docs/UX.md §4.3`
+// (Live Log Stream) — Ultra+ shows more history, Standard fits 12 rows
+// without scrolling on an 80x24 terminal.
+const (
+	liveLogsTailCapUltraPlus = 24
+	liveLogsTailCapUltra     = 18
+	liveLogsTailCapStandard  = 12
+)
+
+// liveLogsTailCap caps the number of rendered rows so the live-log
+// panel never overflows the cockpit.
+func liveLogsTailCap(mode bento.Mode) int {
+	switch mode {
+	case bento.ModeUltraPlus:
+		return liveLogsTailCapUltraPlus
+	case bento.ModeUltra:
+		return liveLogsTailCapUltra
+	default:
+		return liveLogsTailCapStandard
 	}
 }
 

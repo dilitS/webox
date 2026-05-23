@@ -161,7 +161,7 @@ func TestDetailTab_StringAndEnabled(t *testing.T) {
 		{tui.TabOverview, "Overview", true},
 		{tui.TabEnvDiff, "Env Diff", false},
 		{tui.TabDatabase, "Database", false},
-		{tui.TabLogs, "Logs", false},
+		{tui.TabLogs, "Logs", true},
 		{tui.DetailTab(99), "Unknown", false},
 	}
 	for _, tc := range cases {

@@ -23,7 +23,7 @@ func RenderProjectDetail(s Screen) string {
 		"[1] Overview",
 		s.Styles.Muted.Render("[2] Env Diff - unlocked in v0.2"),
 		s.Styles.Muted.Render("[3] Database - unlocked in v0.2"),
-		s.Styles.Muted.Render("[4] Logs - unlocked in v0.2"),
+		"[4] Logs",
 	}, "  ")
 
 	ssl := "unknown"

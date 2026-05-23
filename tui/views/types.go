@@ -110,6 +110,31 @@ type ImportPreviewSnapshot struct {
 	Unmanaged int
 }
 
+// LiveLogLineSnapshot is one entry rendered in the Sprint 09 live-log
+// tab. Level uses the upper-case strings emitted by
+// [components.LogLevel.String] so the view package stays free of the
+// `tui/components` import (would be a cycle when `components` later
+// gains theme-dependent renderers).
+type LiveLogLineSnapshot struct {
+	Level    string
+	Text     string
+	Redacted bool
+}
+
+// LiveLogsSnapshot is the view-layer copy of the live-log tab state.
+// The slice is the most-recent N lines of the ring buffer in
+// insertion order (oldest first); the renderer reverses for display.
+type LiveLogsSnapshot struct {
+	Domain     string
+	LogPath    string
+	AutoScroll bool
+	Connected  bool
+	BufferUsed int
+	BufferCap  int
+	Lines      []LiveLogLineSnapshot
+	Err        string
+}
+
 // Screen contains the immutable data needed by pure render functions.
 type Screen struct {
 	Width         int
@@ -127,4 +152,5 @@ type Screen struct {
 	ResumeForm    ResumeWizardSnapshot
 	ActionForm    ProjectActionSnapshot
 	ImportForm    ImportPreviewSnapshot
+	LiveLogs      LiveLogsSnapshot
 }

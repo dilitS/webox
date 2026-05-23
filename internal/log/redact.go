@@ -50,6 +50,28 @@ var redactionRules = []redactionRule{
 		pattern:     regexp.MustCompile(`ssh-rsa\s+[A-Za-z0-9+/=]{40,}`),
 		replacement: replacement,
 	},
+	// JWT: three base64url segments separated by dots. The header
+	// segment always begins with `eyJ` (base64-url of `{"`); using it
+	// as an anchor keeps the false-positive rate negligible.
+	{
+		pattern:     regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{20,}\b`),
+		replacement: replacement,
+	},
+	// Generic key=value / key: value style secrets in CLI args, JSON
+	// payloads, env lines, and config dumps. The value capture stops
+	// at whitespace, ampersand, comma, or quote so we don't bleed the
+	// surrounding sentence into the redaction marker.
+	{
+		pattern:     regexp.MustCompile(`(?i)\b(password|passwd|token|secret|api[_-]?key|access[_-]?key)\s*[:=]\s*([^\s&"',]{4,})`),
+		replacement: `${1}=` + replacement,
+	},
+	// MySQL / PostgreSQL `-p<password>` form (no space between flag
+	// and value). Anchored to the binary name so generic `-p` flags
+	// in unrelated tools (curl, ssh) are not touched.
+	{
+		pattern:     regexp.MustCompile(`(?i)\b(mysql|mysqldump|psql)\b([^\n]*?)\s-p([^\s\-]\S*)`),
+		replacement: `${1}${2} -p` + replacement,
+	},
 }
 
 // Redact replaces known secret-shaped substrings with "[REDACTED]".

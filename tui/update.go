@@ -290,6 +290,9 @@ func (m Model) beginImportScan() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateProjectDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.activeTab == TabLogs {
+		return m.updateLiveLogsKey(msg)
+	}
 	switch msg.String() {
 	case "left", "esc":
 		m.state = StateDashboard
@@ -297,7 +300,9 @@ func (m Model) updateProjectDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "1":
 		m.activeTab = TabOverview
 		return m, nil
-	case "2", "3", "4", "h", "l":
+	case "4":
+		return m.enterLiveLogsTab()
+	case "2", "3", "h", "l":
 		m.alert = "tab available in v0.2"
 		return m, nil
 	case "r":

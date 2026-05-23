@@ -110,8 +110,10 @@ func (t *placeholderTile) Render(mode Mode, focused bool) string {
 	})
 }
 
-// NewMetricsPlaceholderTile returns the header-metrics placeholder
-// scheduled to ship in Sprint 09 (live CPU/RAM/Disk via SSH).
+// NewMetricsPlaceholderTile returns the header-metrics placeholder used
+// when no live metrics snapshot is available yet (initial render before
+// the first SSH poll completes). Once metrics arrive, the view layer
+// swaps it for [NewHeaderMetricsTile].
 func NewMetricsPlaceholderTile() BentoTile {
 	return &placeholderTile{
 		id:     "header-metrics",
@@ -119,9 +121,61 @@ func NewMetricsPlaceholderTile() BentoTile {
 		header: "[Header Metrics]",
 		subtext: []string{
 			"CPU / RAM / Disk pulse",
-			"Live wiring: Sprint 09",
+			"Awaiting first SSH poll…",
 		},
 	}
+}
+
+// HeaderMetricsSnapshot is the view-layer projection of
+// [sshmetrics.Metrics] consumed by [NewHeaderMetricsTile]. The bento
+// engine does not depend on the metrics package directly, so the
+// snapshot decouples the rendering layer from the polling pipeline.
+type HeaderMetricsSnapshot struct {
+	ProfileAlias string
+	UptimeLabel  string
+	LoadLabel    string
+	RAMLabel     string
+	RTTLabel     string
+	Stale        bool
+}
+
+type headerMetricsTile struct {
+	snap HeaderMetricsSnapshot
+}
+
+// NewHeaderMetricsTile constructs the Bento Ultra header-metrics tile
+// from a snapshot. The renderer adds a `[LIVE]` / `[STALE]` indicator
+// based on snap.Stale so the operator can tell at a glance whether the
+// numbers are fresh.
+func NewHeaderMetricsTile(snap HeaderMetricsSnapshot) BentoTile {
+	return &headerMetricsTile{snap: snap}
+}
+
+// ID satisfies [BentoTile].
+func (t *headerMetricsTile) ID() string { return "header-metrics" }
+
+// Slot satisfies [BentoTile].
+func (t *headerMetricsTile) Slot() Slot { return SlotMetrics }
+
+// Render satisfies [BentoTile].
+func (t *headerMetricsTile) Render(mode Mode, focused bool) string {
+	indicator := "[LIVE]"
+	if t.snap.Stale {
+		indicator = "[STALE]"
+	}
+	body := strings.Join([]string{
+		indicator + " " + nonEmpty(t.snap.ProfileAlias, "(no profile)"),
+		"Uptime: " + nonEmpty(t.snap.UptimeLabel, "—"),
+		"Load: " + nonEmpty(t.snap.LoadLabel, "—"),
+		"RAM: " + nonEmpty(t.snap.RAMLabel, "—"),
+		"Ping: " + nonEmpty(t.snap.RTTLabel, "—"),
+	}, "\n")
+	return renderTilePanel(tilePanelOptions{
+		Header:  "[Header Metrics]",
+		Body:    body,
+		Mode:    mode,
+		Focused: focused,
+	})
 }
 
 // NewCICDPlaceholderTile returns the CI/CD pipeline placeholder scheduled
@@ -138,8 +192,9 @@ func NewCICDPlaceholderTile() BentoTile {
 	}
 }
 
-// NewLogsPlaceholderTile returns the live-log placeholder scheduled to
-// ship in Sprint 09 (SSH tail -f with ring buffer + ANSI parsing).
+// NewLogsPlaceholderTile returns the live-log placeholder used when no
+// project is selected (or before the first stream line arrives). The
+// view layer swaps it for [NewMicroLogsTile] once tail data flows.
 func NewLogsPlaceholderTile() BentoTile {
 	return &placeholderTile{
 		id:     "live-logs",
@@ -147,9 +202,85 @@ func NewLogsPlaceholderTile() BentoTile {
 		header: "[Live Micro-Logs]",
 		subtext: []string{
 			"SSH tail with secret redaction",
-			"Live wiring: Sprint 09",
+			"Select a project to start streaming.",
 		},
 	}
+}
+
+// MicroLogLine is the view-layer projection of one tail entry. The
+// bento package intentionally avoids depending on `services/sshtail`
+// directly so the layout engine remains pure.
+type MicroLogLine struct {
+	Level    string
+	Text     string
+	Redacted bool
+}
+
+type microLogsTile struct {
+	domain string
+	lines  []MicroLogLine
+}
+
+// NewMicroLogsTile renders the bottom-centre live-tail tile populated
+// from a ring buffer snapshot. The caller is expected to clamp the
+// slice to the most recent N lines (defaults to 5 in the standard
+// cockpit and 8 in Ultra+) before passing it in.
+func NewMicroLogsTile(domain string, lines []MicroLogLine) BentoTile {
+	cp := make([]MicroLogLine, len(lines))
+	copy(cp, lines)
+	return &microLogsTile{domain: domain, lines: cp}
+}
+
+// ID satisfies [BentoTile].
+func (t *microLogsTile) ID() string { return "live-logs" }
+
+// Slot satisfies [BentoTile].
+func (t *microLogsTile) Slot() Slot { return SlotLogs }
+
+// Render satisfies [BentoTile].
+func (t *microLogsTile) Render(mode Mode, focused bool) string {
+	if len(t.lines) == 0 {
+		return renderTilePanel(tilePanelOptions{
+			Header:  "[Live Micro-Logs]",
+			Body:    "Streaming " + nonEmpty(t.domain, "—") + " — waiting for first line.",
+			Mode:    mode,
+			Focused: focused,
+		})
+	}
+	rows := make([]string, 0, len(t.lines)+1)
+	rows = append(rows, "Stream: "+nonEmpty(t.domain, "—"))
+	for _, line := range t.lines {
+		marker := "·"
+		switch line.Level {
+		case "ERROR":
+			marker = "✗"
+		case "WARN":
+			marker = "!"
+		case "DEBUG":
+			marker = "›"
+		case "INFO":
+			marker = "·"
+		}
+		row := marker + " " + line.Text
+		if line.Redacted {
+			row += "  (redacted)"
+		}
+		rows = append(rows, row)
+	}
+	return renderTilePanel(tilePanelOptions{
+		Header:  "[Live Micro-Logs]",
+		Body:    strings.Join(rows, "\n"),
+		Mode:    mode,
+		Focused: focused,
+	})
+}
+
+// nonEmpty returns fallback when value is the empty string.
+func nonEmpty(value, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 // NewTopologyPlaceholderTile returns the service-topology placeholder
