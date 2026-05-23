@@ -16,6 +16,12 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `testing/sshmock/` (TASK-02.2) — deterministic in-process SSH server
+  for integration tests without real hosting accounts or shelling out to
+  system `ssh`. It binds localhost on a random port, generates ephemeral
+  ed25519 host/client keys per test, enforces public-key-only auth, maps
+  command strings to stdout/stderr/exit status, and injects disconnect /
+  delay failures for pool and reconnect tests.
 - `ssh/errors.go`, `ssh/types.go`, `ssh/client_config.go` (TASK-02.1) —
   foundation for the Sprint 02 connection pool. Ships five sentinel
   errors (`ErrPoolBusy`, `ErrHostKeyUnknown`, `ErrHostKeyMismatch`,

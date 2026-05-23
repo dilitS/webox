@@ -70,19 +70,21 @@ Po sprincie 02:
 - **Estymata:** M
 - **Zależności:** TASK-02.1
 - **Acceptance Criteria:**
-  - [ ] `testing/sshmock/` uruchamia lokalny serwer SSH na losowym porcie.
-  - [ ] Obsługuje mapowanie `command → stdout/stderr/exit code`.
-  - [ ] Akceptuje ephemeral key auth generowany per test.
-  - [ ] Smoke test: `echo hello` → `stdout == "hello\n"`, exit code 0.
-  - [ ] Support dla injected failures (disconnect / timeout / exit code != 0).
+  - [x] `testing/sshmock/` uruchamia lokalny serwer SSH na losowym porcie.
+  - [x] Obsługuje mapowanie `command → stdout/stderr/exit code`.
+  - [x] Akceptuje ephemeral key auth generowany per test.
+  - [x] Smoke test: `echo hello` → `stdout == "hello\n"`, exit code 0.
+  - [x] Support dla injected failures (disconnect / timeout / exit code != 0).
 - **Pliki:**
-  - `testing/sshmock/doc.go` (new)
-  - `testing/sshmock/server.go` (new)
-  - `testing/sshmock/server_test.go` (new)
+  - `testing/sshmock/doc.go`
+  - `testing/sshmock/server.go`
+  - `testing/sshmock/server_test.go`
 - **Docs:** [`TESTING.md §3`](../TESTING.md#3-mockowanie-ssh), [`RISKS.md R-002`](../RISKS.md#r-002--smallpl-panel-niestabilny--api-zmiany)
 - **Notatki:**
   - To infrastruktura testowa dla sprintów 02–06.
   - Fixture capture z realnego `devil` zostaje na Sprint 03.
+  - Implementacja używa `golang.org/x/crypto/ssh`, bez dodatkowej zależności
+    typu `gliderlabs/ssh`.
 
 ---
 
