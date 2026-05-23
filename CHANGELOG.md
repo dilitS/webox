@@ -16,6 +16,18 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- **Sprint 10 — Live CI/CD Pipeline Panel + F8 Workflow Logs Modal.**
+  - `services/github.Transport` extended with `GetWorkflowSteps(ctx, repo, runID) ([]Step, error)` and `GetWorkflowLogs(ctx, repo, runID, maxLines) ([]WorkflowLogLine, error)` plus the matching `Client` facades. CLI primary path proxies through `gh api /repos/.../actions/runs/<id>/jobs` and shells out to `gh run view <runID> --log`; REST fallback hits the same jobs endpoint and returns a typed `ErrPATScopeInsufficient` for the log endpoint (zip stream we deliberately do not unpack in-process).
+  - New sentinel errors `ErrRunNotFound` (treated as recoverable "no run yet") and `ErrStepsParseError` (gh schema skew worth investigating).
+  - `services/github.Step` and `WorkflowLogLine` projections + `WorkflowRunSummary.IsTerminal` so the tile can switch between static badge and live elapsed-time rendering without touching the transport.
+  - `services/github/logs.go::parseGHLogLines` redacts every log line through `internal/log.Redact` **before** it leaves the transport boundary, then optionally caps to the last `maxLines` (Sprint 10 plan TASK-10.3 hard cap = 50).
+  - `services/github.WorkflowRun` gained the missing `RunNumber` field (`run_number`) so the tile can render `Build #N`.
+  - `tui/bento.NewCICDPipelineTile` ships with a `CICDPipelineSnapshot` (alias / workflow / run number / status / duration / steps / `RateLimited` / `RateLimitHint` / `ErrorMessage`). Steps render as numbered list with UX-§3.1 badges (`✓ ✗ ⏳ … ⊘ ⊗ ?`). Header indicator switches between `[LIVE]` / `[STALE]` / `[LIMITED]` and the footer hints `[F8] View logs · [Enter] Open run`.
+  - `tui/cicd.go` adds the polling pipeline: 10-second `tea.Tick` (`status.GitHubStepsTTL`), `status.GetOrFetchMeta` SWR cache (`gh:steps:<owner>/<repo>:<workflow>`), per-project snapshot map, and graceful rate-limit handling (cached steps preserved, hint extracted from `reset=<RFC3339>` markers when present).
+  - F8 logs modal: `cicdLogsModalForm` + double-border `components.RenderModal`, red border for `FAILED ✗` runs, `↑/↓` scroll, `Esc/F8` to dismiss. Lines arrive already redacted from the transport so the modal cannot leak PATs.
+  - `tui/update.go::onDashboardSelectionChanged` invalidates the active project's CI/CD cache entry and triggers an immediate refetch when the operator moves the selection cursor, satisfying TASK-10.4.
+  - `cmd/webox/run.go` wires `pipelineFetcherFor` and `logsFetcherFor` against the shared `ghsvc.Client` so all three GitHub call paths (last-deploy / pipeline / logs) reuse the same auth state.
+  - `status` package: new `PrefixGitHubSteps = "gh:steps:"` and `GitHubStepsTTL = 10s`; `EventDeploy` invalidation list now includes `gh:steps:` so the post-deploy refresh shows fresh pipeline data immediately.
 - **Sprint 09 — Live Log Stream foundations + Header Bar Server Metrics.**
   - `services/sshtail/` — context-cancellable `tail -f` streamer with a
     1-method `Executor` seam (production wires it to `ssh.Pool`; tests
@@ -69,6 +81,22 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
     live-log tab visually without an SSH session.
 
 ### Security
+- **CI/CD pipeline log redaction at the transport boundary.** Every
+  line returned by `services/github.GetWorkflowLogs` passes through
+  `internal/log.Redact` *before* it is buffered, scrolled, or rendered
+  by the F8 modal. Tests prove the modal cannot leak `ghp_…` PATs even
+  when the workflow output prints them verbatim
+  (`TestCLITransport_GetWorkflowLogs_TailAndRedact`,
+  `TestParseGHLogLines_RedactsSecrets`).
+- **CI/CD cache key never carries credentials.** The status-cache key
+  `gh:steps:<owner>/<repo>:<workflow>` deliberately omits PAT/auth
+  state — gh CLI's cached auth handles the request, not the cache
+  layer (SECURITY §10.4).
+- **Rate-limit graceful degradation.** The CI/CD tile preserves the
+  last successful pipeline snapshot and renders a `[LIMITED]` badge +
+  reset hint instead of clearing the data, so a primary/secondary
+  GitHub rate-limit response cannot hide an in-flight failed deploy
+  from the operator (TASK-10.5).
 - **Goroutine leak coverage for the SSH tail pipeline.**
   `services/sshtail/leak_test.go` runs `goleak.VerifyNone` on the
   cancel-to-shutdown happy path *and* the exhausted-reconnect failure

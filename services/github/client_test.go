@@ -144,6 +144,8 @@ type transportFunc struct {
 	setActionsSecret func(context.Context, RepoRef, string, []byte) error
 	dispatchWorkflow func(context.Context, RepoRef, DispatchWorkflowRequest) (*WorkflowDispatch, error)
 	getLatestRun     func(context.Context, RepoRef, LatestRunRequest) (*WorkflowRun, error)
+	getWorkflowSteps func(context.Context, RepoRef, int64) ([]Step, error)
+	getWorkflowLogs  func(context.Context, RepoRef, int64, int) ([]WorkflowLogLine, error)
 }
 
 func (t transportFunc) CreateRepo(ctx context.Context, req CreateRepoRequest) (*Repository, error) {
@@ -164,4 +166,18 @@ func (t transportFunc) DispatchWorkflow(ctx context.Context, repo RepoRef, req D
 
 func (t transportFunc) GetLatestRun(ctx context.Context, repo RepoRef, req LatestRunRequest) (*WorkflowRun, error) {
 	return t.getLatestRun(ctx, repo, req)
+}
+
+func (t transportFunc) GetWorkflowSteps(ctx context.Context, repo RepoRef, runID int64) ([]Step, error) {
+	if t.getWorkflowSteps == nil {
+		return nil, ErrRunNotFound
+	}
+	return t.getWorkflowSteps(ctx, repo, runID)
+}
+
+func (t transportFunc) GetWorkflowLogs(ctx context.Context, repo RepoRef, runID int64, maxLines int) ([]WorkflowLogLine, error) {
+	if t.getWorkflowLogs == nil {
+		return nil, ErrRunNotFound
+	}
+	return t.getWorkflowLogs(ctx, repo, runID, maxLines)
 }

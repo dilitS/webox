@@ -144,7 +144,16 @@ func realTeaProgram(model tea.Model, stdout io.Writer) teaRunner {
 }
 
 func runTUI(stdout, stderr io.Writer) int {
-	return runTUIWith(stdout, stderr, tui.DefaultConfigPath, realTeaProgram, defaultGitHubLastDeployFetcher())
+	client := ghsvc.NewClient(ghsvc.Options{})
+	return runTUIWith(
+		stdout,
+		stderr,
+		tui.DefaultConfigPath,
+		realTeaProgram,
+		lastDeployFetcherFor(client),
+		pipelineFetcherFor(client),
+		logsFetcherFor(client),
+	)
 }
 
 func runTUIWith(
@@ -153,6 +162,8 @@ func runTUIWith(
 	resolveConfig configPathResolver,
 	makeProgram teaProgramFactory,
 	fetcher tui.GitHubLastDeployFetcher,
+	pipeline tui.GitHubPipelineFetcher,
+	logs tui.GitHubLogsFetcher,
 ) int {
 	cfgPath, err := resolveConfig()
 	if err != nil {
@@ -163,6 +174,8 @@ func runTUIWith(
 		tui.New(tui.Options{
 			ConfigPath:       cfgPath,
 			GitHubLastDeploy: fetcher,
+			GitHubPipeline:   pipeline,
+			GitHubLogs:       logs,
 		}),
 		stdout,
 	)
@@ -173,14 +186,42 @@ func runTUIWith(
 	return exitOK
 }
 
-// defaultGitHubLastDeployFetcher wires the dashboard last-deploy
-// fetcher against the gh CLI transport. The client is instantiated
-// per process — not per fetch — so subsequent dashboard refreshes
-// reuse the same transport tooling and any cached gh auth state.
-func defaultGitHubLastDeployFetcher() tui.GitHubLastDeployFetcher {
-	client := ghsvc.NewClient(ghsvc.Options{})
+// lastDeployFetcherFor wires the dashboard last-deploy fetcher against
+// the supplied GitHub client. Sharing the same client across fetchers
+// reuses the gh CLI's cached auth state for the duration of the run.
+func lastDeployFetcherFor(client *ghsvc.Client) tui.GitHubLastDeployFetcher {
 	return func(ctx context.Context, ref ghsvc.RepoRef, workflow string) (*ghsvc.WorkflowRun, error) {
 		return client.GetLatestRun(ctx, ref, ghsvc.LatestRunRequest{Event: "workflow_dispatch"})
+	}
+}
+
+// pipelineFetcherFor wires the CI/CD pipeline tile against the
+// shared GitHub client. The fetcher first calls `GetLatestRun` to
+// resolve the active run id, then `GetWorkflowSteps` to populate the
+// step list. Rate-limit errors propagate so the tile can degrade
+// gracefully (Sprint 10 plan §TASK-10.5).
+func pipelineFetcherFor(client *ghsvc.Client) tui.GitHubPipelineFetcher {
+	return func(ctx context.Context, ref ghsvc.RepoRef, workflow string) (tui.PipelineFetchResult, error) {
+		run, err := client.GetLatestRun(ctx, ref, ghsvc.LatestRunRequest{})
+		if err != nil {
+			return tui.PipelineFetchResult{}, err
+		}
+		if run == nil {
+			return tui.PipelineFetchResult{}, ghsvc.ErrRunNotFound
+		}
+		steps, err := client.GetWorkflowSteps(ctx, ref, run.ID)
+		if err != nil {
+			return tui.PipelineFetchResult{Run: run}, err
+		}
+		return tui.PipelineFetchResult{Run: run, Steps: steps}, nil
+	}
+}
+
+// logsFetcherFor wires the F8 modal against the shared GitHub client.
+// All lines come back already redacted at the transport boundary.
+func logsFetcherFor(client *ghsvc.Client) tui.GitHubLogsFetcher {
+	return func(ctx context.Context, ref ghsvc.RepoRef, runID int64, maxLines int) ([]ghsvc.WorkflowLogLine, error) {
+		return client.GetWorkflowLogs(ctx, ref, runID, maxLines)
 	}
 }
 

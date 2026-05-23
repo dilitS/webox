@@ -2,8 +2,13 @@ package tui
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/dilitS/webox/tui/bento"
+	"github.com/dilitS/webox/tui/components"
+	"github.com/dilitS/webox/tui/theme"
 	"github.com/dilitS/webox/tui/views"
 )
 
@@ -33,15 +38,116 @@ func (m Model) View() string {
 
 func (m Model) renderDashboard(screen views.Screen) string {
 	mode := m.BentoMode()
+	var base string
 	switch mode {
 	case bento.ModeStandard:
-		return views.RenderDashboard(screen)
+		base = views.RenderDashboard(screen)
 	case bento.ModeTiny:
-		return bento.NewEngine("Webox Cockpit v0.1", nil).
+		base = bento.NewEngine("Webox Cockpit v0.1", nil).
 			RenderMode(screen.Width, screen.Height, mode)
 	default:
-		return bento.NewEngine("Webox Cockpit v0.1", m.dashboardBentoTiles()).
+		base = bento.NewEngine("Webox Cockpit v0.1", m.dashboardBentoTiles()).
 			RenderMode(screen.Width, screen.Height, mode)
+	}
+	if !m.cicdModal.Open {
+		return base
+	}
+	overlay := renderCICDLogsModal(m.cicdModal, screen.Width)
+	return base + "\n" + overlay
+}
+
+// renderCICDLogsModal builds the F8 logs viewer. The modal uses the
+// double-border component from Sprint 08 and inherits the FAILED ✗
+// red border when the run conclusion was a failure (Sprint 10 plan
+// §TASK-10.3 acceptance criteria).
+func renderCICDLogsModal(modal cicdLogsModalForm, screenWidth int) string {
+	if !modal.Open {
+		return ""
+	}
+	tokens := theme.Default()
+	tone := components.ToneInfo
+	if modal.RunStatus == bento.CICDStatusFailure {
+		tone = components.ToneError
+	}
+
+	header := fmt.Sprintf("Workflow Run #%d · %s", modal.RunNumber, cicdModalStatusVerb(modal.RunStatus))
+	if modal.ProjectAlias != "" {
+		header += " · " + modal.ProjectAlias
+	}
+
+	var body strings.Builder
+	switch {
+	case modal.Loading:
+		body.WriteString("Fetching workflow logs (gh run view --log)…")
+	case modal.Err != "":
+		body.WriteString("Error: ")
+		body.WriteString(modal.Err)
+	case len(modal.Lines) == 0:
+		body.WriteString("No log output yet.")
+	default:
+		const maxRows = 20
+		start := modal.ScrollOffset
+		if start < 0 {
+			start = 0
+		}
+		end := start + maxRows
+		if end > len(modal.Lines) {
+			end = len(modal.Lines)
+		}
+		for i := start; i < end; i++ {
+			line := modal.Lines[i]
+			prefix := ""
+			if line.StepName != "" {
+				prefix = "[" + line.StepName + "] "
+			}
+			body.WriteString(lipgloss.NewStyle().
+				Foreground(lipgloss.Color(tokens.TextBright)).
+				Render(prefix + line.Text))
+			body.WriteString("\n")
+		}
+		if len(modal.Lines) > maxRows {
+			body.WriteString("\n")
+			fmt.Fprintf(&body, "(showing %d–%d of %d lines · ↑/↓ scroll)", start+1, end, len(modal.Lines))
+		}
+	}
+
+	const (
+		modalSidePadding = 4
+		modalMinWidth    = 60
+	)
+	minWidth := screenWidth - modalSidePadding
+	if minWidth < modalMinWidth {
+		minWidth = modalMinWidth
+	}
+
+	return components.RenderModal(components.ModalOptions{
+		Title:    header,
+		Body:     body.String(),
+		Footer:   "↑/↓ scroll · Esc/F8 close",
+		MinWidth: minWidth,
+		Tone:     tone,
+		Theme:    tokens,
+	})
+}
+
+func cicdModalStatusVerb(s bento.CICDStatus) string {
+	switch s {
+	case bento.CICDStatusSuccess:
+		return "SUCCESS ✓"
+	case bento.CICDStatusFailure:
+		return "FAILED ✗"
+	case bento.CICDStatusInProgress:
+		return "IN_PROGRESS ⏳"
+	case bento.CICDStatusQueued:
+		return "QUEUED …"
+	case bento.CICDStatusCancelled:
+		return "CANCELLED ⊗"
+	case bento.CICDStatusSkipped:
+		return "SKIPPED ⊘"
+	case bento.CICDStatusUnknown:
+		return "UNKNOWN ?"
+	default:
+		return "UNKNOWN ?"
 	}
 }
 
@@ -53,7 +159,11 @@ func (m Model) dashboardBentoTiles() []bento.BentoTile {
 	registry.Register(bento.NewOverviewTile(domain, overview))
 
 	registry.Register(bento.NewMetricsPlaceholderTile())
-	registry.Register(bento.NewCICDPlaceholderTile())
+	if snap, ok := buildCICDPipelineSnapshot(m); ok {
+		registry.Register(bento.NewCICDPipelineTile(snap))
+	} else {
+		registry.Register(bento.NewCICDPlaceholderTile())
+	}
 	registry.Register(bento.NewLogsPlaceholderTile())
 	registry.Register(bento.NewTopologyPlaceholderTile())
 

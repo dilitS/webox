@@ -215,3 +215,39 @@ type ImportSnapshot struct {
 	Rows      []ImportRow
 	Err       string
 }
+
+// CICDTickMsg drives periodic CI/CD pipeline polling. The dashboard
+// emits one tick per [GitHubStepsTTL] interval (10s) which triggers
+// `pollCICDPipelineCmd` for the selected project.
+type CICDTickMsg time.Time
+
+// CICDFetchedMsg carries a CI/CD pipeline poll outcome. The model
+// updates the per-project snapshot map and (if the polled project
+// matches the dashboard selection) re-renders the tile.
+type CICDFetchedMsg struct {
+	ProjectID string
+	Result    PipelineFetchResult
+	Err       error
+	// FetchedAt records when the poll finished so the renderer can
+	// compute the freshness badge ([LIVE]/[STALE]).
+	FetchedAt time.Time
+}
+
+// CICDLogsFetchedMsg carries the response to the F8 modal open
+// command. ProjectID + RunID identify the run; Lines is already
+// passed through `internal/log.Redact` (transport boundary).
+type CICDLogsFetchedMsg struct {
+	ProjectID string
+	RunID     int64
+	Lines     []CICDLogLineSnapshot
+	Err       error
+}
+
+// CICDLogLineSnapshot is the view-layer projection of one redacted
+// workflow-log line. Kept in `tui` (not in `services/github`) so the
+// modal renderer does not depend on the transport package.
+type CICDLogLineSnapshot struct {
+	JobName  string
+	StepName string
+	Text     string
+}

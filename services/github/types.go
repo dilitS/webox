@@ -97,6 +97,7 @@ type LatestRunRequest struct {
 
 type WorkflowRun struct {
 	ID         int64      `json:"id"`
+	RunNumber  int        `json:"run_number"`
 	Name       string     `json:"name"`
 	Status     string     `json:"status"`
 	Conclusion string     `json:"conclusion"`
@@ -113,4 +114,14 @@ type Transport interface {
 	SetActionsSecret(ctx context.Context, repo RepoRef, name string, value []byte) error
 	DispatchWorkflow(ctx context.Context, repo RepoRef, req DispatchWorkflowRequest) (*WorkflowDispatch, error)
 	GetLatestRun(ctx context.Context, repo RepoRef, req LatestRunRequest) (*WorkflowRun, error)
+	// GetWorkflowSteps returns the per-step status of a workflow run.
+	// Implementations MUST return [ErrRunNotFound] for HTTP 404 /
+	// empty-jobs responses so the CI/CD tile renders "no run yet"
+	// instead of an alert banner.
+	GetWorkflowSteps(ctx context.Context, repo RepoRef, runID int64) ([]Step, error)
+	// GetWorkflowLogs returns the last `maxLines` log lines of the
+	// run (or all of them if `maxLines <= 0`). Lines come back
+	// already passed through `internal/log.Redact` so secrets cannot
+	// leak into UI buffers, the modal cache, or snapshots.
+	GetWorkflowLogs(ctx context.Context, repo RepoRef, runID int64, maxLines int) ([]WorkflowLogLine, error)
 }

@@ -178,8 +178,10 @@ func (t *headerMetricsTile) Render(mode Mode, focused bool) string {
 	})
 }
 
-// NewCICDPlaceholderTile returns the CI/CD pipeline placeholder scheduled
-// to ship in Sprint 10 (live GitHub Actions polling + log modal).
+// NewCICDPlaceholderTile returns the CI/CD pipeline placeholder used
+// before the operator selects a GitHub-linked project (or while the
+// first poll is still in flight). The view layer swaps it for
+// [NewCICDPipelineTile] once a [CICDPipelineSnapshot] is available.
 func NewCICDPlaceholderTile() BentoTile {
 	return &placeholderTile{
 		id:     "cicd-pipeline",
@@ -187,9 +189,212 @@ func NewCICDPlaceholderTile() BentoTile {
 		header: "[CI/CD Pipeline]",
 		subtext: []string{
 			"GitHub Actions stream",
-			"Live wiring: Sprint 10",
+			"No GitHub-linked project selected.",
+			"Press [n] to create a new project.",
 		},
 	}
+}
+
+// CICDStatus enumerates the badge rendering modes used by
+// [CICDStepSnapshot]. Keeping the enum centralised lets snapshot
+// producers (`tui/view.go`) stay free of `services/github` imports.
+type CICDStatus int
+
+// CICDStatus enum values mirror the GitHub Actions step status
+// vocabulary (queued, in_progress, completed × conclusion). The
+// renderer maps each to a UX-§3.1 badge.
+const (
+	CICDStatusUnknown CICDStatus = iota
+	CICDStatusQueued
+	CICDStatusInProgress
+	CICDStatusSuccess
+	CICDStatusFailure
+	CICDStatusCancelled
+	CICDStatusSkipped
+)
+
+// CICDStepSnapshot is the per-step projection rendered inside the
+// CI/CD tile. The shape mirrors the documented numbered-list cell
+// pattern in UX §3.1: `[N] <name> <badge>`.
+type CICDStepSnapshot struct {
+	Number int
+	Name   string
+	Status CICDStatus
+	// Duration is rendered after the badge ("✓ 12s"). When zero, the
+	// renderer omits it so queued steps stay clean.
+	Duration string
+}
+
+// CICDPipelineSnapshot is the full tile projection: header line
+// (`Build #N: STATUS · DURATION`), step list, and the optional
+// rate-limit footer that TASK-10.5 surfaces when GitHub returns a
+// `429`/`x-ratelimit-remaining: 0` response.
+type CICDPipelineSnapshot struct {
+	ProjectAlias  string
+	WorkflowName  string
+	RunNumber     int
+	RunStatus     CICDStatus
+	RunSummary    string // "completed", "in_progress", etc.
+	HeaderTime    string // RFC formatted timestamp (already formatted)
+	Duration      string
+	Steps         []CICDStepSnapshot
+	Stale         bool
+	RateLimited   bool
+	RateLimitHint string // "Reset in 12min" when known.
+	ErrorMessage  string // populated when GitHub call failed (non-rate-limit).
+}
+
+type cicdPipelineTile struct {
+	snap CICDPipelineSnapshot
+}
+
+// NewCICDPipelineTile renders the live GitHub Actions tile. The
+// snapshot is computed in `tui/view.go` from a `status.Cache` lookup so
+// the bento layer remains presentation-only (no API knowledge, no
+// secrets, no goroutines).
+func NewCICDPipelineTile(snap CICDPipelineSnapshot) BentoTile {
+	return &cicdPipelineTile{snap: snap}
+}
+
+// ID satisfies [BentoTile].
+func (t *cicdPipelineTile) ID() string { return "cicd-pipeline" }
+
+// Slot satisfies [BentoTile].
+func (t *cicdPipelineTile) Slot() Slot { return SlotCICD }
+
+// Render satisfies [BentoTile].
+func (t *cicdPipelineTile) Render(mode Mode, focused bool) string {
+	var b strings.Builder
+
+	indicator := "[LIVE]"
+	if t.snap.Stale {
+		indicator = "[STALE]"
+	}
+	if t.snap.RateLimited {
+		indicator = "[LIMITED]"
+	}
+	headerLine := indicator + " " + nonEmpty(t.snap.ProjectAlias, "(no project)")
+	if t.snap.WorkflowName != "" {
+		headerLine += " · " + t.snap.WorkflowName
+	}
+	b.WriteString(headerLine)
+	b.WriteString("\n")
+
+	if t.snap.RateLimited {
+		b.WriteString("GitHub rate limit reached. Cached data shown.")
+		if t.snap.RateLimitHint != "" {
+			b.WriteString(" " + t.snap.RateLimitHint + ".")
+		}
+		b.WriteString("\n")
+	} else if t.snap.ErrorMessage != "" {
+		b.WriteString(t.snap.ErrorMessage)
+		b.WriteString("\n")
+	}
+
+	if t.snap.RunNumber > 0 {
+		runLine := "Build #" + intString(t.snap.RunNumber) + ": " + cicdStatusLabel(t.snap.RunStatus)
+		if t.snap.Duration != "" {
+			runLine += " · " + t.snap.Duration
+		}
+		if t.snap.HeaderTime != "" {
+			runLine += " (" + t.snap.HeaderTime + ")"
+		}
+		b.WriteString(runLine)
+		b.WriteString("\n")
+	} else if !t.snap.RateLimited && t.snap.ErrorMessage == "" {
+		b.WriteString("No workflow run yet for main branch.\n")
+	}
+
+	for _, step := range t.snap.Steps {
+		stepLine := "[" + intString(step.Number) + "] " + step.Name + " " + cicdStatusBadge(step.Status)
+		if step.Duration != "" {
+			stepLine += " · " + step.Duration
+		}
+		b.WriteString(stepLine)
+		b.WriteString("\n")
+	}
+
+	if len(t.snap.Steps) > 0 {
+		b.WriteString("\n[F8] View logs · [Enter] Open run")
+	}
+
+	return renderTilePanel(tilePanelOptions{
+		Header:  "[CI/CD Pipeline]",
+		Body:    strings.TrimRight(b.String(), "\n"),
+		Mode:    mode,
+		Focused: focused,
+	})
+}
+
+// cicdStatusBadge returns the per-step badge string. The mapping
+// matches UX §3.1 (Premium Badges of Status).
+func cicdStatusBadge(s CICDStatus) string {
+	switch s {
+	case CICDStatusSuccess:
+		return "✓"
+	case CICDStatusFailure:
+		return "✗"
+	case CICDStatusInProgress:
+		return "⏳"
+	case CICDStatusQueued:
+		return "…"
+	case CICDStatusSkipped:
+		return "⊘"
+	case CICDStatusCancelled:
+		return "⊗"
+	case CICDStatusUnknown:
+		return "?"
+	default:
+		return "?"
+	}
+}
+
+// cicdStatusLabel returns the verbose label rendered in the build
+// header line. Lowercase verbs match the gh CLI vocabulary.
+func cicdStatusLabel(s CICDStatus) string {
+	switch s {
+	case CICDStatusSuccess:
+		return "SUCCESS ✓"
+	case CICDStatusFailure:
+		return "FAILED ✗"
+	case CICDStatusInProgress:
+		return "IN_PROGRESS ⏳"
+	case CICDStatusQueued:
+		return "QUEUED …"
+	case CICDStatusSkipped:
+		return "SKIPPED ⊘"
+	case CICDStatusCancelled:
+		return "CANCELLED ⊗"
+	case CICDStatusUnknown:
+		return "UNKNOWN ?"
+	default:
+		return "UNKNOWN ?"
+	}
+}
+
+// intString is a tiny helper kept here so the bento package stays
+// `strconv`-free (we already pull `strings` and `lipgloss`).
+func intString(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	negative := n < 0
+	if negative {
+		n = -n
+	}
+	const base = 10
+	buf := [20]byte{}
+	i := len(buf)
+	for n > 0 {
+		i--
+		buf[i] = byte('0' + n%base)
+		n /= base
+	}
+	if negative {
+		i--
+		buf[i] = '-'
+	}
+	return string(buf[i:])
 }
 
 // NewLogsPlaceholderTile returns the live-log placeholder used when no

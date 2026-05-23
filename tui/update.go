@@ -7,6 +7,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/dilitS/webox/providers"
+	ghsvc "github.com/dilitS/webox/services/github"
+	"github.com/dilitS/webox/status"
 	"github.com/dilitS/webox/tui/components"
 	"github.com/dilitS/webox/wizard"
 )
@@ -41,7 +43,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:gocyclo // To
 		m.cfg = msg.Config
 		m.state = StateDashboard
 		m.selectedIndex = clampIndex(m.selectedIndex, len(cfgProjects(m.cfg)))
-		return m, tea.Batch(refreshVisibleProjectsCmd(m), scheduleRefresh(m.refreshInterval))
+		cmds := []tea.Cmd{refreshVisibleProjectsCmd(m), scheduleRefresh(m.refreshInterval)}
+		if m.cicdFetcher != nil {
+			cmds = append(cmds, scheduleCICDTick(status.GitHubStepsTTL))
+			if poll := pollCICDPipelineCmd(m); poll != nil {
+				cmds = append(cmds, poll)
+			}
+		}
+		return m, tea.Batch(cmds...)
 	case ConfigLoadFailedMsg:
 		m.state = StateInitWizard
 		m.initForm = newInitWizardForm()
@@ -93,6 +102,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:gocyclo // To
 			return m, tea.Batch(refreshVisibleProjectsCmd(m), scheduleRefresh(m.refreshInterval))
 		}
 		return m, scheduleRefresh(m.refreshInterval)
+	case CICDTickMsg:
+		return m.applyCICDTick()
+	case CICDFetchedMsg:
+		return m.applyCICDFetched(msg)
+	case CICDLogsFetchedMsg:
+		return m.applyCICDLogsFetched(msg), nil
 	case tea.KeyMsg:
 		return m.updateKey(msg)
 	default:
@@ -249,7 +264,11 @@ func (m Model) updateInitWizardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.cicdModal.Open {
+		return m.updateCICDModalKey(msg)
+	}
 	projectCount := len(cfgProjects(m.cfg))
+	previousIndex := m.selectedIndex
 	switch msg.String() {
 	case "up", "k":
 		m.selectedIndex = clampIndex(m.selectedIndex-1, projectCount)
@@ -275,6 +294,153 @@ func (m Model) updateDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.wizardStack = newStackSlot()
 	case "i":
 		return m.beginImportScan()
+	case "f8":
+		return m.openCICDLogsModal()
+	}
+	if m.selectedIndex != previousIndex {
+		return m.onDashboardSelectionChanged()
+	}
+	return m, nil
+}
+
+// onDashboardSelectionChanged is invoked whenever the operator moves
+// the selection cursor to a different project. Sprint 10 §TASK-10.4
+// requires the CI/CD tile cache to be invalidated so the next poll
+// fetches fresh data for the newly highlighted project.
+func (m Model) onDashboardSelectionChanged() (tea.Model, tea.Cmd) {
+	project, ok := m.selectedProject()
+	if !ok {
+		return m, nil
+	}
+	invalidateCICDCacheForProject(m.cache, project)
+	if m.cicdFetcher == nil {
+		return m, nil
+	}
+	return m, pollCICDPipelineCmd(m)
+}
+
+// applyCICDTick triggers a poll for the active project and schedules
+// the next tick. The tick fires regardless of selection so background
+// data stays warm even when the operator is in a wizard.
+func (m Model) applyCICDTick() (tea.Model, tea.Cmd) {
+	if m.cicdFetcher == nil {
+		return m, scheduleCICDTick(status.GitHubStepsTTL)
+	}
+	cmds := []tea.Cmd{scheduleCICDTick(status.GitHubStepsTTL)}
+	if poll := pollCICDPipelineCmd(m); poll != nil {
+		cmds = append(cmds, poll)
+	}
+	return m, tea.Batch(cmds...)
+}
+
+// applyCICDFetched merges a CI/CD poll result into the per-project
+// snapshot cache. Rate-limit responses preserve any previously
+// successful data (SWR semantics): the tile renders the cached steps
+// with a [LIMITED] badge instead of clearing them.
+func (m Model) applyCICDFetched(msg CICDFetchedMsg) (tea.Model, tea.Cmd) {
+	if m.cicdSnapshots == nil {
+		m.cicdSnapshots = make(map[string]cicdSnapshotEntry)
+	}
+	previous := m.cicdSnapshots[msg.ProjectID]
+
+	if msg.Err != nil {
+		entry := previous
+		entry.Stale = true
+		entry.FetchedAt = msg.FetchedAt
+		switch {
+		case errors.Is(msg.Err, ghsvc.ErrRateLimited):
+			entry.RateLimited = true
+			_, hint := extractRateLimitInfo(msg.Err)
+			entry.RateLimitHint = hint
+		case errors.Is(msg.Err, ghsvc.ErrRunNotFound):
+			entry.Run = nil
+			entry.Steps = nil
+			entry.RateLimited = false
+			entry.Err = ""
+		default:
+			entry.Err = msg.Err.Error()
+		}
+		m.cicdSnapshots[msg.ProjectID] = entry
+		return m, nil
+	}
+
+	entry := cicdSnapshotEntry{
+		Run:       summarizeRun(msg.Result.Run),
+		Steps:     append([]ghsvc.Step(nil), msg.Result.Steps...),
+		FetchedAt: msg.FetchedAt,
+	}
+	if msg.Result.RateLimitHint != "" {
+		entry.RateLimitHint = msg.Result.RateLimitHint
+	}
+	m.cicdSnapshots[msg.ProjectID] = entry
+	return m, nil
+}
+
+// applyCICDLogsFetched populates the F8 modal with the requested log
+// tail. Errors stay in the modal so the operator can read them, then
+// hit `esc` to dismiss.
+func (m Model) applyCICDLogsFetched(msg CICDLogsFetchedMsg) Model {
+	if !m.cicdModal.Open || m.cicdModal.ProjectID != msg.ProjectID {
+		return m
+	}
+	m.cicdModal.Loading = false
+	if msg.Err != nil {
+		m.cicdModal.Err = msg.Err.Error()
+		return m
+	}
+	m.cicdModal.Lines = msg.Lines
+	m.cicdModal.Err = ""
+	return m
+}
+
+// openCICDLogsModal initialises the F8 modal for the active project +
+// run id. Returns a no-op when the project has no run yet, no GitHub
+// link, or no logs fetcher configured.
+func (m Model) openCICDLogsModal() (tea.Model, tea.Cmd) {
+	project, ok := m.selectedProject()
+	if !ok {
+		m.alert = "no project selected"
+		return m, nil
+	}
+	entry, has := m.cicdSnapshots[project.ID]
+	if !has || entry.Run == nil || entry.Run.RunID <= 0 {
+		m.alert = "no workflow run available yet"
+		return m, nil
+	}
+	if m.cicdLogsFetcher == nil {
+		m.alert = "logs fetcher unavailable (install gh CLI)"
+		return m, nil
+	}
+	m.cicdModal = cicdLogsModalForm{
+		Open:         true,
+		ProjectID:    project.ID,
+		ProjectAlias: project.Domain,
+		RunID:        entry.Run.RunID,
+		RunNumber:    entry.Run.RunNumber,
+		RunStatus:    cicdStatusFromGitHub(entry.Run.Status, entry.Run.Conclusion),
+		Loading:      true,
+	}
+	return m, loadCICDLogsCmd(m, entry.Run.RunID)
+}
+
+// updateCICDModalKey handles keypresses while the F8 modal is open.
+// The modal is the only consumer of `↑/↓` while open so the dashboard
+// router defers to it before applying dashboard navigation.
+func (m Model) updateCICDModalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "f8":
+		m.cicdModal = cicdLogsModalForm{}
+		return m, nil
+	case "up", "k":
+		if m.cicdModal.ScrollOffset > 0 {
+			m.cicdModal.ScrollOffset--
+		}
+		return m, nil
+	case "down", "j":
+		if m.cicdModal.ScrollOffset < len(m.cicdModal.Lines)-1 {
+			m.cicdModal.ScrollOffset++
+		}
+		return m, nil
 	}
 	return m, nil
 }

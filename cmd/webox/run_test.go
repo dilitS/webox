@@ -385,7 +385,7 @@ func TestRunTUIWith_ResolveConfigFailureReturnsMisuse(t *testing.T) {
 	stubProgram := func(_ tea.Model, _ io.Writer) teaRunner { return stubTeaRunner{} }
 
 	var stdout, stderr bytes.Buffer
-	got := runTUIWith(&stdout, &stderr, resolve, stubProgram, nil)
+	got := runTUIWith(&stdout, &stderr, resolve, stubProgram, nil, nil, nil)
 	if got != exitMisuse {
 		t.Fatalf("exit = %d, want %d", got, exitMisuse)
 	}
@@ -406,7 +406,7 @@ func TestRunTUIWith_ProgramFailureReturnsMisuse(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	got := runTUIWith(&stdout, &stderr, resolve, stubProgram, nil)
+	got := runTUIWith(&stdout, &stderr, resolve, stubProgram, nil, nil, nil)
 	if got != exitMisuse {
 		t.Fatalf("exit = %d, want %d", got, exitMisuse)
 	}
@@ -427,7 +427,7 @@ func TestRunTUIWith_HappyPathReturnsOK(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	got := runTUIWith(&stdout, &stderr, resolve, stubProgram, nil)
+	got := runTUIWith(&stdout, &stderr, resolve, stubProgram, nil, nil, nil)
 	if got != exitOK {
 		t.Fatalf("exit = %d, want %d", got, exitOK)
 	}
@@ -436,12 +436,13 @@ func TestRunTUIWith_HappyPathReturnsOK(t *testing.T) {
 	}
 }
 
-func TestDefaultGitHubLastDeployFetcher_ProducesNonNilFunc(t *testing.T) {
+func TestLastDeployFetcherFor_ProducesNonNilFunc(t *testing.T) {
 	t.Parallel()
 
-	fetcher := defaultGitHubLastDeployFetcher()
+	client := ghsvc.NewClient(ghsvc.Options{})
+	fetcher := lastDeployFetcherFor(client)
 	if fetcher == nil {
-		t.Fatal("defaultGitHubLastDeployFetcher returned nil")
+		t.Fatal("lastDeployFetcherFor returned nil")
 	}
 
 	// Invoke with a deliberately bogus ref so we exercise the
@@ -451,6 +452,18 @@ func TestDefaultGitHubLastDeployFetcher_ProducesNonNilFunc(t *testing.T) {
 	_, err := fetcher(ctx, ghsvc.RepoRef{Owner: "owner", Name: "name"}, "deploy.yml")
 	if err == nil {
 		t.Fatal("expected error from cancelled context, got nil")
+	}
+}
+
+func TestPipelineFetcherFor_ProducesNonNilFunc(t *testing.T) {
+	t.Parallel()
+
+	client := ghsvc.NewClient(ghsvc.Options{})
+	if pipelineFetcherFor(client) == nil {
+		t.Fatal("pipelineFetcherFor returned nil")
+	}
+	if logsFetcherFor(client) == nil {
+		t.Fatal("logsFetcherFor returned nil")
 	}
 }
 

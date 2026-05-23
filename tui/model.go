@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 
 	"github.com/dilitS/webox/config"
+	ghsvc "github.com/dilitS/webox/services/github"
 	"github.com/dilitS/webox/status"
 	"github.com/dilitS/webox/tui/bento"
 	"github.com/dilitS/webox/tui/components"
@@ -29,6 +30,12 @@ const (
 // StatusFetcher is the side-effect seam used by refresh commands.
 type StatusFetcher func(context.Context, []config.Project, *status.Cache) ([]ProjectStatus, error)
 
+// GitHubLogsFetcher is the seam used by the F8 modal: returns the
+// (already redacted) tail of a workflow run's combined log stream.
+// Splitting it out from [GitHubPipelineFetcher] keeps the polling and
+// modal-open code paths independently testable.
+type GitHubLogsFetcher func(ctx context.Context, ref ghsvc.RepoRef, runID int64, maxLines int) ([]ghsvc.WorkflowLogLine, error)
+
 // Options configures a TUI model without using package globals.
 type Options struct {
 	ConfigPath       string
@@ -36,6 +43,8 @@ type Options struct {
 	Cache            *status.Cache
 	FetchStatuses    StatusFetcher
 	GitHubLastDeploy GitHubLastDeployFetcher
+	GitHubPipeline   GitHubPipelineFetcher
+	GitHubLogs       GitHubLogsFetcher
 	RefreshInterval  time.Duration
 	InitialWidth     int
 	InitialHeight    int
@@ -69,16 +78,20 @@ type Model struct {
 	spinner         spinner.Model
 	styles          theme.Styles
 
-	initForm       initWizardForm
-	projectForm    projectWizardForm
-	resumeForm     resumeWizardForm
-	actionForm     projectActionForm
-	importForm     importPreviewForm
-	liveLogs       liveLogsForm
-	wizardRunner   WizardRunner
-	wizardStack    *wizardStackSlot
-	pendingPath    string
-	layoutOverride string
+	initForm        initWizardForm
+	projectForm     projectWizardForm
+	resumeForm      resumeWizardForm
+	actionForm      projectActionForm
+	importForm      importPreviewForm
+	liveLogs        liveLogsForm
+	cicdSnapshots   map[string]cicdSnapshotEntry
+	cicdModal       cicdLogsModalForm
+	cicdFetcher     GitHubPipelineFetcher
+	cicdLogsFetcher GitHubLogsFetcher
+	wizardRunner    WizardRunner
+	wizardStack     *wizardStackSlot
+	pendingPath     string
+	layoutOverride  string
 }
 
 // liveLogsForm captures the per-session state of the Sprint 09 live-log
@@ -181,6 +194,9 @@ func New(opts Options) Model {
 		wizardRunner:    opts.WizardRunner,
 		initForm:        newInitWizardForm(),
 		layoutOverride:  override,
+		cicdSnapshots:   make(map[string]cicdSnapshotEntry),
+		cicdFetcher:     opts.GitHubPipeline,
+		cicdLogsFetcher: opts.GitHubLogs,
 	}
 }
 

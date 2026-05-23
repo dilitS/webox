@@ -11,6 +11,9 @@ const (
 	PrefixSSL = "ssl:"
 	// PrefixGitHubLastDeploy keys store GitHub Actions last-run status.
 	PrefixGitHubLastDeploy = "gh:lastDeploy:"
+	// PrefixGitHubSteps keys store live CI/CD pipeline step snapshots
+	// for the Sprint 10 dashboard tile. Format: `gh:steps:<owner>/<repo>:<workflow>`.
+	PrefixGitHubSteps = "gh:steps:"
 )
 
 const (
@@ -22,6 +25,11 @@ const (
 	SSLCertTTL = 5 * time.Minute
 	// GitHubLastDeployTTL follows ADR-0005: workflow status updates within minutes.
 	GitHubLastDeployTTL = time.Minute
+	// GitHubStepsTTL caps how often the CI/CD pipeline tile polls
+	// GitHub Actions for per-step state. Sprint 10 plan §TASK-10.2
+	// fixes this at 10s — `gh` CLI auth quota is 5000/h so even
+	// 5 projects × 6/min stay well below the limit.
+	GitHubStepsTTL = 10 * time.Second
 )
 
 // Event names the operations that invalidate status-cache prefixes.
@@ -45,7 +53,7 @@ func PrefixesForEvent(event Event) []string {
 	case EventRestart:
 		return []string{PrefixHTTP}
 	case EventDeploy:
-		return []string{PrefixHTTP, PrefixGitHubLastDeploy}
+		return []string{PrefixHTTP, PrefixGitHubLastDeploy, PrefixGitHubSteps}
 	case EventRemoveSubdomain:
 		return []string{PrefixHTTP}
 	case EventChangeNodeVersion:

@@ -137,6 +137,42 @@ func (t *RESTTransport) DispatchWorkflow(ctx context.Context, repo RepoRef, req 
 	return &response, nil
 }
 
+// GetWorkflowSteps fetches the workflow run's jobs+steps via REST. The
+// payload mirrors the gh CLI projection so callers can switch
+// transports transparently.
+func (t *RESTTransport) GetWorkflowSteps(ctx context.Context, repo RepoRef, runID int64) ([]Step, error) {
+	if err := repo.validate(); err != nil {
+		return nil, err
+	}
+	if runID <= 0 {
+		return nil, ErrRunNotFound
+	}
+	var response jobsResponse
+	if err := t.doJSON(ctx, http.MethodGet, fmt.Sprintf("/repos/%s/actions/runs/%d/jobs", repoPath(repo), runID), nil, &response); err != nil {
+		if errors.Is(err, ErrHTTPUnexpectedStatus) && strings.Contains(err.Error(), "404") {
+			return nil, ErrRunNotFound
+		}
+		return nil, err
+	}
+	if len(response.Jobs) == 0 {
+		return nil, ErrRunNotFound
+	}
+	steps := response.flatten()
+	if len(steps) == 0 {
+		return nil, ErrStepsParseError
+	}
+	return steps, nil
+}
+
+// GetWorkflowLogs returns ErrPATScopeInsufficient: the REST endpoint
+// streams a zip we don't unpack in-process. The CI/CD modal expects
+// the gh CLI to be available for logs; rely on the fallback chain in
+// [Client.GetWorkflowLogs] (gh first → REST returns this typed error
+// → modal surfaces the "logs require gh CLI" hint).
+func (t *RESTTransport) GetWorkflowLogs(_ context.Context, _ RepoRef, _ int64, _ int) ([]WorkflowLogLine, error) {
+	return nil, fmt.Errorf("%w: REST log fallback unsupported; install gh CLI", ErrPATScopeInsufficient)
+}
+
 func (t *RESTTransport) GetLatestRun(ctx context.Context, repo RepoRef, req LatestRunRequest) (*WorkflowRun, error) {
 	if err := repo.validate(); err != nil {
 		return nil, err

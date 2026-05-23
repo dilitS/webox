@@ -131,6 +131,68 @@ func (t *CLITransport) GetLatestRun(ctx context.Context, repo RepoRef, req Lates
 	return &response.WorkflowRuns[0], nil
 }
 
+// GetWorkflowSteps proxies through `gh api /repos/.../jobs` so the
+// gh CLI's auth state is reused. Empty `jobs` arrays surface as
+// [ErrRunNotFound] (matches the wizard's recoverable-error contract).
+func (t *CLITransport) GetWorkflowSteps(ctx context.Context, repo RepoRef, runID int64) ([]Step, error) {
+	if err := repo.validate(); err != nil {
+		return nil, err
+	}
+	if runID <= 0 {
+		return nil, ErrRunNotFound
+	}
+	path := fmt.Sprintf("/repos/%s/actions/runs/%d/jobs", repo.FullName(), runID)
+	var response jobsResponse
+	if err := t.ghAPI(ctx, "GET", path, nil, &response); err != nil {
+		if isNotFoundCLI(err) {
+			return nil, ErrRunNotFound
+		}
+		return nil, err
+	}
+	if len(response.Jobs) == 0 {
+		return nil, ErrRunNotFound
+	}
+	steps := response.flatten()
+	if len(steps) == 0 {
+		return nil, ErrStepsParseError
+	}
+	return steps, nil
+}
+
+// GetWorkflowLogs shells out to `gh run view <runID> --log` because the
+// REST `/runs/<id>/logs` endpoint returns a zip archive we would
+// rather not unpack in process. The tail is computed client-side so
+// callers can request "last 50 lines" without re-downloading the full
+// log on every poll.
+func (t *CLITransport) GetWorkflowLogs(ctx context.Context, repo RepoRef, runID int64, maxLines int) ([]WorkflowLogLine, error) {
+	if err := repo.validate(); err != nil {
+		return nil, err
+	}
+	if runID <= 0 {
+		return nil, ErrRunNotFound
+	}
+	args := []string{"run", "view", fmt.Sprintf("%d", runID), "--repo", repo.FullName(), "--log"}
+	stdout, stderr, err := t.runner.Run(ctx, "gh", args, nil)
+	if err != nil {
+		if isNotFoundCLI(wrapCLIError("run view", stderr, err)) {
+			return nil, ErrRunNotFound
+		}
+		return nil, wrapCLIError("run view --log", stderr, err)
+	}
+	return parseGHLogLines(stdout, maxLines), nil
+}
+
+func isNotFoundCLI(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ErrRunNotFound) {
+		return true
+	}
+	return strings.Contains(err.Error(), "HTTP 404") ||
+		strings.Contains(strings.ToLower(err.Error()), "not found")
+}
+
 func (t *CLITransport) ghAPI(ctx context.Context, method, path string, body, out any) error {
 	args := []string{"api", "--method", method, path}
 	var stdin []byte

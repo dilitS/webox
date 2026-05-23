@@ -57,6 +57,24 @@ func (c *Client) GetLatestRun(ctx context.Context, repo RepoRef, req LatestRunRe
 	})
 }
 
+// GetWorkflowSteps returns the per-step rendering for runID. The
+// fallback chain follows the same gh-cli-first, REST+PAT-second rule
+// as the other client methods. Callers MUST treat [ErrRunNotFound] as
+// a non-fatal condition (renders "no run yet" in the tile).
+func (c *Client) GetWorkflowSteps(ctx context.Context, repo RepoRef, runID int64) ([]Step, error) {
+	return withFallback(ctx, c.primary, c.fallback, func(ctx context.Context, transport Transport) ([]Step, error) {
+		return transport.GetWorkflowSteps(ctx, repo, runID)
+	})
+}
+
+// GetWorkflowLogs returns the tail of the run's combined log stream
+// (already redacted at the transport boundary).
+func (c *Client) GetWorkflowLogs(ctx context.Context, repo RepoRef, runID int64, maxLines int) ([]WorkflowLogLine, error) {
+	return withFallback(ctx, c.primary, c.fallback, func(ctx context.Context, transport Transport) ([]WorkflowLogLine, error) {
+		return transport.GetWorkflowLogs(ctx, repo, runID, maxLines)
+	})
+}
+
 func withFallback[T any](
 	ctx context.Context,
 	primary Transport,

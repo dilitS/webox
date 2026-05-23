@@ -121,20 +121,37 @@ Sprint 10 **nie dodaje** nowych zewnętrznych zależności. Wszystko buduje na `
 
 ---
 
-## Outcome (wypełnij po sprincie)
+## Outcome (✅ Completed 2026-05-23)
 
-- ✅ Done: ...
-- ⏭️ Carry-over: ...
-- 📌 Decyzje: ...
-- 🧠 Surprises: ...
+- ✅ Done:
+  - `services/github.GetWorkflowSteps` + `GetWorkflowLogs` dodane do `Transport` interfejsu, z implementacją CLI (`gh api /repos/.../jobs`, `gh run view --log`) i REST (`GET /actions/runs/<id>/jobs`).
+  - Nowe sentinel errors: `ErrRunNotFound`, `ErrStepsParseError`.
+  - `tui/bento.NewCICDPipelineTile` z `CICDPipelineSnapshot` (header `Build #N: STATUS · DURATION`, kolorowe badge ✓/✗/⏳/⊘ per step, `[F8] View logs` footer).
+  - `tui/cicd.go`: polling co 10s przez `status.GetOrFetchMeta` (klucz `gh:steps:<owner>/<repo>:<workflow>`), `tea.Tick(GitHubStepsTTL)`.
+  - `F8` modal z log viewer (`gh run view --log`, top 50 linii, podwójna ramka, scroll ↑/↓).
+  - Wszystkie logi przechodzą przez `internal/log.Redact` na granicy transportu (`services/github/logs.go::parseGHLogLines`).
+  - Dashboard project switcher invaliduje cache CI/CD per projekt.
+  - Rate-limit graceful degradation: tile pokazuje `[LIMITED]` + cached steps + hint `Reset in <X>min`.
+- ⏭️ Carry-over: brak — wszystkie 5 tasków zamknięte.
+- 📌 Decyzje:
+  - REST fallback dla `GetWorkflowLogs` zwraca `ErrPATScopeInsufficient` (endpoint streamuje zip — nie unpackujemy w procesie). gh CLI jest wymagany do logów; F8 alert informuje o tym.
+  - `Executor`/`CommandRunner` seam już istniał ze Sprint 06 — wykorzystany do testów bez prawdziwego `gh`.
+  - Cache key intencjonalnie **nie zawiera PAT** — same `<owner>/<repo>:<workflow>` (SECURITY §10.4).
+  - Wprowadzono `PrefixGitHubSteps` + `GitHubStepsTTL=10s` w `status/ttl.go`; rozszerzono `EventDeploy` o ten prefix.
+- 🧠 Surprises:
+  - `WorkflowRun` w services/github nie miał pola `RunNumber` — dodane bo CI/CD tile renderuje `Build #N`.
+  - Pierwsza próba w `buildCICDPipelineSnapshot` warunkowała propagację `RateLimited` od `Err != ""`, co maskowało flag rate-limit gdy transport nie zwrócił payloadu błędu — fix: bezpośrednia gałąź.
+  - `unlambda` / `importShadow` / `mnd` lint reguły są nadal aktywne — wszystkie magic numbers (60min/h, 4 col padding) wyciągnięte do named constants.
 - 📊 Metryki:
-  - Coverage `services/github/steps.go`: ?
-  - Coverage `tui/bento/tiles/cicd.go`: ?
-  - Cassettes: success / in-progress / failed / rate-limited (4/4).
+  - Coverage `services/github`: 86.6% (steps.go + logs.go pokryte testami cassette-style).
+  - Coverage `tui/bento`: 83.6% (nowy `cicd_pipeline_tile` + 3 cases).
+  - Coverage `tui`: 73.2% (cicd.go: poll, snapshot, modal, F8, rate-limit, invalidation).
+  - Aggregate coverage: 81.8% (próg 70% spełniony).
+  - Cassettes/scenariusze: success / in-progress / failed / rate-limited / 404 / parse-error (6/4 vs plan).
 - 🔒 Security validation:
-  - [ ] PAT redaction in workflow logs (modal).
-  - [ ] PAT redaction in cache key (key nie zawiera PAT).
-  - [ ] `go test -race ./services/github ./tui/bento/...` green.
+  - [x] PAT redaction in workflow logs (modal) — `parseGHLogLines` → `internal/log.Redact` przed buforowaniem (`TestCLITransport_GetWorkflowLogs_TailAndRedact`, `TestParseGHLogLines_RedactsSecrets`).
+  - [x] PAT redaction in cache key — klucz to `gh:steps:<owner>/<repo>:<workflow>`, nie zawiera PAT (`TestCICDPipelineCacheKey_UsesPrefixAndWorkflow`).
+  - [x] `go test -race ./services/github ./tui/bento ./tui` green.
 - ➡️ Następny sprint: `sprint-11-topology-map.md`
 
 ---

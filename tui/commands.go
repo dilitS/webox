@@ -29,6 +29,32 @@ import (
 // when the repo has no runs yet (not an error).
 type GitHubLastDeployFetcher func(ctx context.Context, ref ghsvc.RepoRef, workflow string) (*ghsvc.WorkflowRun, error)
 
+// GitHubPipelineFetcher returns the CI/CD pipeline snapshot for a
+// workflow run (jobs + steps + optional rate-limit hint). The TUI
+// invokes it through `status.GetOrFetch(GitHubStepsTTL)` so the
+// dashboard never blocks on GitHub and respects [SECURITY §10.4]
+// rate-limit budgets.
+//
+// Implementations MUST:
+//   - return [ghsvc.ErrRunNotFound] when the repo has no runs (the
+//     CI/CD tile renders "no run yet" instead of an error);
+//   - return [ghsvc.ErrRateLimited] when GitHub responds with `429` /
+//     primary or secondary rate limits (the tile renders a cached
+//     payload + reset hint);
+//   - respect ctx cancellation.
+type GitHubPipelineFetcher func(ctx context.Context, ref ghsvc.RepoRef, workflow string) (PipelineFetchResult, error)
+
+// PipelineFetchResult bundles a workflow run header and its flattened
+// step list. RateLimitHint is non-empty when the underlying transport
+// surfaced an `X-RateLimit-Reset` header even though the request
+// succeeded (warning lane); the renderer uses it to decorate the
+// tile without switching to the limited badge.
+type PipelineFetchResult struct {
+	Run           *ghsvc.WorkflowRun
+	Steps         []ghsvc.Step
+	RateLimitHint string
+}
+
 // DefaultWorkflowFile is the workflow filename the wizard commits when
 // it bootstraps a GitHub-backed project. The dashboard fetcher uses it
 // as the LatestRun lookup key for any project that does not override

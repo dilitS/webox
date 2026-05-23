@@ -84,10 +84,10 @@ func TestPlaceholderTilesShowMeaningfulFallbackCopy(t *testing.T) {
 			hints:  []string{"Select a project to start streaming"},
 		},
 		{
-			name:   "cicd placeholder (live wiring in Sprint 10)",
+			name:   "cicd placeholder (no GitHub-linked project)",
 			tile:   bento.NewCICDPlaceholderTile(),
 			header: "[CI/CD Pipeline]",
-			hints:  []string{"Sprint 10"},
+			hints:  []string{"No GitHub-linked project selected", "[n]"},
 		},
 		{
 			name:   "topology placeholder (live wiring in Sprint 11)",
@@ -156,6 +156,88 @@ func TestMicroLogsTileShowsTailWithLevelMarkers(t *testing.T) {
 	}
 }
 
+func TestCICDPipelineTileRendersHeaderAndSteps(t *testing.T) {
+	t.Parallel()
+
+	snap := bento.CICDPipelineSnapshot{
+		ProjectAlias: "app.example.com",
+		WorkflowName: "deploy.yml",
+		RunNumber:    412,
+		RunStatus:    bento.CICDStatusSuccess,
+		HeaderTime:   "14:12 GMT",
+		Duration:     "1m 42s",
+		Steps: []bento.CICDStepSnapshot{
+			{Number: 1, Name: "Git Checkout", Status: bento.CICDStatusSuccess, Duration: "2s"},
+			{Number: 2, Name: "Install Deps", Status: bento.CICDStatusSuccess, Duration: "12s"},
+			{Number: 3, Name: "Code Lint", Status: bento.CICDStatusFailure, Duration: "5s"},
+			{Number: 4, Name: "Build Artifact", Status: bento.CICDStatusSkipped},
+			{Number: 5, Name: "Unit Tests", Status: bento.CICDStatusInProgress, Duration: "00:14"},
+			{Number: 6, Name: "Deploy", Status: bento.CICDStatusQueued},
+		},
+	}
+
+	out := bento.NewCICDPipelineTile(snap).Render(bento.ModeUltra, true)
+
+	for _, needle := range []string{
+		"[CI/CD Pipeline]",
+		"[LIVE]",
+		"app.example.com",
+		"deploy.yml",
+		"Build #412",
+		"SUCCESS ✓",
+		"14:12 GMT",
+		"[1] Git Checkout ✓",
+		"[2] Install Deps ✓",
+		"[3] Code Lint ✗",
+		"[4] Build Artifact ⊘",
+		"[5] Unit Tests ⏳",
+		"[6] Deploy …",
+		"[F8] View logs",
+	} {
+		if !strings.Contains(out, needle) {
+			t.Fatalf("CI/CD tile missing %q\n--- output ---\n%s", needle, out)
+		}
+	}
+}
+
+func TestCICDPipelineTileRendersStaleAndRateLimited(t *testing.T) {
+	t.Parallel()
+
+	stale := bento.NewCICDPipelineTile(bento.CICDPipelineSnapshot{
+		ProjectAlias: "alpha",
+		WorkflowName: "ci.yml",
+		Stale:        true,
+		Steps: []bento.CICDStepSnapshot{
+			{Number: 1, Name: "Lint", Status: bento.CICDStatusSuccess},
+		},
+	}).Render(bento.ModeUltra, false)
+	if !strings.Contains(stale, "[STALE]") {
+		t.Fatalf("stale tile missing [STALE] marker\n%s", stale)
+	}
+
+	limited := bento.NewCICDPipelineTile(bento.CICDPipelineSnapshot{
+		ProjectAlias:  "alpha",
+		RateLimited:   true,
+		RateLimitHint: "Reset in 12min",
+	}).Render(bento.ModeUltra, false)
+	for _, needle := range []string{"[LIMITED]", "GitHub rate limit reached", "Reset in 12min"} {
+		if !strings.Contains(limited, needle) {
+			t.Fatalf("rate-limited tile missing %q\n%s", needle, limited)
+		}
+	}
+}
+
+func TestCICDPipelineTileNoRunPlaceholder(t *testing.T) {
+	t.Parallel()
+
+	out := bento.NewCICDPipelineTile(bento.CICDPipelineSnapshot{
+		ProjectAlias: "alpha",
+	}).Render(bento.ModeUltra, false)
+	if !strings.Contains(out, "No workflow run yet") {
+		t.Fatalf("expected 'No workflow run yet' hint, got\n%s", out)
+	}
+}
+
 func TestMicroLogsTileEmptyShowsWaitingHint(t *testing.T) {
 	t.Parallel()
 
@@ -174,6 +256,7 @@ func TestTileIDsAreStableAndUniquePerSlot(t *testing.T) {
 		bento.NewMetricsPlaceholderTile(),
 		bento.NewHeaderMetricsTile(bento.HeaderMetricsSnapshot{}),
 		bento.NewCICDPlaceholderTile(),
+		bento.NewCICDPipelineTile(bento.CICDPipelineSnapshot{}),
 		bento.NewLogsPlaceholderTile(),
 		bento.NewMicroLogsTile("", nil),
 		bento.NewTopologyPlaceholderTile(),

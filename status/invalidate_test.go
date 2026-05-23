@@ -77,6 +77,9 @@ func TestTTLConstantsMatchADR0005(t *testing.T) {
 	if GitHubLastDeployTTL != time.Minute {
 		t.Fatalf("GitHubLastDeployTTL = %v, want 60s", GitHubLastDeployTTL)
 	}
+	if GitHubStepsTTL != 10*time.Second {
+		t.Fatalf("GitHubStepsTTL = %v, want 10s", GitHubStepsTTL)
+	}
 }
 
 func TestInvalidateEventPrefixes(t *testing.T) {
@@ -87,7 +90,7 @@ func TestInvalidateEventPrefixes(t *testing.T) {
 		want  []string
 	}{
 		{EventRestart, []string{PrefixHTTP}},
-		{EventDeploy, []string{PrefixHTTP, PrefixGitHubLastDeploy}},
+		{EventDeploy, []string{PrefixHTTP, PrefixGitHubLastDeploy, PrefixGitHubSteps}},
 		{EventSetupSSL, []string{PrefixSSL}},
 		{EventRenewSSL, []string{PrefixSSL}},
 		{EventChangeNodeVersion, []string{PrefixSSHNode}},
@@ -115,14 +118,16 @@ func TestInvalidateEvent_RemovesExpectedKeys(t *testing.T) {
 	cache := NewCache(Options{})
 	seedCache(t, cache, "http:example.com", 200)
 	seedCache(t, cache, "gh:lastDeploy:dilitS/webox", 1)
+	seedCache(t, cache, "gh:steps:dilitS/webox:deploy.yml", 7)
 	seedCache(t, cache, "ssl:example.com", 30)
 
 	removed := cache.InvalidateEvent(EventDeploy)
-	if removed != 2 {
-		t.Fatalf("InvalidateEvent(Deploy) removed %d, want 2", removed)
+	if removed != 3 {
+		t.Fatalf("InvalidateEvent(Deploy) removed %d, want 3", removed)
 	}
 	assertCacheMissThenFetch(t, cache, "http:example.com", 201)
 	assertCacheMissThenFetch(t, cache, "gh:lastDeploy:dilitS/webox", 2)
+	assertCacheMissThenFetch(t, cache, "gh:steps:dilitS/webox:deploy.yml", 8)
 	assertCacheHit(t, cache, "ssl:example.com", 30)
 }
 

@@ -43,4 +43,16 @@ var (
 	ErrHTTPUnexpectedStatus = errors.New("github: unexpected http status")
 	// ErrInvalidPublicKey means an Actions secret encryption key is malformed.
 	ErrInvalidPublicKey = errors.New("github: invalid actions public key")
+
+	// ErrRunNotFound is returned when the requested workflow run does
+	// not exist (HTTP 404 from GitHub or empty jobs list from gh).
+	// The CI/CD tile shows "no run yet" rather than treating this as
+	// a hard failure.
+	ErrRunNotFound = errors.New("github: workflow run not found")
+
+	// ErrStepsParseError is returned when GitHub responds with a
+	// payload that does not include the expected `jobs[].steps[]`
+	// shape. Usually means a `gh` version skew or an org-wide API
+	// schema change worth investigating.
+	ErrStepsParseError = errors.New("github: workflow steps parse error")
 )
