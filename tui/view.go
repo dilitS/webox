@@ -16,8 +16,10 @@ func (m Model) View() string {
 		return views.RenderDashboard(screen)
 	case StateProjectDetail:
 		return views.RenderProjectDetail(screen)
+	case StateProjectWizard:
+		return views.RenderProjectWizard(screen)
 	default:
-		return m.styles.Panel.Render(fmt.Sprintf("%s is not enabled in Sprint 04", m.state))
+		return m.styles.Panel.Render(fmt.Sprintf("%s is not enabled in Sprint 05", m.state))
 	}
 }
 
@@ -53,5 +55,64 @@ func (m Model) screen() views.Screen {
 		Config:        m.cfg,
 		Statuses:      statuses,
 		Styles:        m.styles,
+		InitForm:      initFormSnapshot(m.initForm),
+		ProjectForm:   projectFormSnapshot(m.projectForm),
 	}
+}
+
+func initFormSnapshot(f initWizardForm) views.InitWizardSnapshot {
+	return views.InitWizardSnapshot{
+		Step:   int(f.step),
+		Alias:  f.alias,
+		Host:   f.host,
+		Port:   f.port,
+		User:   f.user,
+		Err:    f.err,
+		Saving: f.saving,
+	}
+}
+
+func projectFormSnapshot(f projectWizardForm) views.ProjectWizardSnapshot {
+	snap := views.ProjectWizardSnapshot{
+		Step:         int(f.step),
+		ProfileAlias: f.profileAlias,
+		Stack:        f.stack,
+		Domain:       f.domain,
+		NodeVersion:  f.nodeVersion,
+		DBWanted:     f.dbWanted,
+		DBKind:       f.dbKind,
+		DBName:       f.dbName,
+		Err:          f.err,
+		Executing:    f.executing,
+		RolledBack:   f.rolledBack,
+		RollbackErr:  errString(f.rollbackErr),
+	}
+	if f.report != nil {
+		snap.SubdomainOK = f.report.Subdomain.OK
+		snap.SSLOK = f.report.SSL.OK
+		snap.DatabaseOK = f.report.Database.OK
+		if f.report.Subdomain.Err != nil {
+			snap.SubdomainErr = f.report.Subdomain.Err.Error()
+		}
+		if f.report.SSL.Err != nil {
+			snap.SSLErr = f.report.SSL.Err.Error()
+		}
+		if f.report.Database.Err != nil {
+			snap.DatabaseErr = f.report.Database.Err.Error()
+		}
+	}
+	for _, r := range f.rollbackResults {
+		snap.RollbackResults = append(snap.RollbackResults, views.RollbackResultSnapshot{
+			Name: r.Step.Name,
+			Err:  errString(r.Err),
+		})
+	}
+	return snap
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }

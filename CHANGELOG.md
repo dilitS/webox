@@ -16,10 +16,94 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `docs/sprints/sprint-06-github-deploy-workflow.md` —
+  rolling-wave plan for Sprint 06 closing the MVP path: resume on
+  launch for `pending_cleanups.json`, `services/github` minimal
+  client, embedded workflow templates pinned to full 40-char SHAs,
+  wizard extension for repo/secrets/workflow/deploy, post-deploy
+  SSH verification, and a TUI keymap-matrix test follow-up.
+- `docs/retros/2026-05-23-sprint-05.md` — Sprint 05 retrospective
+  capturing the secret-shape guard pattern in `wizard.Stack.Push`,
+  the Vim-key-eats-input regression and its picker/text-step gate,
+  the `wizardStackSlot` pointer-on-Model decision, and the
+  promotion of preflight failures to sentinel errors.
+- `wizard/` package — first writable flow in Webox. Five files split
+  by responsibility: `types.go` (CleanupStep, ProvisionPlan,
+  ProvisionReport, DatabaseCredentials, ProvisionStatus),
+  `plan.go` (supported stacks `vite-react`/`node-express`/`static`,
+  supported DB kinds `mysql`/`postgres`, ValidatePlan that wraps
+  `ErrInvalidPlan`), `rollback.go` (LIFO `Stack` with secret-shape
+  guard on every Push and `MakeStepRunner` dispatcher over
+  `providers.HostingProvider`), `pending_cleanups.go` (atomic
+  persistence of the stack into `pending_cleanups.json` with
+  schema_version pinning, `ErrCorruptedSnapshot` /
+  `ErrSchemaMismatch` sentinels, and a `FilePersister` that uses
+  `os.O_EXCL` tmpfile + rename in the same directory), and
+  `execute.go` (Preflight, CheckSubdomainAvailable, Execute,
+  IsRecoverable; pushes cleanups in reverse order of provisioning
+  so SSL is removed before subdomain).
+- `wizard/errors.go` — explicit sentinels for the wizard package
+  (`ErrInvalidStep`, `ErrSecretInCleanup`, `ErrUnsupportedKind`,
+  `ErrInvalidPlan`, `ErrCorruptedSnapshot`, `ErrSchemaMismatch`,
+  `ErrPreflightSSHDisconnected`, `ErrPreflightNilStatus`). Lets the
+  TUI branch via `errors.Is` instead of string matching, and keeps
+  `err113` lint green.
+- `tui/wizard.go`, `tui/wizard_runner.go`,
+  `tui/views/project_wizard.go`, and `tui/views/init_wizard.go`
+  (rewrite) — interactive init wizard (Welcome → Alias → Host →
+  Port → User → Review) and full project wizard (Profile → Stack →
+  DB choice → DB kind → DB name → Domain → Review → Execute →
+  Failure → Rolling back). The runner seam keeps `Update` pure: it
+  builds the `HostingProvider` on demand inside a `tea.Cmd` so
+  side-effecting I/O never happens during message dispatch. Vim-style
+  `j`/`k` navigation is gated to picker steps only so text inputs
+  consume every rune.
+- `tui/commands.go` wizard tea.Cmds: `saveProfileCmd`,
+  `wizardPreflightCmd`, `wizardDomainCheckCmd`, `wizardExecuteCmd`,
+  `wizardRollbackCmd`. The execute command generates a UUID per
+  wizard run, threads the same `*wizard.Stack` through the model via
+  a small mutex-guarded `wizardStackSlot`, persists progress after
+  every success, and clears `pending_cleanups.json` on commit.
+- Wizard test corpus: `wizard/plan_test.go`,
+  `wizard/rollback_test.go`, `wizard/pending_cleanups_test.go`,
+  `wizard/execute_test.go`, `wizard/fake_provider_test.go`, and
+  `tui/wizard_test.go`. Scenarios cover happy path, domain
+  collision (recoverable, stays in wizard), SSL failure with
+  rollback, DB failure with rollback, persistence corruption, schema
+  drift, context cancellation, and the dashboard→wizard re-entry
+  with cache invalidation. `go.mod` adds `github.com/google/uuid` as
+  the only new direct dependency.
 - `docs/sprints/sprint-04-tui-shell.md` — rolling-wave plan for
   Sprint 04 (Bubble Tea / Lipgloss bootstrap, MVU shell, read-only
   dashboard with SWR refresh, Project Detail Overview tab). Dependency
   sign-off section enumerates the four direct deps the sprint adds.
+
+### Changed
+- `tui/model.go`, `tui/states.go`, `tui/messages.go`, `tui/update.go`
+  and `tui/view.go` extended with wizard sub-states
+  (`StateProjectWizard`, `InitWizardStep`, `ProjectWizardStep`) and
+  matching `tea.Msg` types (`ProfileSavedMsg`,
+  `ProfileSaveFailedMsg`, `ProjectWizardPreflightMsg`,
+  `ProjectWizardDomainCheckedMsg`, `ProjectWizardExecutedMsg`,
+  `ProjectWizardRolledBackMsg`). All wizard state lives inside
+  `Model`; no new globals.
+- `tui/commands.go` `loadConfigCmd` now returns
+  `ConfigLoadedMsg{Missing: true}` whenever `cfg.Profiles` is empty,
+  not only when the file is absent. This lets the TUI route any
+  zero-profile install (including hand-edited configs) through the
+  init wizard instead of dropping the user on an empty dashboard.
+
+### Security
+- Every `wizard.Stack.Push` rejects `CleanupStep.Params` values that
+  match the project-wide secret regex corpus (same source as
+  `internal/log/redact.go`). Tests in `wizard/rollback_test.go` and
+  `wizard/pending_cleanups_test.go` assert that a
+  `REDACTED-NEVER-A-REAL-SECRET-...` token in any param surfaces
+  `ErrSecretInCleanup` and is never written to disk.
+- `ProvisionReport.Credentials` is populated only in memory while
+  the wizard runs; on success the TUI never re-renders the
+  plaintext password and `RemovePending` truncates the snapshot
+  file before the wizard transitions back to the dashboard.
 - `docs/retros/2026-05-23-sprint-03.md` — Sprint 03 retrospective
   capturing the executor-seam pattern, the tripwire-prefixed fixture
   passwords, and the `commit-msg` hook learnings.
