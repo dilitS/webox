@@ -192,16 +192,17 @@ Po sprincie 02:
 - **Estymata:** M
 - **Zależności:** TASK-02.5
 - **Acceptance Criteria:**
-  - [ ] `services/httpcheck/` (lub `services/probe/`) z probe HTTP 200/3xx/5xx + latency.
-  - [ ] TLS probe zwraca `not_after` + `days_left`.
-  - [ ] Timeouty injectable, default 1 s dla HTTP / TLS handshake.
-  - [ ] Testy przez `httptest.NewServer` i lokalny TLS server.
+  - [x] `services/httpcheck/` z probe HTTP 200/3xx/5xx + latency.
+  - [x] TLS probe zwraca `not_after` + `days_left`.
+  - [x] Timeouty injectable, default 1 s dla HTTP / TLS handshake.
+  - [x] Testy przez `httptest.NewServer` i lokalny TLS server.
 - **Pliki:**
-  - `services/httpcheck/doc.go` (new)
-  - `services/httpcheck/http.go` (new)
-  - `services/httpcheck/tls.go` (new)
-  - `services/httpcheck/http_test.go` (new)
-  - `services/httpcheck/tls_test.go` (new)
+  - `services/httpcheck/doc.go`
+  - `services/httpcheck/errors.go`
+  - `services/httpcheck/http.go`
+  - `services/httpcheck/tls.go`
+  - `services/httpcheck/http_test.go`
+  - `services/httpcheck/tls_test.go`
 - **Docs:** [`PRD.md F5`](../PRD.md#6-ficzery--z-priorytetami), [`DESIGN.md §8.2`](../DESIGN.md#8-tr%C3%B3jpoziomowy-status-cache-stale-while-revalidate)
 - **Notatki:**
   - Brak GitHub deploy-status probe w tym sprincie — to zostaje przy Sprint 06.

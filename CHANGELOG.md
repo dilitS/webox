@@ -16,6 +16,12 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `services/httpcheck/` (TASK-02.7) — dashboard probes for HTTP status
+  and TLS certificate expiry. `ProbeHTTP` returns status code, class
+  (`2xx`/`3xx`/`4xx`/`5xx`) and latency with a default 1 s timeout;
+  `ProbeTLS` performs a TLS handshake and returns leaf `NotAfter` plus
+  `DaysLeft`, also with injectable 1 s timeout / clock seams. Tests use
+  `httptest.NewServer` and `httptest.NewTLSServer`.
 - `status/ttl.go` + invalidation metadata (TASK-02.6) — ADR-0005 TTL
   constants and deterministic prefixes (`http:`, `ssh:node:`, `ssl:`,
   `gh:lastDeploy:`), event-to-prefix invalidation for Restart / Deploy /
