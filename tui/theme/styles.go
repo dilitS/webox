@@ -49,22 +49,27 @@ func NewStyles(t Theme) Styles {
 			Foreground(lipgloss.Color(t.TextBright)).
 			Bold(true),
 		status: map[string]lipgloss.Style{
-			"ONLINE": lipgloss.NewStyle().
-				Bold(true).
-				Foreground(lipgloss.Color(t.Success)),
-			"BUILDING": lipgloss.NewStyle().
-				Bold(true).
-				Foreground(lipgloss.Color(t.Warning)),
-			"OFFLINE": lipgloss.NewStyle().
-				Bold(true).
-				Foreground(lipgloss.Color(t.Error)),
-			"STALE": lipgloss.NewStyle().
-				Bold(true).
-				Foreground(lipgloss.Color(t.Muted)),
+			"ONLINE":   newPremiumBadge(t.Success, t.SurfaceBase),
+			"BUILDING": newPremiumBadge(t.Warning, t.SurfaceBase),
+			"OFFLINE":  newPremiumBadge(t.Error, t.TextBright),
+			"STALE":    newPremiumBadge(t.Muted, t.TextBright),
+			"DEGRADED": newPremiumBadge(t.Degraded, t.SurfaceBase),
 			"UNKNOWN": lipgloss.NewStyle().
-				Foreground(lipgloss.Color(t.TextDim)),
+				Foreground(lipgloss.Color(t.TextDim)).
+				Padding(0, 1),
 		},
 	}
+}
+
+// newPremiumBadge composes the cockpit's pill-shaped status badges.
+// They are filled with the role colour and bolded so the operator's
+// eye lands on them first in the project list.
+func newPremiumBadge(bg, fg string) lipgloss.Style {
+	return lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(fg)).
+		Background(lipgloss.Color(bg)).
+		Padding(0, 1)
 }
 
 // StatusBadge returns a badge style for a normalized state string.

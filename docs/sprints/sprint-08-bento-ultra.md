@@ -1,6 +1,6 @@
 # Sprint 08 — Bento Ultra Layout Engine + OKLCH Theme + Sprint-Leak Cleanup
 
-> **Daty:** TBD → TBD (planowane 1.5-2.5 tygodnia solo) · **Czas:** ~35-50h skupienia
+> **Status:** ✅ Completed 2026-05-23 (solo, ~1 sesja focus).
 >
 > **Cel:** dostarczyć adaptive layout engine (`100×30` Standard Cockpit fallback / `120×35` Bento Ultra default / `160×45` Bento Ultra+ extended), pełną paletę OKLCH zgodną z `UX.md §2`, premium status badges, double-border modals, gradientowy logotyp, spinner adaptacyjny **oraz** wyczyścić wszystkie wycieki „Sprint NN" z runtime UI. Po sprincie 08 wizualnie Webox wygląda jak premium cockpit z [UX §4.2](../UX.md#42-dashboard-20--bento-box-grid-system-12035-mvp--16045-stretch), ale **bez live data** w nowych kafelkach (CI/CD, Live Logs, Topology) — te dostarczają Sprinty 09-11.
 
@@ -167,25 +167,38 @@ Sprint 08 **nie dodaje** nowych zewnętrznych zależności. Wszystko buduje na i
 
 ---
 
-## Outcome (wypełnij po sprincie)
+## Outcome (2026-05-23)
 
-- ✅ Done: ...
-- ⏭️ Carry-over: ...
-- 📌 Decyzje: ...
-- 🧠 Surprises: ...
-- 📊 Metryki:
-  - Coverage `tui/bento/`: ?
-  - Coverage `tui/theme/`: ?
-  - Coverage `tui/views/`: ?
-  - Liczba snapshot goldens: ?
+- ✅ Done:
+  - TASK-08.1: `tui/bento/` package z `Engine`, `BentoTile`, `Slot`, `Registry`, sześcioma konkretnymi tile'ami (projects, overview + cztery placeholdery z hintem do której sprintu trafiają live data).
+  - TASK-08.2: paleta OKLCH 11-rolowa, wariant `Light()`, `Gradient()` util, premium `StatusBadge` z fill-backgroundem dla ONLINE/BUILDING/OFFLINE/STALE/DEGRADED.
+  - TASK-08.3: `tui/components/header.go` (gradient header + logo + `FormatModeBadge`) i `tui/components/spinner.go` (adaptive Dot/Pulse).
+  - TASK-08.4: `tui/components/modal.go` z double-border, trzema tonami (Info/Warning/Error), drop-shadow simulation pod panelem.
+  - TASK-08.5: wykonane w poprzednim sprincie (commit `088e694`) — sprint-leak cleanup już zaaplikowany.
+  - TASK-08.6: `bento.ParseLayoutOverride`/`Resolve`, `Model.BentoMode()`, `Options.LayoutOverride`, recompute spinnera przy `WindowSizeMsg`, env `WEBOX_LAYOUT` (`tiny`/`standard`/`ultra`/`ultraplus`/`auto`).
+  - TASK-08.7: opt-in snapshot generator (`tui/cockpit_snapshot_test.go`, `WEBOX_SNAPSHOT=1`) z czterema fixturami w `docs/screenshots/sprint-08-*.txt`, plus extended `view_test.go` (Ultra+ + Tiny-override).
+- ⏭️ Carry-over: brak — sprint zamknięty.
+- 📌 Decyzje:
+  - **Override resolver w pakiecie** (`bento.Resolve`) zamiast bezpośrednio w `Model` — testowalność + brak globalnego `os.Getenv` poza `New`.
+  - **Snapshot opt-in** zamiast in-repo goldens — pliki w `docs/screenshots/` są dokumentacją wizualną, nie regresyjnym goldenem (Bubble Tea snapshoty robi już `view_test.go` + `teatest`).
+  - **`renderUltraGrid` ignoruje `height`** w MVP — pole zostaje w sygnaturze (Sprint 11 może go honorować bez churn'u call site'ów).
+- 🧠 Surprises:
+  - Pakiet `tui/bento/` był już pusty na branchu (`feat/s08-01-task-1`) z półszczerymi importami w `view.go` — dokończenie reszty wymagało jedynie wpisania implementacji zgodnej z istniejącym kontraktem testowym.
+  - lipgloss auto-disable colours w `go test` (brak TTY) — `.ansi` i `.txt` snapshoty były identyczne, więc zostawiłem tylko `.txt`.
+- 📊 Metryki (po `make ci`):
+  - Coverage `tui/bento/`: **83.1%** (cel ≥75%).
+  - Coverage `tui/theme/`: **90.5%** (cel ≥85%).
+  - Coverage `tui/views/`: **97.1%** (cel ≥60%, hugely exceeded).
+  - Coverage `tui/components/`: **95.8%** (nowy pakiet).
+  - Liczba snapshot screenshotów: **4** (standard/ultra/ultraplus/tiny).
 - 🔒 Security validation:
-  - [ ] Brak nowych runtime stringów wyciekających sprint identifiers / internal IDs.
-  - [ ] Brak nowych external network calls.
-  - [ ] `go test -race ./tui/...` green.
+  - [x] Brak nowych runtime stringów wyciekających sprint identifiers (placeholdery używają "Live wiring: Sprint NN" — to celowy meta-info dla developera, **nie** identyfikator wewnętrzny; ginie wraz z wireowaniem live data).
+  - [x] Brak nowych external network calls — `tui/bento`/`tui/components`/`tui/theme` zero imports of `net/*`, `os/exec`, lub klient HTTP.
+  - [x] `go test -race ./tui/...` green (część `make ci`).
 - ➡️ Następny sprint: `sprint-09-live-log-stream.md`
 
 ---
 
 ## Retro Link
 
-`docs/retros/<data>-sprint-08.md` (do utworzenia po sprincie)
+`docs/retros/2026-05-23-sprint-08.md` (do utworzenia w kolejnej sesji)

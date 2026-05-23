@@ -15,6 +15,35 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ## [Unreleased]
 
+### Added
+- **Sprint 08 — Bento Ultra Layout Engine + premium components.**
+  - `tui/bento/` adaptive layout engine with `BentoTile` interface,
+    `Slot` enum, `Registry`, and a stateless `Engine` that renders four
+    tiers (`Tiny` ≤70×22 fallback, `Standard` 100×30, `Ultra` 120×35,
+    `UltraPlus` 160×45). Mode detection is pure (`bento.DetectMode`);
+    `bento.Resolve` layers in the `WEBOX_LAYOUT` env override
+    (`tiny`/`standard`/`ultra`/`ultraplus`/`auto`).
+  - Six tile implementations: `ProjectsTile`, `OverviewTile`, plus four
+    placeholder tiles for `Header Metrics`, `CI/CD Pipeline`,
+    `Live Micro-Logs`, and `Topology` — each advertises the sprint
+    (09/10/11) that will wire its live data, so the Ultra silhouette is
+    visible end-to-end even before the next sprints land.
+  - `tui/theme/` palette extended with a `Light()` variant (eleven
+    OKLCH-anchored roles), premium `StatusBadge` (filled background +
+    bold for `ONLINE`/`BUILDING`/`OFFLINE`/`STALE`/`DEGRADED`), and a
+    `Gradient()` utility (sRGB interpolation, multi-byte rune safe).
+  - `tui/components/` package — `RenderHeaderBar` (gradient title +
+    pill badge), `LogoArt`, `FormatModeBadge`, `RenderModal`
+    (double-border with `Info`/`Warning`/`Error` tones and a
+    drop-shadow strip), `SpinnerStyle`/`NewAdaptiveSpinner` (`Dot`
+    for Standard, `Pulse` for Ultra/UltraPlus).
+  - `Model.BentoMode()` plus `Options.LayoutOverride` for tests; the
+    spinner frame set is recomputed on `tea.WindowSizeMsg` when the
+    resolved mode changes.
+  - Opt-in cockpit snapshot generator (`WEBOX_SNAPSHOT=1 go test ./tui
+    -run TestCockpitSnapshots`) that writes ANSI-stripped renders to
+    `docs/screenshots/sprint-08-*.txt` for visual review.
+
 ### Changed
 - **MVP scope (v0.1) significantly expanded by [ADR-0007](./docs/adr/0007-bento-ultra-eskalacja-mvp.md):** Bento Ultra adaptive layout (`100×30` / `120×35` / `160×45`), Live Log Stream (`tail -f` via SSH with ring buffer + ANSI level coloring + pre-render redaction), Live CI/CD Pipeline Panel (live GitHub Actions workflow steps + click-through logs), and Live Service Topology Map are now in v0.1 — previously they were 🔶 STRETCH (v0.2+). Roadmap re-baselined from P50 22 → 27 weeks, P70 32 → 35 weeks. Four new sprints added: 08 (Bento Ultra Layout Engine + OKLCH theme + sprint-leak cleanup), 09 (Live Log Stream + Header Bar Metrics), 10 (CI/CD Panel), 11 (Topology Map). Rationale: brand promise of "Terminal Cockpit klasy premium" from PRD §3 and UX TL;DR requires premium visual layer in MVP, not v0.2+ — early-adopter perception of v0.1 matters more than +5-week delay. v0.2 reshuffled to focus on second provider, Env Merger, Sound Engine, fast-chord bindings, and multi-provider dashboard aggregator (instead of catching up on visual layer).
 

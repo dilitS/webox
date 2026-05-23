@@ -2,14 +2,23 @@ package tui
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 
 	"github.com/dilitS/webox/config"
 	"github.com/dilitS/webox/status"
+	"github.com/dilitS/webox/tui/bento"
+	"github.com/dilitS/webox/tui/components"
 	"github.com/dilitS/webox/tui/theme"
 )
+
+// layoutOverrideEnv is the environment variable a power user can set to
+// pin the cockpit to a specific Bento mode (see [bento.ParseLayoutOverride]).
+// We resolve it once in [New] so the rest of the model sees a stable
+// value across the lifetime of the process.
+const layoutOverrideEnv = "WEBOX_LAYOUT"
 
 const (
 	defaultRefreshInterval = 30 * time.Second
@@ -32,6 +41,9 @@ type Options struct {
 	InitialHeight    int
 	NewContext       func() (context.Context, context.CancelFunc)
 	WizardRunner     WizardRunner
+	// LayoutOverride mirrors `WEBOX_LAYOUT` for tests: when non-empty
+	// it bypasses the env-var lookup performed by [New].
+	LayoutOverride string
 }
 
 // Model contains all mutable TUI state. It is copied by value by Update,
@@ -57,14 +69,15 @@ type Model struct {
 	spinner         spinner.Model
 	styles          theme.Styles
 
-	initForm     initWizardForm
-	projectForm  projectWizardForm
-	resumeForm   resumeWizardForm
-	actionForm   projectActionForm
-	importForm   importPreviewForm
-	wizardRunner WizardRunner
-	wizardStack  *wizardStackSlot
-	pendingPath  string
+	initForm       initWizardForm
+	projectForm    projectWizardForm
+	resumeForm     resumeWizardForm
+	actionForm     projectActionForm
+	importForm     importPreviewForm
+	wizardRunner   WizardRunner
+	wizardStack    *wizardStackSlot
+	pendingPath    string
+	layoutOverride string
 }
 
 // importPreviewForm holds in-memory state for the read-only import
@@ -114,14 +127,21 @@ func New(opts Options) Model {
 		opts.WizardRunner = DefaultWizardRunner()
 	}
 	ctx, cancel := opts.NewContext()
-	spin := spinner.New()
-	spin.Spinner = spinner.Dot
+
+	override := opts.LayoutOverride
+	if override == "" {
+		override = os.Getenv(layoutOverrideEnv)
+	}
+	width := fallbackInt(opts.InitialWidth, defaultTerminalWidth)
+	height := fallbackInt(opts.InitialHeight, defaultTerminalHeight)
+	mode := bento.Resolve(width, height, override)
+	spin := components.NewAdaptiveSpinner(mode.String())
 
 	return Model{
 		state:           StateDashboard,
 		activeTab:       TabOverview,
-		width:           fallbackInt(opts.InitialWidth, defaultTerminalWidth),
-		height:          fallbackInt(opts.InitialHeight, defaultTerminalHeight),
+		width:           width,
+		height:          height,
 		statuses:        make(map[string]ProjectStatus),
 		configPath:      opts.ConfigPath,
 		pendingPath:     opts.PendingPath,
@@ -134,7 +154,16 @@ func New(opts Options) Model {
 		styles:          theme.NewStyles(theme.Default()),
 		wizardRunner:    opts.WizardRunner,
 		initForm:        newInitWizardForm(),
+		layoutOverride:  override,
 	}
+}
+
+// BentoMode returns the resolved Bento mode for the current viewport
+// and any [layoutOverrideEnv] override captured at construction time.
+// Exposing it on the model keeps the cockpit's routing logic centralised
+// (view.go, components, tests).
+func (m Model) BentoMode() bento.Mode {
+	return bento.Resolve(m.width, m.height, m.layoutOverride)
 }
 
 // State returns the current top-level route.

@@ -34,6 +34,42 @@ func TestViewRendersInitWizardDashboardAndProjectDetail(t *testing.T) {
 			needles: []string{"Webox Cockpit", "Projects", "sui.demo.smallhost.pl", "STALE", "Overview"},
 		},
 		{
+			name: "dashboard bento ultra",
+			model: New(Options{InitialWidth: 120, InitialHeight: 35}).
+				withConfig(fixtureConfig()).
+				withStatuses(map[string]ProjectStatus{
+					"p1": {ProjectID: "p1", State: ProjectOnline, HTTPHealth: "200 OK", SSLDaysLeft: 27, NodeVersion: "v24.15.0", LastDeploy: "2h ago"},
+				}),
+			needles: []string{"[BENTO Ultra]", "[Projects]", "[Overview]", "[CI/CD Pipeline]", "[Live Micro-Logs]"},
+		},
+		{
+			name: "dashboard bento ultra plus",
+			model: New(Options{InitialWidth: 160, InitialHeight: 45}).
+				withConfig(fixtureConfig()).
+				withStatuses(map[string]ProjectStatus{
+					"p1": {ProjectID: "p1", State: ProjectOnline, HTTPHealth: "200 OK", SSLDaysLeft: 27, NodeVersion: "v24.15.0", LastDeploy: "2h ago"},
+				}),
+			needles: []string{
+				"[BENTO Ultra+]",
+				"[Projects]",
+				"[Overview]",
+				"[Topology]",
+				"Deep-dive strip",
+			},
+		},
+		{
+			name: "dashboard tiny fallback",
+			model: New(Options{InitialWidth: 60, InitialHeight: 20}).
+				withConfig(fixtureConfig()),
+			needles: []string{"Terminal too small", "Tiny fallback"},
+		},
+		{
+			name: "dashboard tiny via layout override",
+			model: New(Options{InitialWidth: 120, InitialHeight: 35, LayoutOverride: "tiny"}).
+				withConfig(fixtureConfig()),
+			needles: []string{"Terminal too small", "Tiny fallback"},
+		},
+		{
 			name: "project detail overview",
 			model: New(Options{InitialWidth: 100, InitialHeight: 30}).
 				withConfig(fixtureConfig()).

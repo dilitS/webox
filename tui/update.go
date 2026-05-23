@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/dilitS/webox/providers"
+	"github.com/dilitS/webox/tui/components"
 	"github.com/dilitS/webox/wizard"
 )
 
@@ -18,8 +19,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:gocyclo // To
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		previous := m.BentoMode()
 		m.width = msg.Width
 		m.height = msg.Height
+		if next := m.BentoMode(); next != previous {
+			m.spinner.Spinner = components.SpinnerStyle(next.String())
+		}
 		return m, nil
 	case ConfigLoadedMsg:
 		if m.resumeForm.snapshot != nil || m.resumeForm.loadErr != nil {

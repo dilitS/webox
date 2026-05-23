@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 
+	"github.com/dilitS/webox/tui/bento"
 	"github.com/dilitS/webox/tui/views"
 )
 
@@ -13,7 +14,7 @@ func (m Model) View() string {
 	case StateInitWizard:
 		return views.RenderInitWizard(screen)
 	case StateDashboard:
-		return views.RenderDashboard(screen)
+		return m.renderDashboard(screen)
 	case StateProjectDetail:
 		return views.RenderProjectDetail(screen)
 	case StateProjectWizard:
@@ -25,6 +26,95 @@ func (m Model) View() string {
 	default:
 		return m.styles.Panel.Render(fmt.Sprintf("%s is not enabled", m.state))
 	}
+}
+
+func (m Model) renderDashboard(screen views.Screen) string {
+	mode := m.BentoMode()
+	switch mode {
+	case bento.ModeStandard:
+		return views.RenderDashboard(screen)
+	case bento.ModeTiny:
+		return bento.NewEngine("Webox Cockpit v0.1", nil).
+			RenderMode(screen.Width, screen.Height, mode)
+	default:
+		return bento.NewEngine("Webox Cockpit v0.1", m.dashboardBentoTiles()).
+			RenderMode(screen.Width, screen.Height, mode)
+	}
+}
+
+func (m Model) dashboardBentoTiles() []bento.BentoTile {
+	registry := bento.NewRegistry()
+	registry.Register(bento.NewProjectsTile(m.dashboardProjectRows()))
+
+	domain, overview := m.dashboardOverviewSnapshot()
+	registry.Register(bento.NewOverviewTile(domain, overview))
+
+	registry.Register(bento.NewMetricsPlaceholderTile())
+	registry.Register(bento.NewCICDPlaceholderTile())
+	registry.Register(bento.NewLogsPlaceholderTile())
+	registry.Register(bento.NewTopologyPlaceholderTile())
+
+	return registry.Tiles()
+}
+
+func (m Model) dashboardProjectRows() []string {
+	projects := cfgProjects(m.cfg)
+	if len(projects) == 0 {
+		return nil
+	}
+	rows := make([]string, 0, len(projects))
+	for idx, project := range projects {
+		marker := " "
+		if idx == m.selectedIndex {
+			marker = ">"
+		}
+		state := ProjectUnknown
+		if status, ok := m.statuses[project.ID]; ok {
+			state = status.State
+		}
+		rows = append(rows, fmt.Sprintf("%s %s [%s]", marker, project.Domain, state))
+	}
+	return rows
+}
+
+func (m Model) dashboardOverviewSnapshot() (domain string, lines []string) {
+	projects := cfgProjects(m.cfg)
+	if len(projects) == 0 || m.selectedIndex < 0 || m.selectedIndex >= len(projects) {
+		return "", []string{"Select a project to inspect status."}
+	}
+
+	project := projects[m.selectedIndex]
+	status, ok := m.statuses[project.ID]
+	if !ok {
+		return project.Domain, []string{
+			"HTTP: pending",
+			"SSL: unknown",
+			"Node: " + fallbackString(project.NodeVersion, "unknown"),
+			"Repo: " + fallbackString(project.Repo, "not linked"),
+			"Last deploy: pending",
+		}
+	}
+
+	ssl := "unknown"
+	if status.SSLDaysLeft >= 0 {
+		ssl = fmt.Sprintf("%d days remaining", status.SSLDaysLeft)
+	}
+
+	return project.Domain, []string{
+		"Status: " + string(status.State),
+		"HTTP: " + fallbackString(status.HTTPHealth, "pending"),
+		"SSL: " + ssl,
+		"Node: " + fallbackString(status.NodeVersion, fallbackString(project.NodeVersion, "unknown")),
+		"Repo: " + fallbackString(project.Repo, "not linked"),
+		"Last deploy: " + fallbackString(status.LastDeploy, "—"),
+	}
+}
+
+func fallbackString(value, def string) string {
+	if value == "" {
+		return def
+	}
+	return value
 }
 
 func (m Model) screen() views.Screen {
