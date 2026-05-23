@@ -16,6 +16,12 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `ssh/exec.go` + `ssh/keepalive.go` (TASK-02.4) — pooled `Exec`
+  helper returning `ExecResult{Stdout, Stderr, ExitCode, Duration}`,
+  per-client `keepalive@openssh.com` global request loop (default
+  15 s), and reconnect classification via `RetryPolicy` with default
+  `3s/6s/12s` backoff. `Exec` intentionally does not replay commands
+  after transport failure; providers must verify remote state first.
 - `ssh/pool.go` + `ssh/dialer.go` (TASK-02.3) — concurrency-safe SSH
   connection pool keyed by `Target.Key()` with default `max=3` per host,
   5 s acquire timeout, 60 s idle timeout, `Acquire`/`Release`/`Close`,

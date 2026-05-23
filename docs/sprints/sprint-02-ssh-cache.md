@@ -120,18 +120,18 @@ Po sprincie 02:
 - **Estymata:** M
 - **Zależności:** TASK-02.3
 - **Acceptance Criteria:**
-  - [ ] Keepalive ticker co 15 s (`keepalive@openssh.com`) na aktywnych klientach.
-  - [ ] `Exec(ctx, target, command)` zwraca `ExecResult{Stdout, Stderr, ExitCode}`.
-  - [ ] Zerwane połączenie klasyfikowane pod retry policy z `DESIGN §9` (3 próby, `3s/6s/12s` + jitter seam).
-  - [ ] Komenda nie jest ślepo ponawiana; API zwraca enough context, by provider mógł wykonać state check.
-  - [ ] Testy:
+  - [x] Keepalive ticker co 15 s (`keepalive@openssh.com`) na aktywnych klientach.
+  - [x] `Exec(ctx, target, command)` zwraca `ExecResult{Stdout, Stderr, ExitCode, Duration}`.
+  - [x] Zerwane połączenie klasyfikowane pod retry policy z `DESIGN §9` (3 próby, `3s/6s/12s` + injectable sleeper seam; jitter zostaje warstwą policy ponad deterministycznym backoffem).
+  - [x] Komenda nie jest ślepo ponawiana; `Exec` kończy się wynikiem/błędem, a `Reconnect` tylko przywraca klienta — provider musi wykonać state check przed replay.
+  - [x] Testy:
     - keepalive loop stops on close,
     - one reconnect path succeeds,
     - retries exhausted → `ErrReconnectExhausted`.
 - **Pliki:**
-  - `ssh/exec.go` (new)
-  - `ssh/keepalive.go` (new)
-  - `ssh/exec_test.go` (new)
+  - `ssh/exec.go`
+  - `ssh/keepalive.go`
+  - `ssh/exec_test.go`
 - **Docs:** [`DESIGN.md §5`, `§9`](../DESIGN.md#5-warstwa-ssh--sftp-connection-pooling), [`TESTING.md §3`](../TESTING.md#3-mockowanie-ssh)
 - **Notatki:**
   - Retry logic musi mieć injectable clock / sleeper. Żadnego `time.Sleep` hardcoded w testach.

@@ -45,9 +45,10 @@ type Server struct {
 	clientSigner cryptossh.Signer
 	clientPub    cryptossh.PublicKey
 
-	mu       sync.RWMutex
-	commands map[string]CommandResult
-	closed   chan struct{}
+	mu             sync.RWMutex
+	commands       map[string]CommandResult
+	globalRequests map[string]int
+	closed         chan struct{}
 }
 
 // New starts an SSH mock server. It fails the test immediately if the
@@ -64,12 +65,13 @@ func New(t testing.TB, opts ...Option) *Server {
 	}
 
 	server := &Server{
-		listener:     listener,
-		hostSigner:   hostSigner,
-		clientSigner: clientSigner,
-		clientPub:    clientSigner.PublicKey(),
-		commands:     make(map[string]CommandResult),
-		closed:       make(chan struct{}),
+		listener:       listener,
+		hostSigner:     hostSigner,
+		clientSigner:   clientSigner,
+		clientPub:      clientSigner.PublicKey(),
+		commands:       make(map[string]CommandResult),
+		globalRequests: make(map[string]int),
+		closed:         make(chan struct{}),
 	}
 	for _, opt := range opts {
 		opt(server)
@@ -110,6 +112,16 @@ func (s *Server) Dial(t testing.TB) *cryptossh.Client {
 		t.Fatalf("dial sshmock %s: %v", s.Addr(), err)
 	}
 	return client
+}
+
+// GlobalRequestCount returns how many global requests of requestType
+// the server has observed. It is primarily used to verify SSH keepalive
+// loops.
+func (s *Server) GlobalRequestCount(requestType string) int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.globalRequests[requestType]
 }
 
 // Close stops accepting new connections. In-flight connections are
@@ -159,7 +171,7 @@ func (s *Server) handleConn(conn net.Conn, config *cryptossh.ServerConfig) {
 	}
 	defer serverConn.Close()
 
-	go cryptossh.DiscardRequests(requests)
+	go s.handleGlobalRequests(requests)
 	for newChannel := range channels {
 		if newChannel.ChannelType() != "session" {
 			_ = newChannel.Reject(cryptossh.UnknownChannelType, "sshmock: only session channels are supported")
@@ -230,6 +242,15 @@ func (s *Server) command(command string) (CommandResult, bool) {
 
 	result, ok := s.commands[command]
 	return result, ok
+}
+
+func (s *Server) handleGlobalRequests(requests <-chan *cryptossh.Request) {
+	for req := range requests {
+		s.mu.Lock()
+		s.globalRequests[req.Type]++
+		s.mu.Unlock()
+		reply(req, true)
+	}
 }
 
 func parseExecCommand(payload []byte) (string, error) {

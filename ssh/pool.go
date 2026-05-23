@@ -14,6 +14,7 @@ const (
 	defaultMaxPerHost     = 3
 	defaultIdleTimeout    = 60 * time.Second
 	defaultAcquireTimeout = 5 * time.Second
+	defaultKeepalive      = 15 * time.Second
 )
 
 var errPoolClosed = errors.New("ssh: pool closed")
@@ -23,13 +24,14 @@ type ConfigFunc func(Target) (*cryptossh.ClientConfig, error)
 
 // PoolOptions configures a connection pool.
 type PoolOptions struct {
-	MaxPerHost      int
-	IdleTimeout     time.Duration
-	AcquireTimeout  time.Duration
-	CleanupInterval time.Duration
-	Dialer          Dialer
-	Config          ConfigFunc
-	Clock           Clock
+	MaxPerHost        int
+	IdleTimeout       time.Duration
+	AcquireTimeout    time.Duration
+	CleanupInterval   time.Duration
+	KeepaliveInterval time.Duration
+	Dialer            Dialer
+	Config            ConfigFunc
+	Clock             Clock
 }
 
 // Pool reuses SSH clients per target key and enforces a per-host
@@ -239,6 +241,7 @@ func (p *Pool) dialReserved(ctx context.Context, target Target) (*cryptossh.Clie
 	}
 	host.active[client] = struct{}{}
 	p.mu.Unlock()
+	p.startKeepalive(client)
 	return client, nil
 }
 
@@ -340,6 +343,9 @@ func normalizePoolOptions(opts PoolOptions) PoolOptions {
 			opts.CleanupInterval = time.Second
 		}
 	}
+	if opts.KeepaliveInterval == 0 {
+		opts.KeepaliveInterval = defaultKeepalive
+	}
 	if opts.Dialer == nil {
 		opts.Dialer = NetDialer{}
 	}
@@ -347,6 +353,13 @@ func normalizePoolOptions(opts PoolOptions) PoolOptions {
 		opts.Clock = SystemClock{}
 	}
 	return opts
+}
+
+func (p *Pool) startKeepalive(client *cryptossh.Client) {
+	if p.opts.KeepaliveInterval < 0 {
+		return
+	}
+	go keepaliveLoop(p.done, client, p.opts.KeepaliveInterval)
 }
 
 func closeClients(clients []*cryptossh.Client) {
