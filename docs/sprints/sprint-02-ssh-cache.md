@@ -222,25 +222,34 @@ Po sprincie 02:
 
 ---
 
-## Outcome (wypełnij po sprincie)
+## Outcome
 
-- ✅ Done: TASK-02.X, ...
-- ⏭️ Carry-over: TASK-02.X → Sprint 03
-- 📌 Decyzje: <ADR jeśli powstał>
-- 🧠 Surprises: ...
+- ✅ Done: TASK-02.1, TASK-02.2, TASK-02.3, TASK-02.4, TASK-02.5, TASK-02.6, TASK-02.7.
+- ⏭️ Carry-over: none. Sprint 03 starts from provider contracts and smallhost parser fixtures.
+- 📌 Decyzje:
+  - `testing/sshmock` uses `golang.org/x/crypto/ssh` directly instead of adding `gliderlabs/ssh`, keeping dependencies smaller and exercising the same transport stack as production code.
+  - Main module floor raised to `go 1.25.0` because new reachable `x/crypto/ssh` call paths made `govulncheck` fail on `x/crypto v0.41.0`; the full fix requires `x/crypto v0.52.0`, which declares Go 1.25.
+  - `Exec` deliberately does not retry commands. `Reconnect` only restores connectivity; providers must run idempotent state probes before replay.
+- 🧠 Surprises:
+  - `govulncheck` stayed quiet before Sprint 02 because the repo imported `x/crypto/ssh` but did not call the vulnerable symbols. Adding `sshmock`, `NetDialer`, `Exec`, and keepalive made the vulnerabilities reachable.
+  - A race appeared in `Pool.ReapIdle` from reading `len(p.hosts)` before acquiring `p.mu`. The fix moved preallocation under the lock and is covered by `go test -race ./ssh`.
+  - Avoiding `gliderlabs/ssh` was straightforward; `x/crypto/ssh.NewServerConn` was enough for deterministic session/exec tests.
 - 📊 Metryki:
-  - Coverage `ssh/`: %
-  - Coverage `status/`: %
-  - Coverage `services/httpcheck/`: %
-  - Czas faktyczny vs estymata: ratio
+  - Coverage `ssh/`: 82.7%
+  - Coverage `status/`: 83.2%
+  - Coverage `services/httpcheck/`: 88.9%
+  - Coverage `testing/sshmock/`: 79.2%
+  - Global coverage: 85.6%
 - 🔒 Security validation:
-  - [ ] `go test -race ./ssh ./status ./services/...` green
-  - [ ] Host-key mismatch nadal strict-block (brak auto-accept)
-  - [ ] No secrets in any SSH / cache logs
-- ➡️ Następny sprint: `sprint-03-provider-smallhost.md`
+  - [x] `go test -race ./ssh ./status ./services/...` green.
+  - [x] `make ci` green: lint, vet, govulncheck, race tests, coverage gate, build.
+  - [x] `govulncheck` reports `No vulnerabilities found`.
+  - [x] Host-key mismatch remains strict-block (`ErrHostKeyMismatch`, no auto-accept).
+  - [x] No secrets introduced in SSH / cache logs.
+- ➡️ Następny sprint: [`sprint-03-provider-smallhost.md`](sprint-03-provider-smallhost.md)
 
 ---
 
 ## Retro link (po sprincie)
 
-`docs/retros/YYYY-MM-DD-sprint-02.md`
+[`docs/retros/2026-05-23-sprint-02.md`](../retros/2026-05-23-sprint-02.md)

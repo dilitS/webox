@@ -16,6 +16,12 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `docs/sprints/sprint-03-provider-smallhost.md` — rolling-wave plan for
+  Sprint 03 (provider contracts, `smallhost` constructor, path helpers,
+  Devil parser fixtures, and smallhost method skeleton over `ssh.Exec`).
+- `docs/retros/2026-05-23-sprint-02.md` — Sprint 02 retrospective with
+  the `x/crypto/ssh` security upgrade, pool race fix, and process change
+  to run lint after each task commit.
 - `services/httpcheck/` (TASK-02.7) — dashboard probes for HTTP status
   and TLS certificate expiry. `ProbeHTTP` returns status code, class
   (`2xx`/`3xx`/`4xx`/`5xx`) and latency with a default 1 s timeout;
