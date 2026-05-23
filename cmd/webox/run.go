@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"io"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/dilitS/webox/internal/version"
+	"github.com/dilitS/webox/tui"
 )
 
 // Exit codes follow the POSIX convention: 0 success, 1 general error,
@@ -48,17 +51,22 @@ type opts struct {
 // package-level state.
 type doctorDispatcher func(jsonOutput bool, stdout, stderr io.Writer) int
 
+type tuiDispatcher func(stdout, stderr io.Writer) int
+
 // Run dispatches the command implied by args (without the program name)
 // and returns the process exit code. Output is written to the supplied
 // writers so tests can capture it without touching os.Stdout/os.Stderr.
 func Run(args []string, stdout, stderr io.Writer) int {
-	return runWith(args, stdout, stderr, runDoctor)
+	return runWithDeps(args, stdout, stderr, runDoctor, runTUI)
 }
 
-// runWith is the testable CLI router. Production wires it to runDoctor;
-// table-driven tests pass a stub dispatcher to verify the dispatch
-// surface in isolation from the doctor service.
-func runWith(args []string, stdout, stderr io.Writer, dispatch doctorDispatcher) int {
+func runWithDeps(
+	args []string,
+	stdout,
+	stderr io.Writer,
+	dispatch doctorDispatcher,
+	startTUI tuiDispatcher,
+) int {
 	parsed, errMsg := parseArgs(args)
 	if errMsg != "" {
 		fmt.Fprintln(stderr, errMsg)
@@ -76,12 +84,27 @@ func runWith(args []string, stdout, stderr io.Writer, dispatch doctorDispatcher)
 		return dispatch(parsed.doctorJSON, stdout, stderr)
 	}
 
-	// `webox` alone shows help until the TUI is wired in Sprint 04. The
-	// --debug modifier is parsed (so order-independent invocations such
-	// as `webox --debug --version` work today) but has no observable
-	// effect yet.
+	// The --debug modifier is parsed (so order-independent invocations such
+	// as `webox --debug --version` work today) but log-level routing lands
+	// with the diagnostics wiring.
 	_ = parsed.debug
-	fmt.Fprint(stdout, helpText)
+	return startTUI(stdout, stderr)
+}
+
+func runTUI(stdout, stderr io.Writer) int {
+	cfgPath, err := tui.DefaultConfigPath()
+	if err != nil {
+		fmt.Fprintf(stderr, "webox: resolve config path: %v\n", err)
+		return exitMisuse
+	}
+	program := tea.NewProgram(
+		tui.New(tui.Options{ConfigPath: cfgPath}),
+		tea.WithOutput(stdout),
+	)
+	if _, err := program.Run(); err != nil {
+		fmt.Fprintf(stderr, "webox: TUI failed: %v\n", err)
+		return exitMisuse
+	}
 	return exitOK
 }
 
