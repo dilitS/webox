@@ -16,6 +16,20 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `providers/smallhost/methods.go` + `executor.go` (TASK-03.6) —
+  HostingProvider method skeletons wire the Devil parsers to a
+  narrow `Executor` seam. Production wiring uses `NewSSHExecutor`
+  over `ssh.Pool`; tests inject a recording fake. Every command
+  builder uses pre-validated tokens (`ValidateDomain`,
+  `ValidateDBName`, `ValidateNodeVersion`) before concatenation so
+  shell injection is impossible at the boundary. Methods map
+  parser sentinels onto the HostingProvider contract (idempotent
+  Remove*, ErrSubdomainExists, ErrAppNotFound, ErrAppNotNode,
+  ErrDNSNotResolving, ErrRateLimitLetsEncrypt, ErrCLINotFound). The
+  fail-closed branch — methods invoked before SetExecutor — returns
+  `providers.ErrUnknownOutputFormat` wrapped with an "executor not
+  configured" sentinel so wiring bugs surface in tests instead of
+  silent no-ops.
 - `parseVhostList`, `parseSSLAdd`, `parseSSLDelete`, `parseDBAdd`,
   `parseDBDelete` in `providers/smallhost/parsers.go` (TASK-03.5) —
   cover the SSL provisioning round-trip (account IP lookup → cert

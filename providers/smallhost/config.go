@@ -54,9 +54,16 @@ type Properties struct {
 // Provider is the small.pl HostingProvider implementation. It is
 // constructed via [New] and registered with `providers.Register` in
 // init(); business logic NEVER instantiates it directly.
+//
+// The executor field is the SSH-command seam ([Executor]). Tests
+// install a fake via [Provider.SetExecutor]; the wizard installs a
+// real one over `ssh.Pool` via [NewSSHExecutor]. Until SetExecutor
+// runs, every method that needs SSH returns ErrUnknownOutputFormat
+// wrapped with a "not configured" diagnostic — fail-closed.
 type Provider struct {
-	cfg   providers.ProviderConfig
-	props Properties
+	cfg      providers.ProviderConfig
+	props    Properties
+	executor Executor
 }
 
 // Name satisfies [providers.HostingProvider]. It returns the
