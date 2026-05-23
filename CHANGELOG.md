@@ -16,6 +16,13 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `docs/sprints/sprint-04-tui-shell.md` — rolling-wave plan for
+  Sprint 04 (Bubble Tea / Lipgloss bootstrap, MVU shell, read-only
+  dashboard with SWR refresh, Project Detail Overview tab). Dependency
+  sign-off section enumerates the four direct deps the sprint adds.
+- `docs/retros/2026-05-23-sprint-03.md` — Sprint 03 retrospective
+  capturing the executor-seam pattern, the tripwire-prefixed fixture
+  passwords, and the `commit-msg` hook learnings.
 - `providers/smallhost/methods.go` + `executor.go` (TASK-03.6) —
   HostingProvider method skeletons wire the Devil parsers to a
   narrow `Executor` seam. Production wiring uses `NewSSHExecutor`
