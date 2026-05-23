@@ -38,6 +38,23 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   contributors notice the `/proc/<pid>/environ` exposure surface.
 
 ### Added
+- `services/doctor/` + `cmd/webox/doctor.go` — MVP `webox doctor`
+  subcommand with local diagnostics for Go runtime info, config-dir
+  writability, secrets backend classification (`os` / `fallback` /
+  `none`), `secrets.enc` permission checks, `WEBOX_MASTER_PASSWORD`
+  workstation warning, and `SSH_AUTH_SOCK` probing. Reports render both
+  as colored human output and `--json` machine output with stable exit
+  codes `0/1/2`.
+- `i18n/i18n.go` + tests — Sprint-01 translation skeleton with a tiny
+  in-memory `Catalog`, `T(key, args...)`, EN/PL tables, five doctor
+  strings, and fail-soft fallback to English / the raw key.
+- `internal/telemetry/telemetry.go` + tests — explicit local-only
+  telemetry seam (`Sink`, `Event`, `Disabled`) so future instrumentation
+  can depend on a stable no-op interface without violating the
+  zero-remote-telemetry policy.
+- `docs/sprints/sprint-02-ssh-cache.md` — full rolling-wave plan for the
+  next sprint (SSH connection pool, `testing/sshmock`, SWR cache, HTTP /
+  TLS probes).
 - `secrets/fallback.go`, `secrets/fallback_crypto.go`,
   `secrets/fallback_io.go` — full `FallbackBackend` with `NewFallback`,
   `Get`/`Set`/`Delete`/`Close`/`RotatePassword`, atomic write through
@@ -72,6 +89,13 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   the toolchain past 1.24).
 
 ### Changed
+- `cmd/webox` now routes `webox doctor` and `webox doctor --json` through
+  the same lightweight manual parser used for `--version` / `--help`,
+  keeping ADR-0001's "small CLI surface" intact without introducing
+  Cobra or other command frameworks.
+- `docs/sprints/sprint-01-foundations.md`, `docs/sprints/README.md`, and
+  `docs/retros/2026-05-23-sprint-01.md` close Sprint 01 at 10/10 tasks,
+  57/57 AC and link the ready-to-start Sprint 02 plan.
 - `secrets/backend.go` no longer ships a placeholder `FallbackBackend`
   — the type and its methods now live in `secrets/fallback.go`. The
   interface itself is unchanged.
