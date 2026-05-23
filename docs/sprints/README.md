@@ -232,13 +232,17 @@ Wszystkie powtarzalne kroki są skryptowane. Główne komendy z `Makefile`:
 | 01 | Foundations (config + secrets) | ✅ Done | [sprint-01-foundations.md](sprint-01-foundations.md) | [2026-05-23-sprint-01.md](../retros/2026-05-23-sprint-01.md) |
 | 02 | SSH + status cache | ✅ Done | [sprint-02-ssh-cache.md](sprint-02-ssh-cache.md) | [2026-05-23-sprint-02.md](../retros/2026-05-23-sprint-02.md) |
 | 03 | Provider abstraction + `small.pl` skeleton | ✅ Done | [sprint-03-provider-smallhost.md](sprint-03-provider-smallhost.md) | [2026-05-23-sprint-03.md](../retros/2026-05-23-sprint-03.md) |
-| 04 | TUI shell (MVU, navigation, dashboard) | 📅 Planned | [sprint-04-tui-shell.md](sprint-04-tui-shell.md) | — |
-| 05 | Wizard tworzenia projektu (LIFO rollback) | 📝 Outlined | — | — |
-| 06 | GitHub deploy workflow | 📝 Outlined | — | — |
-| 07 | Doctor + diagnostics + i18n | 📝 Outlined | — | — |
-| 08 | Polish, beta release, RC1 | 📝 Outlined | — | — |
+| 04 | TUI shell (MVU, navigation, dashboard) | ✅ Done | [sprint-04-tui-shell.md](sprint-04-tui-shell.md) | [2026-05-23-sprint-04.md](../retros/2026-05-23-sprint-04.md) |
+| 05 | Wizard tworzenia projektu (LIFO rollback) | ✅ Done | [sprint-05-wizard-project.md](sprint-05-wizard-project.md) | [2026-05-23-sprint-05.md](../retros/2026-05-23-sprint-05.md) |
+| 06 | GitHub deploy workflow | ✅ Done (z carry-over do 07) | [sprint-06-github-deploy-workflow.md](sprint-06-github-deploy-workflow.md) | [2026-05-23-sprint-06.md](../retros/2026-05-23-sprint-06.md) |
+| 07 | Import + Doctor GitHub + deploy polish | 📅 Planned | [sprint-07-import-doctor-polish.md](sprint-07-import-doctor-polish.md) | — |
+| 08 | **Bento Ultra Layout Engine + OKLCH theme + Sprint-leak cleanup** (po [ADR-0007](../adr/0007-bento-ultra-eskalacja-mvp.md)) | 📝 Planned | [sprint-08-bento-ultra.md](sprint-08-bento-ultra.md) | — |
+| 09 | **Live Log Stream + Header Bar Server Metrics** | 📝 Planned | [sprint-09-live-log-stream.md](sprint-09-live-log-stream.md) | — |
+| 10 | **Live CI/CD Pipeline Panel** | 📝 Planned | [sprint-10-cicd-panel.md](sprint-10-cicd-panel.md) | — |
+| 11 | **Live Service Topology Map** | 📝 Planned | [sprint-11-topology-map.md](sprint-11-topology-map.md) | — |
+| 12 | Polish, beta release, RC1 → v0.1 | 📝 Outlined | — | — |
 
-Sprinty 02-08 dostaną pełne plany w trybie rolling-wave, po zakończeniu poprzedniego.
+Sprinty 08–11 dodane do MVP po [ADR-0007](../adr/0007-bento-ultra-eskalacja-mvp.md) (2026-05-23) — eskalacja Bento Ultra + live logs + GHA panel + topology z STRETCH (v0.2+) do MVP (v0.1).
 
 ---
 
@@ -279,4 +283,4 @@ Sprinty 02-08 dostaną pełne plany w trybie rolling-wave, po zakończeniu poprz
 
 ---
 
-_Last reviewed: 2026-05-22. Reviewer: project owner._
+_Last reviewed: 2026-05-23. Reviewer: project owner. Trigger: [ADR-0007](../adr/0007-bento-ultra-eskalacja-mvp.md) — eskalacja Bento Ultra do MVP._

@@ -35,6 +35,28 @@ type WizardRunner interface {
 	// reverse order. Idempotent: missing panel resources are
 	// success.
 	Rollback(ctx context.Context, profile config.Profile, stack *wizard.Stack) ([]wizard.CleanupResult, error)
+
+	// RestartApp restarts the Node.js application bound to domain.
+	// Wraps [providers.HostingProvider.RestartNodeApp] but keeps the
+	// runner as the only TUI-facing seam so tests stay deterministic.
+	RestartApp(ctx context.Context, profile config.Profile, domain string) error
+
+	// RenewSSL re-runs the panel's "ssl www add" call. small.pl's
+	// Devil treats repeat invocations as renew, so the wizard and
+	// dashboard share the same provider method. Returns the same
+	// sentinel set as the wizard SSL step.
+	RenewSSL(ctx context.Context, profile config.Profile, domain string) error
+
+	// TailLog returns the last `lines` log entries for the project.
+	// The runner clamps the line count via the provider so a UI bug
+	// cannot ship 1 GiB of log to the local process.
+	TailLog(ctx context.Context, profile config.Profile, domain string, lines int) ([]byte, error)
+
+	// ListProviderSubdomains is the read-only enumeration used by
+	// the dashboard import flow. Returns the panel snapshot so the
+	// caller can diff against `config.json` without making any
+	// state-changing call.
+	ListProviderSubdomains(ctx context.Context, profile config.Profile) ([]providers.Subdomain, error)
 }
 
 // providerProvider is the seam used by [DefaultWizardRunner] to
@@ -46,12 +68,11 @@ type providerProvider func(config.Profile) (providers.HostingProvider, error)
 // DefaultWizardRunner returns a runner that constructs the panel
 // provider on demand via [providers.New]. The runner does NOT cache
 // providers across calls — each step opens a fresh adapter because
-// Sprint 05 provider methods are stateless (`smallhost.Provider`
-// uses an executor seam set on every call).
+// the smallhost provider methods are stateless (the adapter uses an
+// executor seam set on every call).
 //
-// In Sprint 06 the runner will be upgraded to carry a long-lived
-// `ssh.Pool` so deploy flows reuse connections across the wizard
-// + status loop.
+// A future revision can carry a long-lived `ssh.Pool` so deploy
+// flows reuse connections across the wizard + status loop.
 func DefaultWizardRunner() WizardRunner {
 	return &defaultRunner{provider: newProviderFromProfile}
 }
@@ -106,13 +127,51 @@ func (r *defaultRunner) Rollback(ctx context.Context, profile config.Profile, st
 	return stack.Rollback(ctx, wizard.MakeStepRunner(p))
 }
 
+// RestartApp resolves the provider and forwards to RestartNodeApp.
+func (r *defaultRunner) RestartApp(ctx context.Context, profile config.Profile, domain string) error {
+	p, err := r.provider(profile)
+	if err != nil {
+		return err
+	}
+	return p.RestartNodeApp(ctx, domain)
+}
+
+// RenewSSL resolves the provider and forwards to SetupSSL. Devil
+// treats SetupSSL as idempotent renew.
+func (r *defaultRunner) RenewSSL(ctx context.Context, profile config.Profile, domain string) error {
+	p, err := r.provider(profile)
+	if err != nil {
+		return err
+	}
+	return p.SetupSSL(ctx, domain)
+}
+
+// TailLog resolves the provider and forwards to TailLog.
+func (r *defaultRunner) TailLog(ctx context.Context, profile config.Profile, domain string, lines int) ([]byte, error) {
+	p, err := r.provider(profile)
+	if err != nil {
+		return nil, err
+	}
+	return p.TailLog(ctx, domain, lines)
+}
+
+// ListProviderSubdomains resolves the provider and forwards to
+// ListSubdomains.
+func (r *defaultRunner) ListProviderSubdomains(ctx context.Context, profile config.Profile) ([]providers.Subdomain, error) {
+	p, err := r.provider(profile)
+	if err != nil {
+		return nil, err
+	}
+	return p.ListSubdomains(ctx)
+}
+
 // newProviderFromProfile constructs a [providers.HostingProvider]
-// from the persisted profile. Sprint 05 wires the smallhost executor
-// with a nil pool because no provider call goes over a live network
-// yet — the wizard surfaces "ssh disconnected" at preflight when the
-// pool dependency lands in Sprint 06. For now, MVP integration tests
-// install a fake runner; the default runner stays compiled but
-// guarded by the executor-not-configured sentinel.
+// from the persisted profile. The smallhost executor is wired with a
+// nil pool because no provider call goes over a live network yet —
+// the wizard surfaces "ssh disconnected" at preflight when the pool
+// dependency is plumbed in. For now, integration tests install a
+// fake runner; the default runner stays compiled but guarded by the
+// executor-not-configured sentinel.
 func newProviderFromProfile(profile config.Profile) (providers.HostingProvider, error) {
 	return providers.New(providers.ProviderConfig{
 		Alias:      profile.Alias,

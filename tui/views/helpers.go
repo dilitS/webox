@@ -46,7 +46,7 @@ func statusFor(s Screen, project config.Project) ProjectStatus {
 		HTTPHealth:  "pending",
 		SSLDaysLeft: -1,
 		NodeVersion: fallback(project.NodeVersion, "unknown"),
-		LastDeploy:  "pending Sprint 06",
+		LastDeploy:  "—",
 		State:       state,
 	}
 }

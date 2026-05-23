@@ -223,6 +223,54 @@ func TestStackRollbackRunsInReverseOrderAndAggregates(t *testing.T) {
 	}
 }
 
+func TestStackRollbackDispatchesGitHubCleanupKinds(t *testing.T) {
+	t.Parallel()
+
+	stack := wizard.NewStack(nil, "")
+	steps := []wizard.CleanupStep{
+		{Name: "repo", Kind: wizard.ResourceGitHubRepo, Params: map[string]string{"owner": "dilitS", "repo": "demo"}},
+		{Name: "key", Kind: wizard.ResourceGitHubDeployKey, Params: map[string]string{"owner": "dilitS", "repo": "demo", "keyID": "42"}},
+		{Name: "secret", Kind: wizard.ResourceGitHubActionsSecret, Params: map[string]string{"owner": "dilitS", "repo": "demo", "name": "DEPLOY_HOST"}},
+		{Name: "workflow", Kind: wizard.ResourceGitHubWorkflowFile, Params: map[string]string{"owner": "dilitS", "repo": "demo", "path": ".github/workflows/deploy.yml", "branch": "main"}},
+	}
+	for _, step := range steps {
+		if err := stack.Push(context.Background(), step); err != nil {
+			t.Fatalf("Push(%s) = %v", step.Name, err)
+		}
+	}
+
+	gh := &fakeGitHubCleanup{}
+	results, err := stack.Rollback(context.Background(), wizard.MakeStepRunnerWithGitHub(nil, gh))
+	if err != nil {
+		t.Fatalf("Rollback = %v", err)
+	}
+	if len(results) != 4 {
+		t.Fatalf("results = %d, want 4", len(results))
+	}
+	got := strings.Join(gh.calls, ",")
+	want := "workflow:dilitS/demo/.github/workflows/deploy.yml@main,secret:dilitS/demo/DEPLOY_HOST,key:dilitS/demo/42,repo:dilitS/demo"
+	if got != want {
+		t.Fatalf("github cleanup calls = %s, want %s", got, want)
+	}
+}
+
+func TestGitHubCleanupKindWithoutRunnerFailsClosed(t *testing.T) {
+	t.Parallel()
+
+	stack := wizard.NewStack(nil, "")
+	if err := stack.Push(context.Background(), wizard.CleanupStep{
+		Name:   "repo",
+		Kind:   wizard.ResourceGitHubRepo,
+		Params: map[string]string{"owner": "dilitS", "repo": "demo"},
+	}); err != nil {
+		t.Fatalf("Push = %v", err)
+	}
+	_, err := stack.Rollback(context.Background(), wizard.MakeStepRunnerWithGitHub(nil, nil))
+	if !errors.Is(err, wizard.ErrUnsupportedKind) {
+		t.Fatalf("Rollback err = %v, want ErrUnsupportedKind", err)
+	}
+}
+
 func TestStackRollbackRunsIdempotentRemovesTwice(t *testing.T) {
 	t.Parallel()
 
@@ -355,4 +403,28 @@ func TestRollbackContinuesPastSingleFailure(t *testing.T) {
 	if results[0].Step.Name != "ssl" || results[1].Step.Name != "sub" {
 		t.Fatalf("results order = %+v", results)
 	}
+}
+
+type fakeGitHubCleanup struct {
+	calls []string
+}
+
+func (f *fakeGitHubCleanup) RemoveGitHubRepo(_ context.Context, owner, repo string) error {
+	f.calls = append(f.calls, "repo:"+owner+"/"+repo)
+	return nil
+}
+
+func (f *fakeGitHubCleanup) RemoveGitHubDeployKey(_ context.Context, owner, repo string, keyID int64) error {
+	f.calls = append(f.calls, fmt.Sprintf("key:%s/%s/%d", owner, repo, keyID))
+	return nil
+}
+
+func (f *fakeGitHubCleanup) RemoveGitHubActionsSecret(_ context.Context, owner, repo, name string) error {
+	f.calls = append(f.calls, "secret:"+owner+"/"+repo+"/"+name)
+	return nil
+}
+
+func (f *fakeGitHubCleanup) RemoveGitHubWorkflowFile(_ context.Context, owner, repo, path, branch string) error {
+	f.calls = append(f.calls, "workflow:"+owner+"/"+repo+"/"+path+"@"+branch)
+	return nil
 }

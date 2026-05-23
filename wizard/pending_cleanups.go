@@ -45,6 +45,7 @@ const pendingTempBytes = 6
 type PendingCleanups struct {
 	SchemaVersion int           `json:"schema_version"`
 	WizardID      string        `json:"wizard_id,omitempty"`
+	ProfileAlias  string        `json:"profile_alias,omitempty"`
 	UpdatedAt     time.Time     `json:"updated_at"`
 	Steps         []CleanupStep `json:"steps"`
 }
@@ -173,6 +174,13 @@ func RemovePending(path string) error {
 // to path. Empty step slices remove the file so the resume detector
 // does not surface an empty pending.
 func NewFilePersister(path, wizardID string) PersistFunc {
+	return NewFilePersisterWithProfile(path, wizardID, "")
+}
+
+// NewFilePersisterWithProfile returns a persister that records the
+// provider profile alias needed by resume-on-launch rollback. The alias
+// is metadata only; it must never carry credentials.
+func NewFilePersisterWithProfile(path, wizardID, profileAlias string) PersistFunc {
 	return func(ctx context.Context, steps []CleanupStep) error {
 		if len(steps) == 0 {
 			return RemovePending(path)
@@ -180,6 +188,7 @@ func NewFilePersister(path, wizardID string) PersistFunc {
 		snap := &PendingCleanups{
 			SchemaVersion: PendingSchemaVersion,
 			WizardID:      wizardID,
+			ProfileAlias:  profileAlias,
 			UpdatedAt:     time.Now().UTC(),
 			Steps:         append([]CleanupStep(nil), steps...),
 		}

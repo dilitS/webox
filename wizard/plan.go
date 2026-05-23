@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/dilitS/webox/providers"
-	"github.com/dilitS/webox/providers/smallhost"
 )
 
 // Supported stacks for the MVP wizard. New stacks land in v0.2+; the
@@ -89,23 +88,32 @@ func IsDBRequiredForStack(stack string) bool {
 }
 
 // ValidatePlan runs the cross-field invariants before any provider
-// call. Returns a wrapped [ErrInvalidPlan]. Tests cover every branch
+// call. Adapter-specific validators (domain shape, node version
+// allow-list, DB identifier rules) come from the [providers.PlanValidators]
+// the caller resolves through [providers.PlanValidatorsFor]; the
+// wizard intentionally does NOT import any provider sub-package so
+// adding a new adapter does not require editing this file.
+//
+// Returns a wrapped [ErrInvalidPlan]. Tests cover every branch
 // because this is the last line of defense before the LIFO stack
 // starts pushing real provider state.
-func ValidatePlan(plan ProvisionPlan) error {
+func ValidatePlan(plan ProvisionPlan, validators providers.PlanValidators) error {
+	if !validators.IsComplete() {
+		return fmt.Errorf("%w: validator set is incomplete (ValidateDomain/ValidateNodeVersion/ValidateDBName)", ErrInvalidPlan)
+	}
 	if plan.ProfileAlias == "" {
 		return fmt.Errorf("%w: profile_alias is required", ErrInvalidPlan)
 	}
 	if !IsValidStack(plan.Stack) {
 		return fmt.Errorf("%w: stack %q is not in %v", ErrInvalidPlan, plan.Stack, SupportedStacks)
 	}
-	if err := smallhost.ValidateDomain(plan.Domain); err != nil {
+	if err := validators.ValidateDomain(plan.Domain); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidPlan, err)
 	}
 	if plan.NodeVersion == "" {
 		return fmt.Errorf("%w: node_version is required", ErrInvalidPlan)
 	}
-	if err := smallhost.ValidateNodeVersion(plan.NodeVersion); err != nil {
+	if err := validators.ValidateNodeVersion(plan.NodeVersion); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidPlan, err)
 	}
 	if plan.DBKind == "" && plan.DBName == "" {
@@ -117,7 +125,7 @@ func ValidatePlan(plan ProvisionPlan) error {
 	if !IsValidDBKind(plan.DBKind) {
 		return fmt.Errorf("%w: db_kind %q is not in %v", ErrInvalidPlan, plan.DBKind, SupportedDBKinds)
 	}
-	if err := smallhost.ValidateDBName(plan.DBName); err != nil {
+	if err := validators.ValidateDBName(plan.DBName); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidPlan, err)
 	}
 	return nil

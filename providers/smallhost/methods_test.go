@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dilitS/webox/providers"
 	"github.com/dilitS/webox/providers/smallhost"
@@ -289,6 +290,54 @@ func TestCheckStatus_CLINotFound(t *testing.T) {
 	}
 }
 
+// TestCheckStatus_LatencyUsesInjectedClock asserts that the
+// per-instance clock seam ([Provider.SetClock]) drives the
+// LatencyMS field. Two t0/t1 readings differ by 42 ms; we expect
+// the report to surface that exact difference rather than a real
+// wall-clock value.
+func TestCheckStatus_LatencyUsesInjectedClock(t *testing.T) {
+	t.Parallel()
+	p, exec := newProvider(t)
+	exec.On("devil --version", fakeResponse{stdout: []byte("devil 1.0.0\n")})
+
+	base := time.Unix(1_700_000_000, 0).UTC()
+	readings := []time.Time{base, base.Add(42 * time.Millisecond)}
+	idx := 0
+	p.SetClock(func() time.Time {
+		ts := readings[idx%len(readings)]
+		idx++
+		return ts
+	})
+
+	status, err := p.CheckStatus(context.Background())
+	if err != nil {
+		t.Fatalf("CheckStatus: %v", err)
+	}
+	if status.LatencyMS != 42 {
+		t.Fatalf("LatencyMS = %d, want 42 (injected clock delta)", status.LatencyMS)
+	}
+}
+
+// TestCheckStatus_SetClockNilRestoresDefault asserts that passing
+// nil to SetClock is the documented way to revert to time.Now —
+// otherwise tests that share a provider across subtests would leak
+// stub clocks.
+func TestCheckStatus_SetClockNilRestoresDefault(t *testing.T) {
+	t.Parallel()
+	p, exec := newProvider(t)
+	exec.On("devil --version", fakeResponse{stdout: []byte("devil 1.0.0\n")})
+
+	p.SetClock(func() time.Time { return time.Unix(0, 0).UTC() })
+	p.SetClock(nil)
+	status, err := p.CheckStatus(context.Background())
+	if err != nil {
+		t.Fatalf("CheckStatus: %v", err)
+	}
+	if status.LatencyMS < 0 {
+		t.Fatalf("LatencyMS = %d, want non-negative", status.LatencyMS)
+	}
+}
+
 func TestMethods_FailClosedWithoutExecutor(t *testing.T) {
 	provider, err := smallhost.New(validConfig())
 	if err != nil {
@@ -337,6 +386,88 @@ func TestMethods_FailClosedWithoutExecutor(t *testing.T) {
 				t.Fatalf("err = %v, want wrap of ErrUnknownOutputFormat", err)
 			}
 		})
+	}
+}
+
+func TestTailLog_HappyPath(t *testing.T) {
+	p, exec := newProvider(t)
+	const domain = "app.webox-test.smallhost.pl"
+	logPath := p.GetLogPath(domain)
+	cmd := "tail -n 50 -- " + logPath + "/node.log " + logPath + "/error.log"
+	exec.On(cmd, fakeResponse{stdout: []byte("[info] booted on :3000\n[info] request OK\n")})
+
+	out, err := p.TailLog(context.Background(), domain, 50)
+	if err != nil {
+		t.Fatalf("TailLog: %v", err)
+	}
+	if want := "booted on :3000"; !strings.Contains(string(out), want) {
+		t.Fatalf("output missing %q: %s", want, out)
+	}
+	if got := exec.Calls(); len(got) != 1 || got[0] != cmd {
+		t.Fatalf("calls = %v, want [%q]", got, cmd)
+	}
+}
+
+func TestTailLog_DefaultsAndClampsLineCount(t *testing.T) {
+	tests := []struct {
+		name      string
+		lines     int
+		wantInCmd string
+	}{
+		{"zero defaults to 200", 0, "tail -n 200 --"},
+		{"negative defaults to 200", -5, "tail -n 200 --"},
+		{"over cap clamps to 10000", 99999, "tail -n 10000 --"},
+		{"within bounds passes through", 25, "tail -n 25 --"},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			p, exec := newProvider(t)
+			const domain = "app.webox-test.smallhost.pl"
+			logPath := p.GetLogPath(domain)
+			cmd := tt.wantInCmd + " " + logPath + "/node.log " + logPath + "/error.log"
+			exec.On(cmd, fakeResponse{stdout: []byte("ok\n")})
+			if _, err := p.TailLog(context.Background(), domain, tt.lines); err != nil {
+				t.Fatalf("TailLog: %v", err)
+			}
+			if got := exec.Calls(); len(got) != 1 || got[0] != cmd {
+				t.Fatalf("calls = %v, want %q", got, cmd)
+			}
+		})
+	}
+}
+
+func TestTailLog_RejectsBadDomain(t *testing.T) {
+	p, exec := newProvider(t)
+	_, err := p.TailLog(context.Background(), "evil$(rm).example.com", 100)
+	if !errors.Is(err, providers.ErrInvalidProviderConfig) {
+		t.Fatalf("err = %v, want ErrInvalidProviderConfig", err)
+	}
+	if len(exec.Calls()) != 0 {
+		t.Errorf("calls = %v, want none", exec.Calls())
+	}
+}
+
+func TestTailLog_MissingFilesReturnsCombinedOutput(t *testing.T) {
+	p, exec := newProvider(t)
+	const domain = "app.webox-test.smallhost.pl"
+	logPath := p.GetLogPath(domain)
+	cmd := "tail -n 100 -- " + logPath + "/node.log " + logPath + "/error.log"
+	exec.On(cmd, fakeResponse{
+		stdout:   []byte("==> error.log <==\nstarted\n"),
+		stderr:   []byte("tail: cannot open '" + logPath + "/node.log' for reading: No such file or directory\n"),
+		exitCode: 1,
+		err:      errors.New("Process exited with status 1"),
+	})
+	out, err := p.TailLog(context.Background(), domain, 100)
+	if err != nil {
+		t.Fatalf("TailLog should swallow exit 1 from tail: %v", err)
+	}
+	if !strings.Contains(string(out), "started") {
+		t.Fatalf("missing stdout fragment: %s", out)
+	}
+	if !strings.Contains(string(out), "No such file or directory") {
+		t.Fatalf("missing stderr fragment: %s", out)
 	}
 }
 

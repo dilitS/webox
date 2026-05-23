@@ -1,9 +1,9 @@
 // Package theme defines Webox Lipgloss design tokens.
 package theme
 
-// Theme is the single source of truth for Sprint 04 colors. Hex values are
-// copied from docs/UX.md §2.1, whose OKLCH tokens are represented in
-// Lipgloss as terminal truecolor hex strings.
+// Theme is the single source of truth for cockpit colors. Hex values
+// are anchored in OKLCH per docs/UX.md §2.1 and rendered in Lipgloss
+// as terminal truecolor hex strings.
 type Theme struct {
 	Primary     string
 	Success     string

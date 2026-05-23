@@ -29,6 +29,17 @@ type fakeRunner struct {
 	executeCalls   int
 	rollbackCalls  int
 	pushDuringExec []wizard.CleanupStep
+
+	restartErr     error
+	restartCalls   int
+	renewErr       error
+	renewCalls     int
+	tailOutput     []byte
+	tailErr        error
+	tailCalls      int
+	listSubdomains []providers.Subdomain
+	listErr        error
+	listCalls      int
 }
 
 func (r *fakeRunner) Preflight(context.Context, config.Profile) (*providers.ProviderStatus, error) {
@@ -76,6 +87,26 @@ func (r *fakeRunner) Execute(ctx context.Context, _ config.Profile, plan wizard.
 func (r *fakeRunner) Rollback(context.Context, config.Profile, *wizard.Stack) ([]wizard.CleanupResult, error) {
 	r.rollbackCalls++
 	return r.rollbackResult, r.rollbackErr
+}
+
+func (r *fakeRunner) RestartApp(context.Context, config.Profile, string) error {
+	r.restartCalls++
+	return r.restartErr
+}
+
+func (r *fakeRunner) RenewSSL(context.Context, config.Profile, string) error {
+	r.renewCalls++
+	return r.renewErr
+}
+
+func (r *fakeRunner) TailLog(context.Context, config.Profile, string, int) ([]byte, error) {
+	r.tailCalls++
+	return r.tailOutput, r.tailErr
+}
+
+func (r *fakeRunner) ListProviderSubdomains(context.Context, config.Profile) ([]providers.Subdomain, error) {
+	r.listCalls++
+	return r.listSubdomains, r.listErr
 }
 
 func newModelWithRunner(t *testing.T, runner tui.WizardRunner) tui.Model {

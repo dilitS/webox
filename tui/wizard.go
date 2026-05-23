@@ -191,6 +191,23 @@ type projectWizardForm struct {
 	rollbackErr     error
 }
 
+type resumeWizardForm struct {
+	snapshot     *wizard.PendingCleanups
+	loadErr      error
+	confirmInput string
+	discarding   bool
+	rollingBack  bool
+	err          string
+	results      []wizard.CleanupResult
+}
+
+func (f resumeWizardForm) discardPhrase() string {
+	if f.snapshot == nil || f.snapshot.WizardID == "" {
+		return "discard pending"
+	}
+	return "discard " + f.snapshot.WizardID
+}
+
 // newProjectWizardForm seeds the form with profile alias + the
 // default stack at index 0. The wizard expects len(profiles) > 0 —
 // the caller is responsible for routing first-run users to the

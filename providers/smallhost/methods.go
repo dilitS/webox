@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,8 +37,28 @@ const (
 	cmdPgsqlAdd     = "pgsql add"
 	cmdPgsqlDel     = "pgsql del"
 	cmdDevilVersion = "devil --version"
+	cmdTail         = "tail"
 	tokenNodeJS     = "nodejs"
 	tokenLE         = "le"
+)
+
+// Log tail bounds. Empty / negative input from the dashboard maps to
+// [defaultTailLines]; anything above [maxTailLines] is silently
+// clamped so a stray UI value cannot ship 1 GB of log to the local
+// process.
+const (
+	defaultTailLines = 200
+	maxTailLines     = 10000
+)
+
+// Well-known log file names a small.pl Node.js subdomain emits. The
+// adapter tails both unconditionally: missing files are not an
+// adapter-level error because the operator may not have generated
+// traffic yet. The remote `tail` exits 1 in that case but still
+// writes a useful diagnostic on stderr, which we surface verbatim.
+const (
+	logFileNode  = "node.log"
+	logFileError = "error.log"
 )
 
 // exitCLINotFound is the conventional exit status used by shells when
@@ -45,11 +66,6 @@ const (
 // to providers.ErrCLINotFound so the doctor flow can surface an
 // actionable diagnostic.
 const exitCLINotFound = 127
-
-// nowFn is the seam used by [Provider.CheckStatus] to measure
-// latency. Tests substitute a stub clock to make the latency field
-// deterministic.
-var nowFn = time.Now
 
 // dbNamePattern guards database / table identifiers before they
 // reach `devil mysql add` or `devil pgsql add`. SQL identifier
@@ -234,14 +250,64 @@ func (p *Provider) RemoveDatabase(ctx context.Context, dbType, dbName string) er
 	return parseDBDelete(combine(out))
 }
 
+// TailLog returns the last `lines` log entries from the Node.js
+// stdout/stderr files (`node.log` + `error.log`) under
+// [Provider.GetLogPath]. The remote `tail` exits 1 when one of the
+// files does not exist yet (no traffic, no panel-side restart) — the
+// adapter swallows that case and returns the combined stdout/stderr
+// because the message is the most useful thing the operator can see.
+//
+// `lines` is bounded: zero or negative values resolve to
+// [defaultTailLines]; values above [maxTailLines] are silently
+// clamped. The line count is the only user-controlled token in the
+// command; `domain` is validated through [ValidateDomain] before the
+// path is built so shell metacharacters can never reach the remote
+// shell.
+func (p *Provider) TailLog(ctx context.Context, domain string, lines int) ([]byte, error) {
+	if err := ValidateDomain(domain); err != nil {
+		return nil, fmt.Errorf("%w: %w", providers.ErrInvalidProviderConfig, err)
+	}
+	lines = clampTailLines(lines)
+	logDir := p.GetLogPath(domain)
+	if logDir == "" {
+		return nil, fmt.Errorf("%w: log path unavailable", providers.ErrInvalidProviderConfig)
+	}
+	cmd := strings.Join([]string{
+		cmdTail,
+		"-n", strconv.Itoa(lines),
+		"--",
+		joinPath(logDir, logFileNode),
+		joinPath(logDir, logFileError),
+	}, " ")
+	out, err := p.exec(ctx, cmd)
+	if err != nil {
+		if out.ExitCode > 0 {
+			return combine(out), nil
+		}
+		return nil, err
+	}
+	return out.Stdout, nil
+}
+
+func clampTailLines(n int) int {
+	if n <= 0 {
+		return defaultTailLines
+	}
+	if n > maxTailLines {
+		return maxTailLines
+	}
+	return n
+}
+
 // CheckStatus runs the cheap probe required by the dashboard's
 // health badge: it confirms the panel CLI exists and reports its
 // version. ErrCLINotFound is returned when the remote shell reports
 // exit 127 ("command not found").
 func (p *Provider) CheckStatus(ctx context.Context) (*providers.ProviderStatus, error) {
-	start := nowFn()
+	now := p.clock()
+	start := now()
 	out, err := p.exec(ctx, cmdDevilVersion)
-	elapsed := nowFn().Sub(start)
+	elapsed := now().Sub(start)
 	latencyMS := int(elapsed / time.Millisecond)
 	if err != nil {
 		return &providers.ProviderStatus{

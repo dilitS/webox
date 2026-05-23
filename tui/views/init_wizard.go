@@ -25,9 +25,9 @@ const (
 )
 
 // RenderInitWizard renders the read-only first-run shell for the
-// init wizard. Step 0 (Welcome) keeps the Sprint 04 silhouette; the
-// form steps render the live input value, helper text, and any
-// validation error.
+// init wizard. Step 0 (Welcome) renders the systemic pre-requisites
+// silhouette; the form steps render the live input value, helper
+// text, and any validation error.
 func RenderInitWizard(s Screen) string {
 	width := clamp(s.Width, initWizardMinWidth, initWizardMaxWidth)
 	body := renderInitStep(s, width-initWizardPanelGutter)
@@ -84,7 +84,8 @@ func renderInitWelcome(s Screen, panelWidth int) string {
 			"Path: ~/.ssh/id_ed25519_webox",
 			"Fingerprint: deferred to v0.2 (auto-inject flow)",
 			"",
-			"Sprint 05 captures the profile only; keypair work lands in v0.2.",
+			"Webox captures the SSH profile only at this stage; keypair",
+			"generation and auto-deploy to the host land in v0.2.",
 		}, "\n")),
 		"",
 		"[ Enter ] Continue   [ Esc ] Quit",

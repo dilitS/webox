@@ -3,13 +3,18 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"sync/atomic"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/dilitS/webox/internal/version"
 	doctorservice "github.com/dilitS/webox/services/doctor"
+	ghsvc "github.com/dilitS/webox/services/github"
+	"github.com/dilitS/webox/tui"
 )
 
 func TestRun_Version_PrintsVersionLine(t *testing.T) {
@@ -198,6 +203,51 @@ func TestRunWith_DoctorDispatchesJSON(t *testing.T) {
 	}
 }
 
+func TestRunWith_DoctorGitHubRoutesToGitHubDispatcher(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		args     []string
+		wantJSON bool
+	}{
+		{"text", []string{"doctor", "github"}, false},
+		{"json after target", []string{"doctor", "github", "--json"}, true},
+		{"json before target", []string{"doctor", "--json", "github"}, true},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var ghCalls atomic.Int32
+			var gotJSON atomic.Bool
+			ghStub := func(jsonOutput bool, stdout, stderr io.Writer) int {
+				ghCalls.Add(1)
+				gotJSON.Store(jsonOutput)
+				_, _ = stdout.Write([]byte("gh doctor\n"))
+				return 0
+			}
+			coreStub, coreCalls := stubDispatcher(t, 0, false, "core doctor\n", "")
+
+			var stdout, stderr bytes.Buffer
+			got := runWithFullDeps(tt.args, &stdout, &stderr, coreStub, ghStub, brokenTUI)
+			if got != 0 {
+				t.Fatalf("exit = %d, want 0; stderr=%q", got, stderr.String())
+			}
+			if ghCalls.Load() != 1 {
+				t.Fatalf("github dispatcher called %d, want 1", ghCalls.Load())
+			}
+			if coreCalls.Load() != 0 {
+				t.Fatalf("core dispatcher should not be called for github target, got %d", coreCalls.Load())
+			}
+			if gotJSON.Load() != tt.wantJSON {
+				t.Fatalf("json flag forwarded = %t, want %t", gotJSON.Load(), tt.wantJSON)
+			}
+		})
+	}
+}
+
 func TestRun_JSONWithoutDoctorReturnsMisuse(t *testing.T) {
 	t.Parallel()
 
@@ -300,3 +350,110 @@ type brokenWriter struct{}
 func (brokenWriter) Write([]byte) (int, error) {
 	return 0, io.ErrShortWrite
 }
+
+// stubTeaRunner is the in-memory teaRunner used by runTUIWith tests
+// to assert the TUI dispatcher wires the model + writers without
+// spinning up a real Bubble Tea program (which would race against
+// stdin).
+type stubTeaRunner struct {
+	err error
+}
+
+func (s stubTeaRunner) Run() (tea.Model, error) { return nil, s.err }
+
+func TestParseArgs_DoctorTargetCannotBeChangedTwice(t *testing.T) {
+	t.Parallel()
+	_, errMsg := parseArgs([]string{"doctor", "github", "github"})
+	if errMsg != "" {
+		t.Fatalf("second `github` should be idempotent, got %q", errMsg)
+	}
+}
+
+func TestParseArgs_GithubBeforeDoctorIsMisuse(t *testing.T) {
+	t.Parallel()
+	_, errMsg := parseArgs([]string{"github"})
+	if !strings.Contains(errMsg, "only valid after `doctor`") {
+		t.Fatalf("errMsg = %q, want hint about doctor", errMsg)
+	}
+}
+
+func TestRunTUIWith_ResolveConfigFailureReturnsMisuse(t *testing.T) {
+	t.Parallel()
+
+	resolveErr := errors.New("home directory unset")
+	resolve := func() (string, error) { return "", resolveErr }
+	stubProgram := func(_ tea.Model, _ io.Writer) teaRunner { return stubTeaRunner{} }
+
+	var stdout, stderr bytes.Buffer
+	got := runTUIWith(&stdout, &stderr, resolve, stubProgram, nil)
+	if got != exitMisuse {
+		t.Fatalf("exit = %d, want %d", got, exitMisuse)
+	}
+	if !strings.Contains(stderr.String(), "resolve config path") {
+		t.Fatalf("stderr = %q, want resolve hint", stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+}
+
+func TestRunTUIWith_ProgramFailureReturnsMisuse(t *testing.T) {
+	t.Parallel()
+
+	resolve := func() (string, error) { return "/tmp/config.json", nil }
+	stubProgram := func(_ tea.Model, _ io.Writer) teaRunner {
+		return stubTeaRunner{err: errors.New("tea: program crashed")}
+	}
+
+	var stdout, stderr bytes.Buffer
+	got := runTUIWith(&stdout, &stderr, resolve, stubProgram, nil)
+	if got != exitMisuse {
+		t.Fatalf("exit = %d, want %d", got, exitMisuse)
+	}
+	if !strings.Contains(stderr.String(), "TUI failed") {
+		t.Fatalf("stderr = %q, want TUI failed hint", stderr.String())
+	}
+}
+
+func TestRunTUIWith_HappyPathReturnsOK(t *testing.T) {
+	t.Parallel()
+
+	resolve := func() (string, error) { return "/tmp/config.json", nil }
+
+	var receivedModel tea.Model
+	stubProgram := func(model tea.Model, _ io.Writer) teaRunner {
+		receivedModel = model
+		return stubTeaRunner{}
+	}
+
+	var stdout, stderr bytes.Buffer
+	got := runTUIWith(&stdout, &stderr, resolve, stubProgram, nil)
+	if got != exitOK {
+		t.Fatalf("exit = %d, want %d", got, exitOK)
+	}
+	if receivedModel == nil {
+		t.Fatal("teaProgramFactory was never called with a model")
+	}
+}
+
+func TestDefaultGitHubLastDeployFetcher_ProducesNonNilFunc(t *testing.T) {
+	t.Parallel()
+
+	fetcher := defaultGitHubLastDeployFetcher()
+	if fetcher == nil {
+		t.Fatal("defaultGitHubLastDeployFetcher returned nil")
+	}
+
+	// Invoke with a deliberately bogus ref so we exercise the
+	// transport error path rather than relying on live GitHub.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := fetcher(ctx, ghsvc.RepoRef{Owner: "owner", Name: "name"}, "deploy.yml")
+	if err == nil {
+		t.Fatal("expected error from cancelled context, got nil")
+	}
+}
+
+// Ensure the seam types are still exported through compile-time
+// usage so the linter does not flag them as unused.
+var _ = tui.GitHubLastDeployFetcher(nil)

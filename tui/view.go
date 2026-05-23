@@ -18,8 +18,12 @@ func (m Model) View() string {
 		return views.RenderProjectDetail(screen)
 	case StateProjectWizard:
 		return views.RenderProjectWizard(screen)
+	case StateResumeWizard:
+		return views.RenderResumeWizard(screen)
+	case StateImportPreview:
+		return views.RenderImportPreview(screen)
 	default:
-		return m.styles.Panel.Render(fmt.Sprintf("%s is not enabled in Sprint 05", m.state))
+		return m.styles.Panel.Render(fmt.Sprintf("%s is not enabled", m.state))
 	}
 }
 
@@ -57,7 +61,49 @@ func (m Model) screen() views.Screen {
 		Styles:        m.styles,
 		InitForm:      initFormSnapshot(m.initForm),
 		ProjectForm:   projectFormSnapshot(m.projectForm),
+		ResumeForm:    resumeFormSnapshot(m.resumeForm),
+		ActionForm:    actionFormSnapshot(m.actionForm),
+		ImportForm:    importFormSnapshot(m),
 	}
+}
+
+func importFormSnapshot(m Model) views.ImportPreviewSnapshot {
+	snap := views.ImportPreviewSnapshot{
+		Loading: m.importForm.Loading,
+		Saving:  m.importForm.Saving,
+		Err:     m.importForm.Err,
+	}
+	for _, row := range m.importForm.Rows {
+		snap.Rows = append(snap.Rows, views.ImportRowSnapshot{
+			ProfileAlias: row.ProfileAlias,
+			Domain:       row.Domain,
+			Type:         row.Type,
+			NodeVersion:  row.NodeVersion,
+			Managed:      row.Managed,
+		})
+		if row.Managed {
+			snap.Managed++
+		} else {
+			snap.Unmanaged++
+		}
+	}
+	snap.Total = len(snap.Rows)
+	return snap
+}
+
+func actionFormSnapshot(f projectActionForm) views.ProjectActionSnapshot {
+	snap := views.ProjectActionSnapshot{
+		Kind:      string(f.Kind),
+		ProjectID: f.ProjectID,
+		Running:   f.Running,
+	}
+	if f.Output != nil {
+		snap.Output = string(f.Output)
+	}
+	if f.Err != nil {
+		snap.Err = f.Err.Error()
+	}
+	return snap
 }
 
 func initFormSnapshot(f initWizardForm) views.InitWizardSnapshot {
@@ -115,4 +161,31 @@ func errString(err error) string {
 		return ""
 	}
 	return err.Error()
+}
+
+func resumeFormSnapshot(f resumeWizardForm) views.ResumeWizardSnapshot {
+	snap := views.ResumeWizardSnapshot{
+		Err:           f.err,
+		Discarding:    f.discarding,
+		DiscardPhrase: f.discardPhrase(),
+		ConfirmInput:  f.confirmInput,
+		RollingBack:   f.rollingBack,
+	}
+	if f.snapshot != nil {
+		snap.WizardID = f.snapshot.WizardID
+		snap.ProfileAlias = f.snapshot.ProfileAlias
+		if !f.snapshot.UpdatedAt.IsZero() {
+			snap.UpdatedAt = f.snapshot.UpdatedAt.Format("2006-01-02 15:04:05 UTC")
+		}
+		for _, step := range f.snapshot.Steps {
+			snap.StepNames = append(snap.StepNames, step.Name)
+		}
+	}
+	for _, result := range f.results {
+		snap.Results = append(snap.Results, views.RollbackResultSnapshot{
+			Name: result.Step.Name,
+			Err:  errString(result.Err),
+		})
+	}
+	return snap
 }

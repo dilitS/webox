@@ -1,14 +1,14 @@
 # Webox — Roadmap
 
-> Status: Stable scope, evolving estimates · Ostatnia aktualizacja: 2026-05-22 · Właściciel: @maintainer
+> Status: Stable scope, evolving estimates · Ostatnia aktualizacja: 2026-05-23 · Właściciel: @maintainer
 >
 > Pokrewne dokumenty: [PRD.md](./PRD.md) (priorytety ficzerów), [DESIGN.md](./DESIGN.md), [adr/](./adr/), [sprints/](./sprints/) (rolling-wave taktyka), [RISKS.md](./RISKS.md).
 
 ## TL;DR
 
-MVP (v0.1) ogranicza się **wyłącznie do small.pl/Devil** i tylko do wybranego wycinka P0 z [PRD §6](./PRD.md#6-ficzery--z-priorytetami). v0.2 dorzuca **jednego, świadomie wybranego** drugiego providera (kandydaci: cPanel, DirectAdmin — wybór po review notatek badawczych), public contributor surface po angielsku, live log stream, GHA monitor i pełny Command Palette. v0.3+ — multi-provider, in-app updater, scaffolding kolejnych stacków, eksport/import konfiguracji. Wersja **v1.0** wymaga 3 mies. stabilności + ścieżki dla community providerów potwierdzonej realnym PR albo jawnie odroczonej w GA review.
+MVP (v0.1) ogranicza się **wyłącznie do small.pl/Devil** i tylko do wybranego wycinka P0 z [PRD §6](./PRD.md#6-ficzery--z-priorytetami). Po decyzji z [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md) MVP **dostarcza pełen Bento Ultra cockpit (`120×35`) z live log stream, GitHub Actions live panel i Service Topology Map** — wcześniej te elementy były 🔶 STRETCH (v0.2+). v0.2 dorzuca **jednego, świadomie wybranego** drugiego providera (kandydaci: cPanel, DirectAdmin — wybór po review notatek badawczych), public contributor surface po angielsku, Env Merger, Sound Engine, fast-chord bindings, multi-provider dashboard agregator i pełny Command Palette. v0.3+ — multi-provider scaling, in-app updater, scaffolding kolejnych stacków, eksport/import konfiguracji. Wersja **v1.0** wymaga 3 mies. stabilności + ścieżki dla community providerów potwierdzonej realnym PR albo jawnie odroczonej w GA review.
 
-**Estymata solo (P50): ~22 tygodnie**. Pełne uzasadnienie w [§3.5](#35-estymata). Sprint plan i taktyka w [`sprints/`](./sprints/). Aktywne ryzyka w [`RISKS.md`](./RISKS.md).
+**Estymata solo (P50): ~27 tygodni** (po eskalacji Bento Ultra z [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md); poprzednio 22 tygodnie). Pełne uzasadnienie w [§3.5](#35-estymata). Sprint plan i taktyka w [`sprints/`](./sprints/). Aktywne ryzyka w [`RISKS.md`](./RISKS.md).
 
 ## Spis treści
 
@@ -71,8 +71,12 @@ GA = `v1.0.0`. Wymagania (wszystkie naraz):
 | 04 | TUI shell | MVU, navigation, dashboard (read-only). |
 | 05 | Wizard tworzenia projektu | 5-step wizard + LIFO rollback + `pending_cleanups.json`. |
 | 06 | GitHub deploy workflow | Deploy keys, fine-grained PAT, embed.FS templates, SSL Let's Encrypt. |
-| 07 | Doctor + diagnostics + i18n | `webox doctor` rozszerzony, i18n PL/EN core screens. |
-| 08 | Polish + release hardening | Bug bash, RC1 → v0.1. |
+| 07 | Import + Doctor GitHub + deploy polish | Real import flow, `webox doctor github`, carry-over from Sprint 06. |
+| 08 | Bento Ultra Layout Engine | Adaptive grid (`100×30`/`120×35`/`160×45`), OKLCH theme refresh, premium components, czyszczenie wycieków „Sprint NN" z UI. Patrz [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md). |
+| 09 | Live Log Stream | SSH `tail -f` + ring buffer + ANSI level coloring + redactor pre-render + header bar server metrics. |
+| 10 | Live CI/CD Pipeline Panel | Live GitHub Actions workflow steps, click-through do logów; nadbudowa na `services/github`. |
+| 11 | Live Service Topology Map | ASCII graph GitHub → Server → App ← DB z live edge animations. |
+| 12 | Polish + release hardening | Bug bash, RC1 → v0.1. |
 
 Pełna dekompozycja per sprint: [`sprints/`](./sprints/).
 
@@ -87,14 +91,21 @@ Lista P0 z [PRD §6](./PRD.md#6-ficzery--z-priorytetami) (skrócone IDs):
 - **F5** Status check.
 - **F6** Restart aplikacji.
 - **F7** SSL Let's Encrypt — issue + renew.
-- **F8** Podgląd logów (tail ostatnich N linii — **nie** live stream).
+- **F8** Podgląd logów (tail ostatnich N linii) **+ F14 Live log stream** (`tail -f` via SSH, ring buffer w UI, ANSI level coloring, redactor pre-render). Eskalowane do P0 przez [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md).
 - **F9** Import istniejących projektów (`/import`).
 - **F10** Rollback transakcyjny kreatora + `pending_cleanups.json`.
 - **F11** Sekrety w keyringu + fallback AES-GCM.
 - **F12 (minimalne)** Command Palette z `/create`, `/provider`, `/import`, `/settings`.
+- **F15** Deployment Monitor — Live GitHub Actions panel z workflow steps + click-through do logów. Eskalowane do P0 przez [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md).
 - **F21 (częściowe)** Scaffolding `Vite + React`, `Node.js (Express)`, `Static site`. Next/Nuxt → v0.2.
 - **F23** Stale projects detection.
 - **F24 (zewnętrzny)** Update przez `brew` / `go install` / GH Releases — brak in-app updatera.
+
+**Premium UX cockpit** (eskalowane do MVP przez [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md)):
+
+- **Bento Ultra adaptive layout** (`100×30` / `120×35` / `160×45`) z OKLCH theming, dynamic layering i premium badges/components z [UX §2-3](./UX.md#2-design-system-20).
+- **Live Service Topology Map** — wizualny graf zależności (GitHub → Server → App ← DB) z [UX §3.4](./UX.md#34-wizualny-graf-topologii-us%C5%82ug-live-service-topology-map).
+- **Header bar server metrics** — server uptime/load/RAM/RTT via SSH polling.
 
 ### 3.2 Zakres techniczny
 
@@ -111,12 +122,16 @@ Lista P0 z [PRD §6](./PRD.md#6-ficzery--z-priorytetami) (skrócone IDs):
 ### 3.3 Czego NIE ma w MVP
 
 - **Brak** `/db`, `/env`, `/storage`, `/domain` jako interaktywne sub-widoki. Po wybraniu z palette → komunikat `coming in v0.2`.
-- **Brak** live log stream.
-- **Brak** GitHub Actions Monitor (status workflow runs widoczny w `last_deploy.status`, ale bez logów workflow).
+- **Brak** Env Merger (`TUI .env diff/merge`) — STRETCH v0.2+.
+- **Brak** Sound Engine i fast-chord bindings — STRETCH v0.2+.
+- **Brak** multi-provider dashboard agregatora (cocfig.json wspiera multi-profile od dnia 1, ale UI ogranicza wybór do jednego aktywnego profilu w MVP).
+- **Brak** Bento Ultra+ (`≥ 160×45`) — MVP target = Bento Ultra `120×35` po eskalacji z [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md); `160×45` to v0.2+ rozszerzenie.
 - **Brak** drugiego providera (mock nie liczy się).
 - **Brak** in-app updatera.
 - **Brak** CLI flags do skryptowania (poza `webox doctor`).
 - **Brak** długiego ogona lokalizacji (DE/ES/FR itd.) i pełnego coverage tłumaczeń we wszystkich przyszłych sub-widokach. `v0.1` utrzymuje tylko `en` i `pl`, z priorytetem dla ekranów core.
+
+> **Uwaga historyczna:** wcześniejsze wersje tej sekcji wymieniały Live Log Stream, GitHub Actions Monitor i Bento Ultra w „NIE w MVP". Po [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md) (2026-05-23) te elementy są w P0 — patrz [§3.1](#31-zakres-ficzerowy).
 
 ### 3.4 Kryteria wypuszczenia v0.1
 
@@ -132,24 +147,25 @@ Lista P0 z [PRD §6](./PRD.md#6-ficzery--z-priorytetami) (skrócone IDs):
 
 | Percentyl | Czas (tyg) | Komentarz |
 |-----------|------------|-----------|
-| P50 | **22** | Median scenario, brak większych blokerów. |
-| P70 | 26 | Jeden większy spike (np. crypto rework, parser overhaul). |
-| P90 | 32 | Wystąpi 1-2 ryzyka z [`RISKS.md`](./RISKS.md) (R-001, R-002, R-004). |
+| P50 | **27** | Median scenario, brak większych blokerów. Wzrost z 22 → 27 tyg po [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md) (eskalacja Bento Ultra + live logs + GHA panel + topology do MVP). |
+| P70 | 32 | Jeden większy spike (np. live log stream perf, layout engine snapshot baseline). |
+| P90 | 38 | Wystąpi 1-2 ryzyka z [`RISKS.md`](./RISKS.md) (R-001, R-002, R-004) + premium UX cockpit overhead. |
 
-**Dwuosobowy zespół (każdy 25h/tydzień):** 10-14 tygodni (P50: 12).
+**Dwuosobowy zespół (każdy 25h/tydzień):** 13-17 tygodni (P50: 15).
 
-**Ścieżka krytyczna** (`~60% czasu`):
+**Ścieżka krytyczna** (`~65% czasu`):
 
 1. SSH layer + connection pool (Sprint 02).
 2. Provider Pattern + `small.pl` adapter (Sprint 03).
 3. Wizard z LIFO rollback (Sprint 05).
 4. GitHub Actions integracja + workflow templates (Sprint 06).
+5. **Bento Ultra layout engine + Live Log Stream** (Sprint 08-09, po [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md)).
 
-**Reszta** (`~40%`): TUI polish, testy live z `small.pl`, fixture capture, release hardening, contributor-facing docs EN, dogłębne security review.
+**Reszta** (`~35%`): TUI polish, testy live z `small.pl`, fixture capture, release hardening, contributor-facing docs EN, dogłębne security review, CI/CD panel + topology map (Sprint 10-11).
 
-**Sprint cadence:** ~9 sprintów (00-08) × 1-2 tyg, planowane rolling-wave. Pełna metodologia w [`sprints/README.md`](./sprints/README.md).
+**Sprint cadence:** ~13 sprintów (00-12) × 1-2 tyg, planowane rolling-wave. Pełna metodologia w [`sprints/README.md`](./sprints/README.md).
 
-> ⚠️ **Honest disclaimer:** historyczna dokładność estymat solo-devów to 1.5×-2.5× pierwotnej wartości. Re-baseline ROADMAP planowany po sprincie 03 (mamy wtedy 3 punkty rzeczywistej velocity).
+> ⚠️ **Honest disclaimer:** historyczna dokładność estymat solo-devów to 1.5×-2.5× pierwotnej wartości. Re-baseline ROADMAP wykonane po Sprint 06 (mamy 6 punktów rzeczywistej velocity) — kolejny re-baseline po Sprint 09 (live log stream ma najwyższe ryzyko estymowe).
 
 ## 4. v0.2 — drugi provider + dokończenie palette
 
@@ -171,13 +187,16 @@ Decyzja **po review** notatek badawczych ([providers/cpanel.md](./providers/cpan
 
 - **Drugi provider** (cPanel **lub** DirectAdmin — jeden, **porządnie**).
 - **F12 pełne Command Palette** — `/db`, `/env`, `/storage`, `/domain`.
-- **F14** Live log stream (`tail -f` via SSH, ring buffer w UI).
-- **F15** GitHub Actions monitor: progress workflow runs + logi job-ów.
+- **Env Merger** — interactive `.env` diff/merge (`UX.md §9.3`).
+- **Sound Engine + fast-chord bindings** (`UX.md §12`, `g r` / `g d` / etc.).
+- **Bento Ultra+ (`≥ 160×45`)** — rozszerzenie premium tier o dodatkowe kafelki (TTL panels, multi-server agregator).
 - **F17** Cert expiry monitoring + OS notifications (opt-in).
-- **F18** Multi-provider — wybór profilu na dashboardzie, agregacja projektów z różnych providerów.
+- **F18** Multi-provider dashboard agregator — wybór profilu na dashboardzie, agregacja projektów z różnych providerów.
 - **F21 pełne** scaffolding — Next.js + Nuxt + dodatkowe stack'i.
 - Rozszerzenie coverage tłumaczeń poza ekrany core + pierwsze community packi (`de`, `es`, `fr`, ...).
 - **Coverage** ≥ 75 %.
+
+> **Uwaga historyczna:** wcześniejsze wersje tej sekcji wymieniały F14 (live log stream), F15 (GHA monitor) i Bento Ultra w v0.2. Po [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md) (2026-05-23) te elementy dostarczamy w v0.1 — patrz [§3.1](#31-zakres-ficzerowy).
 
 ### 4.3 Czego nie ma w v0.2
 

@@ -21,6 +21,22 @@ const (
 	// ResourceDatabase maps to [providers.HostingProvider.RemoveDatabase].
 	// Params: {"dbKind": "mysql|postgresql", "dbName": "<identifier>"}.
 	ResourceDatabase ResourceKind = "database"
+
+	// ResourceGitHubRepo removes a repository created by the wizard.
+	// Params: {"owner": "<owner>", "repo": "<name>"}.
+	ResourceGitHubRepo ResourceKind = "github_repo"
+
+	// ResourceGitHubDeployKey removes a repository deploy key.
+	// Params: {"owner": "<owner>", "repo": "<name>", "keyID": "<decimal id>"}.
+	ResourceGitHubDeployKey ResourceKind = "github_deploy_key"
+
+	// ResourceGitHubActionsSecret removes one Actions secret.
+	// Params: {"owner": "<owner>", "repo": "<name>", "name": "<secret name>"}.
+	ResourceGitHubActionsSecret ResourceKind = "github_actions_secret" //nolint:gosec // G101: resource kind metadata, not a secret value.
+
+	// ResourceGitHubWorkflowFile removes the generated deploy workflow file.
+	// Params: {"owner": "<owner>", "repo": "<name>", "path": ".github/workflows/deploy.yml", "branch": "main"}.
+	ResourceGitHubWorkflowFile ResourceKind = "github_workflow_file"
 )
 
 // CleanupStep is the persisted record of a rollback action. Every

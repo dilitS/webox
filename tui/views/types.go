@@ -61,6 +61,55 @@ type RollbackResultSnapshot struct {
 	Err  string
 }
 
+// ResumeWizardSnapshot is the view-layer copy of resume-on-launch state.
+type ResumeWizardSnapshot struct {
+	WizardID      string
+	ProfileAlias  string
+	UpdatedAt     string
+	StepNames     []string
+	Err           string
+	Discarding    bool
+	DiscardPhrase string
+	ConfirmInput  string
+	RollingBack   bool
+	Results       []RollbackResultSnapshot
+}
+
+// ProjectActionSnapshot is the view-layer copy of the active /
+// last-completed dashboard action (restart / ssl renew / log tail).
+// Kind == "" means no action ever ran for the current session.
+type ProjectActionSnapshot struct {
+	Kind      string
+	ProjectID string
+	Running   bool
+	Output    string
+	Err       string
+}
+
+// ImportRowSnapshot is the view-layer row in the import preview
+// table. Managed reflects whether the local config already knows
+// about the domain.
+type ImportRowSnapshot struct {
+	ProfileAlias string
+	Domain       string
+	Type         string
+	NodeVersion  string
+	Managed      bool
+}
+
+// ImportPreviewSnapshot is the view-layer copy of the import-preview
+// form. Loading=true while the scan command is in flight; Err is the
+// stringified scan error when the runner failed.
+type ImportPreviewSnapshot struct {
+	Loading   bool
+	Saving    bool
+	Err       string
+	Rows      []ImportRowSnapshot
+	Total     int
+	Managed   int
+	Unmanaged int
+}
+
 // Screen contains the immutable data needed by pure render functions.
 type Screen struct {
 	Width         int
@@ -75,4 +124,7 @@ type Screen struct {
 	Styles        theme.Styles
 	InitForm      InitWizardSnapshot
 	ProjectForm   ProjectWizardSnapshot
+	ResumeForm    ResumeWizardSnapshot
+	ActionForm    ProjectActionSnapshot
+	ImportForm    ImportPreviewSnapshot
 }

@@ -1,0 +1,9 @@
+# Golden needles for stripped review state at 100x30.
+New project wizard
+Step 5/6: Review
+Profile: main
+Stack:   vite-react
+Domain:  app.demo.smallhost.pl
+Node:    22
+DB:      skip
+Press Enter to provision

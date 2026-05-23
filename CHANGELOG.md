@@ -15,7 +15,65 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ## [Unreleased]
 
+### Changed
+- **MVP scope (v0.1) significantly expanded by [ADR-0007](./docs/adr/0007-bento-ultra-eskalacja-mvp.md):** Bento Ultra adaptive layout (`100×30` / `120×35` / `160×45`), Live Log Stream (`tail -f` via SSH with ring buffer + ANSI level coloring + pre-render redaction), Live CI/CD Pipeline Panel (live GitHub Actions workflow steps + click-through logs), and Live Service Topology Map are now in v0.1 — previously they were 🔶 STRETCH (v0.2+). Roadmap re-baselined from P50 22 → 27 weeks, P70 32 → 35 weeks. Four new sprints added: 08 (Bento Ultra Layout Engine + OKLCH theme + sprint-leak cleanup), 09 (Live Log Stream + Header Bar Metrics), 10 (CI/CD Panel), 11 (Topology Map). Rationale: brand promise of "Terminal Cockpit klasy premium" from PRD §3 and UX TL;DR requires premium visual layer in MVP, not v0.2+ — early-adopter perception of v0.1 matters more than +5-week delay. v0.2 reshuffled to focus on second provider, Env Merger, Sound Engine, fast-chord bindings, and multi-provider dashboard aggregator (instead of catching up on visual layer).
+
 ### Added
+- ADR-0007 — explicit override of the [AGENTS.md §2.4](./AGENTS.md#24-scope-discipline) scope-discipline guardrail to escalate Bento Ultra, Live Log Stream, GHA live panel, and Topology Map from STRETCH (v0.2+) to MVP (v0.1). Cross-linked from PRD §6 (F14/F15 P1→P0), ROADMAP §3.0/§3.1/§3.3/§3.5/§4.2, AGENTS §3.1/§3.2, UX TL;DR/§3.4/§4.2/§4.3 Tab [4]. Sprint plans `sprint-08-bento-ultra.md`, `sprint-09-live-log-stream.md`, `sprint-10-cicd-panel.md`, `sprint-11-topology-map.md` created with full task breakdown, AC, risk watch, and outcome templates.
+- TUI project actions (Sprint 07 push toward production): `[r] Restart`,
+  `[s] SSL Renew`, and `[v] Tail Logs` on the project-detail screen,
+  wired through a new `WizardRunner.{RestartApp,RenewSSL,TailLog,
+  ListProviderSubdomains}` seam. Restart and renew invalidate the
+  matching `status.Cache` prefix on success; tail logs renders the
+  last 200 lines inside a scoped panel. `providers.HostingProvider`
+  gained `TailLog(ctx, domain, lines)` with line-count clamping
+  (`defaultTailLines=200`, `maxTailLines=10000`), and the small.pl
+  adapter ships an implementation that tails `node.log` + `error.log`
+  while treating "missing file" exit codes as soft errors.
+- `webox doctor github [--json]` — read-only GitHub integration
+  diagnostics in `services/doctor/github.go`. Checks the `gh` CLI
+  presence on PATH, parses `gh auth status` (with PAT redaction via
+  `internal/log.Redact`), probes `GET /rate_limit` through the gh
+  transport, and reports keyring slot presence for the default PAT
+  account. CLI argument parser now treats `github` as a subcommand
+  for `webox doctor`, and `--json` is forwarded regardless of
+  position.
+- Dashboard `last_deploy` integration: `tui.FetchProjectStatusesWithGitHub`
+  resolves the most recent workflow run per project through a SWR
+  cache (`gh:lastDeploy:<owner>/<repo>:<workflow>`, 60s TTL) and
+  formats it as `2m ago · success`. The production wiring lives in
+  `cmd/webox`; nil fetchers degrade gracefully to a `—` placeholder
+  so the dashboard never blocks on GitHub.
+- Read-only import preview (PRD F9): pressing `i` on the dashboard
+  scans every configured profile for subdomains via
+  `WizardRunner.ListProviderSubdomains`, joins them with
+  `config.Projects`, and shows a managed/new diff. Accepting with
+  `a` writes stub `config.Project` entries for the unmanaged rows
+  with `ImportedAt` set; no server resource is mutated. The new
+  `StateImportPreview` route lives alongside the existing wizard
+  states.
+- `services/github/` — minimal GitHub integration for Sprint 06 with
+  `gh` CLI as the primary transport, REST+PAT fallback, repository
+  creation, deploy keys, Actions secrets via sealed-box encryption,
+  workflow dispatch, latest-run polling, workflow-file commits, and
+  metadata-only cleanup methods for LIFO rollback.
+- `assets/workflows/` and `wizard/workflow_validate.go` — embedded
+  deploy workflow templates for `vite-react`, `node-express`, and
+  `static`; all GitHub Actions `uses:` references are pinned to full
+  40-character SHAs and rendered workflow fields reject GitHub
+  expression / shell injection.
+- Resume-on-launch for `pending_cleanups.json`: the TUI now opens a
+  Resume Wizard when an interrupted LIFO snapshot exists, supports
+  rollback from the loaded stack, keep-and-exit, and phrase-confirmed
+  discard.
+- `wizard.ExecuteGitHubProvision` — GitHub-side wizard sequencing for
+  repo creation, deploy key, Actions secrets, workflow file commit, and
+  workflow dispatch, with cleanup steps persisted after every successful
+  external mutation.
+- TUI regression coverage for Sprint 06: keymap matrix tests for wizard
+  text-vs-picker behavior, Resume Wizard tests, and committed golden
+  view fixtures for init/project wizard review states at 80×24 and
+  100×30.
 - `docs/sprints/sprint-06-github-deploy-workflow.md` —
   rolling-wave plan for Sprint 06 closing the MVP path: resume on
   launch for `pending_cleanups.json`, `services/github` minimal
@@ -92,8 +150,37 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   not only when the file is absent. This lets the TUI route any
   zero-profile install (including hand-edited configs) through the
   init wizard instead of dropping the user on an empty dashboard.
+- `wizard/plan.go` no longer imports `providers/smallhost` directly.
+  `ValidatePlan` now accepts a `providers.PlanValidators` set
+  resolved from the new validator registry, so the wizard layer can
+  drive any registered provider without a compile-time dependency on
+  a concrete adapter. `providers/validators.go` exposes
+  `RegisterPlanValidators` / `PlanValidatorsFor` with sentinel
+  `ErrUnknownValidator` / `ErrInvalidValidatorSet` errors, and
+  `wizard.Execute` resolves validators from the provider's name.
+- `smallhost.Provider` carries an injectable `now func() time.Time`
+  clock instead of the package-level `nowFn`. The shared mutable
+  global is gone, which removes a `t.Parallel()` race vector and
+  lets tests assert latency calculations deterministically via
+  `SetClock`.
+- `cmd/webox/run.go` factors the TUI bootstrap into
+  `runTUIWith(configPathResolver, teaProgramFactory, teaRunner)`
+  seams so the CLI's failure paths (config lookup, program build,
+  program run) are unit-testable without a real terminal.
+
+### Fixed
+- `services/doctor/github.go` `parseGHAccount` now strips the leading
+  `✓` (or `x`) status glyph that `gh` 2.40+ prepends to the
+  "Logged in to ..." line. Without this, `webox doctor github`
+  reported WARN ("no active account was parsed") for properly
+  authenticated users on modern `gh` releases.
 
 ### Security
+- GitHub PAT and Actions secret handling now has explicit redaction and
+  non-leak tests: CLI/REST errors are filtered through the project
+  redactor, Actions secret plaintext is passed only through stdin or
+  sealed-box ciphertext, and GitHub rollback snapshots carry only
+  metadata, never token or key material.
 - Every `wizard.Stack.Push` rejects `CleanupStep.Params` values that
   match the project-wide secret regex corpus (same source as
   `internal/log/redact.go`). Tests in `wizard/rollback_test.go` and

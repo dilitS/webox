@@ -22,15 +22,16 @@ type StatusFetcher func(context.Context, []config.Project, *status.Cache) ([]Pro
 
 // Options configures a TUI model without using package globals.
 type Options struct {
-	ConfigPath      string
-	PendingPath     string
-	Cache           *status.Cache
-	FetchStatuses   StatusFetcher
-	RefreshInterval time.Duration
-	InitialWidth    int
-	InitialHeight   int
-	NewContext      func() (context.Context, context.CancelFunc)
-	WizardRunner    WizardRunner
+	ConfigPath       string
+	PendingPath      string
+	Cache            *status.Cache
+	FetchStatuses    StatusFetcher
+	GitHubLastDeploy GitHubLastDeployFetcher
+	RefreshInterval  time.Duration
+	InitialWidth     int
+	InitialHeight    int
+	NewContext       func() (context.Context, context.CancelFunc)
+	WizardRunner     WizardRunner
 }
 
 // Model contains all mutable TUI state. It is copied by value by Update,
@@ -58,9 +59,36 @@ type Model struct {
 
 	initForm     initWizardForm
 	projectForm  projectWizardForm
+	resumeForm   resumeWizardForm
+	actionForm   projectActionForm
+	importForm   importPreviewForm
 	wizardRunner WizardRunner
 	wizardStack  *wizardStackSlot
 	pendingPath  string
+}
+
+// importPreviewForm holds in-memory state for the read-only import
+// preview (PRD F9). Loading is true while the scan command is in
+// flight; Rows is the joined view of provider subdomains × local
+// projects; Err captures any scan failure so the renderer can flag it
+// without crashing.
+type importPreviewForm struct {
+	Loading bool
+	Rows    []ImportRow
+	Err     string
+	Saving  bool
+}
+
+// projectActionForm holds the in-memory state of a dashboard action
+// (restart / ssl renew / log tail). Empty Kind == no action in
+// flight; the renderer keeps the last completed action visible so the
+// operator can read the output before triggering the next one.
+type projectActionForm struct {
+	Kind      ProjectActionKind
+	ProjectID string
+	Running   bool
+	Output    []byte
+	Err       error
 }
 
 // New creates a pure initial model. I/O starts only when Init returns a Cmd.
@@ -69,7 +97,10 @@ func New(opts Options) Model {
 		opts.Cache = status.NewCache(status.Options{})
 	}
 	if opts.FetchStatuses == nil {
-		opts.FetchStatuses = FetchProjectStatuses
+		fetcher := opts.GitHubLastDeploy
+		opts.FetchStatuses = func(ctx context.Context, projects []config.Project, cache *status.Cache) ([]ProjectStatus, error) {
+			return FetchProjectStatusesWithGitHub(ctx, projects, cache, fetcher)
+		}
 	}
 	if opts.RefreshInterval <= 0 {
 		opts.RefreshInterval = defaultRefreshInterval
@@ -122,6 +153,28 @@ func (m Model) Alert() string { return m.alert }
 func (m Model) ProjectStatus(projectID string) (ProjectStatus, bool) {
 	got, ok := m.statuses[projectID]
 	return got, ok
+}
+
+// ImportSnapshot exposes the read-only import preview state for
+// renderers and tests. Returns (zero, false) when no scan has run.
+func (m Model) ImportSnapshot() (ImportSnapshot, bool) {
+	if !m.importForm.Loading && len(m.importForm.Rows) == 0 && m.importForm.Err == "" {
+		return ImportSnapshot{}, false
+	}
+	snap := ImportSnapshot{
+		Loading: m.importForm.Loading,
+		Rows:    m.importForm.Rows,
+		Err:     m.importForm.Err,
+		Total:   len(m.importForm.Rows),
+	}
+	for _, row := range m.importForm.Rows {
+		if row.Managed {
+			snap.Managed++
+		} else {
+			snap.Unmanaged++
+		}
+	}
+	return snap, true
 }
 
 func (m Model) withState(state State) Model {

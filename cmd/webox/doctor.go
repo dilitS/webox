@@ -24,6 +24,14 @@ func runDoctor(jsonOutput bool, stdout, stderr io.Writer) int {
 	return runDoctorWith(jsonOutput, stdout, stderr, doctor.NewDefault())
 }
 
+// runDoctorGitHub is the production entry point for
+// `webox doctor github [--json]`. The runner is read-only: it inspects
+// the local gh CLI install, the secrets backend slot, and (when
+// possible) the GitHub rate limit — but never mutates remote state.
+func runDoctorGitHub(jsonOutput bool, stdout, stderr io.Writer) int {
+	return runDoctorWith(jsonOutput, stdout, stderr, doctor.NewGitHubDefault())
+}
+
 // runDoctorWith executes the supplied runner and writes the report to
 // stdout. The render error path goes to stderr — JSON consumers parse
 // stdout, so polluting it with English diagnostics would break their

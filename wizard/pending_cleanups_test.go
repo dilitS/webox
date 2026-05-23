@@ -19,7 +19,8 @@ func TestSaveAndLoadPendingRoundtrip(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "pending_cleanups.json")
 	snap := &wizard.PendingCleanups{
-		WizardID: "wizard-42",
+		WizardID:     "wizard-42",
+		ProfileAlias: "main",
 		Steps: []wizard.CleanupStep{
 			{Name: "remove sub", Kind: wizard.ResourceSubdomain, Params: map[string]string{"domain": "app.demo.smallhost.pl"}, CreatedAt: time.Now().UTC()},
 			{Name: "remove ssl", Kind: wizard.ResourceSSL, Params: map[string]string{"domain": "app.demo.smallhost.pl"}, CreatedAt: time.Now().UTC()},
@@ -47,6 +48,9 @@ func TestSaveAndLoadPendingRoundtrip(t *testing.T) {
 	}
 	if loaded.WizardID != "wizard-42" {
 		t.Fatalf("WizardID = %q", loaded.WizardID)
+	}
+	if loaded.ProfileAlias != "main" {
+		t.Fatalf("ProfileAlias = %q, want main", loaded.ProfileAlias)
 	}
 	if loaded.SchemaVersion != wizard.PendingSchemaVersion {
 		t.Fatalf("SchemaVersion = %d", loaded.SchemaVersion)
@@ -180,6 +184,26 @@ func TestFilePersisterRemovesFileOnEmptyStack(t *testing.T) {
 	}
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("file should be removed, err = %v", err)
+	}
+}
+
+func TestFilePersisterWithProfilePersistsProfileAlias(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "p.json")
+	persist := wizard.NewFilePersisterWithProfile(path, "wizard-1", "main")
+	step := wizard.CleanupStep{Name: "sub", Kind: wizard.ResourceSubdomain, Params: map[string]string{"domain": "x.smallhost.pl"}}
+
+	if err := persist(context.Background(), []wizard.CleanupStep{step}); err != nil {
+		t.Fatalf("persist = %v", err)
+	}
+	loaded, err := wizard.LoadPending(path)
+	if err != nil {
+		t.Fatalf("LoadPending = %v", err)
+	}
+	if loaded.ProfileAlias != "main" {
+		t.Fatalf("ProfileAlias = %q, want main", loaded.ProfileAlias)
 	}
 }
 

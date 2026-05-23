@@ -38,7 +38,7 @@ func TestViewRendersInitWizardDashboardAndProjectDetail(t *testing.T) {
 			model: New(Options{InitialWidth: 100, InitialHeight: 30}).
 				withConfig(fixtureConfig()).
 				withState(StateProjectDetail),
-			needles: []string{"Overview", "Env Diff", "unlocked in v0.2", "Restart", "disabled"},
+			needles: []string{"Overview", "Env Diff", "unlocked in v0.2", "Restart", "SSL Renew", "Tail Logs"},
 		},
 	}
 

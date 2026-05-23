@@ -155,6 +155,14 @@ type HostingProvider interface {
 	// / stderr logs. Pure function: no I/O.
 	GetLogPath(domain string) string
 
+	// TailLog returns the last `lines` log entries for the Node.js
+	// subdomain. Implementations MUST clamp the line count to a
+	// safe upper bound and accept zero/negative as "use adapter
+	// default". The byte slice contains stdout (and possibly stderr
+	// for soft errors such as "log file missing") so the dashboard
+	// can render the operator-facing diagnostic verbatim.
+	TailLog(ctx context.Context, domain string, lines int) ([]byte, error)
+
 	// CheckStatus performs the cheap sanity probe against the panel
 	// (SSH session + CLI version). The result is consumed by the
 	// dashboard's health badge and `webox doctor`.

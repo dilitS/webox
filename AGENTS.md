@@ -2,7 +2,7 @@
 
 > Operator handbook dla AI coding agents pracujących nad Webox.
 >
-> Status: Stable for v0.1 implementation phase · Ostatnia aktualizacja: 2026-05-22 · Właściciel: @maintainer
+> Status: Stable for v0.1 implementation phase · Ostatnia aktualizacja: 2026-05-23 · Właściciel: @maintainer
 >
 > Ten plik jest **kontraktem** między człowiekiem-maintainerem a agentem. Agent czyta go **przed** każdym task'em. Jeśli zalecenie z `AGENTS.md` koliduje z user request, **agent zatrzymuje się i pyta**.
 
@@ -151,25 +151,30 @@ testing/           fixtures, sshmock, ghmock cassettes
 - Import existing projects (read-only, detects gaps).
 - LIFO rollback przy częściowym fail wizard'a.
 - Keyring secrets + AES-GCM fallback z Argon2id.
-- `webox doctor` + `webox doctor --json`.
+- `webox doctor` + `webox doctor --json` + `webox doctor github [--json]`.
 - Host-key mismatch resolution przez TUI phrase-confirm flow w `v0.1`; opcjonalna CLI (`webox doctor security --update-host-key`) dopiero `v0.2+`.
+- **Bento Ultra adaptive layout** (`100×30` Standard Cockpit fallback / `120×35` default / `160×45` extended) z OKLCH theming, dynamic layering, premium status badges, double-border modals, gradientowy logotyp, spinner adaptacyjny. Eskalowane do MVP przez [ADR-0007](./docs/adr/0007-bento-ultra-eskalacja-mvp.md).
+- **Live Log Stream** — `tail -f` via SSH, ring buffer 1000 linii, ANSI level coloring (INFO/WARN/ERROR/DEBUG), redactor pre-render (każda linia przepuszczona przez `internal/log.Redact`), 60fps throttle, context-cancellable na `q`/`Esc`. Eskalowane przez ADR-0007.
+- **Live CI/CD Pipeline Panel** — nadbudowa na `services/github` (poll TTL 10s), kolorowe step results, click-through do `gh run view` ostatnich 50 linii. Eskalowane przez ADR-0007.
+- **Live Service Topology Map** — ASCII box-drawing graph (GitHub Repo → Production Server → App ← MySQL/Postgres) z live edge animations (ONLINE / BUILDING / OFFLINE), sterowane przez `status/` cache. Eskalowane przez ADR-0007.
+- **Header bar server metrics** — uptime, load avg, RAM %, RTT, SSL day-warnings przez SSH polling 5s TTL.
 
 ### 3.2 NIE w MVP (STRETCH v0.2+)
 
-- Live log stream (`tail -f` via SSH).
 - `/db`, `/env`, `/storage`, `/domain` tabs i ich Command Palette commands.
 - TUI Env Merger (interactive `.env` diff/merge).
 - Multi-provider dashboard agregujący projekty z różnych serwerów.
 - DAG-based transactional engine (LIFO wystarcza dla MVP).
 - Sound engine (osobny RFC post-v0.2).
-- Bento Ultra dashboard (≥120×35) — MVP target = Standard Cockpit (100×30).
+- **Bento Ultra+ (≥160×45)** — MVP dostarcza `120×35` (po eskalacji ADR-0007); `160×45` z dodatkowymi kafelkami (multi-server agregator, TTL panels) to v0.2+.
 - Fast-chord bindings (`g r`, `g d`, etc.).
-- Live Service Topology Map.
 - `webox auth login github` (OAuth Device Flow) — MVP używa `gh` CLI lub PAT.
 - Drugi provider (cPanel, DirectAdmin, CyberPanel) — research only.
 - Jump host / SSH bastion / ProxyJump.
 - In-app updater.
 - Non-interactive operatorskie CLI commands poza `webox doctor`.
+
+> **Uwaga historyczna:** Live log stream, Bento Ultra dashboard i Topology Map były tu wymienione do 2026-05-23. Po [ADR-0007](./docs/adr/0007-bento-ultra-eskalacja-mvp.md) zostały eskalowane do MVP — patrz [§3.1](#31-w-mvp-v01-musi-dzia%C5%82a%C4%87-przed-release).
 
 ### 3.3 Czego NIGDY nie będziemy robić
 

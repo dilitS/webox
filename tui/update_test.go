@@ -76,19 +76,40 @@ func TestUpdateDashboardNavigationAndDetailReturn(t *testing.T) {
 	}
 }
 
-func TestUpdateDisabledProjectDetailActionsSetAlert(t *testing.T) {
+func TestUpdateProjectDetailDisabledTabsSetAlert(t *testing.T) {
 	t.Parallel()
 
 	m := New(Options{})
 	m, _ = applyMsg(t, m, ConfigLoadedMsg{Config: fixtureConfig()})
 	m, _ = applyMsg(t, m, key(tea.KeyRight, ""))
 
-	for _, pressed := range []string{"r", "s", "v", "2", "3", "4"} {
+	for _, pressed := range []string{"2", "3", "4"} {
 		pressed := pressed
 		t.Run(pressed, func(t *testing.T) {
 			got, _ := applyMsg(t, m, key(tea.KeyRunes, pressed))
 			if got.Alert() == "" {
-				t.Fatalf("key %q should set disabled-action alert", pressed)
+				t.Fatalf("key %q should set disabled-tab alert", pressed)
+			}
+			if got.State() != StateProjectDetail {
+				t.Fatalf("key %q changed state to %s", pressed, got.State())
+			}
+		})
+	}
+}
+
+func TestUpdateProjectDetailActionKeysDispatchCommand(t *testing.T) {
+	t.Parallel()
+
+	m := New(Options{})
+	m, _ = applyMsg(t, m, ConfigLoadedMsg{Config: fixtureConfig()})
+	m, _ = applyMsg(t, m, key(tea.KeyRight, ""))
+
+	for _, pressed := range []string{"r", "s", "v"} {
+		pressed := pressed
+		t.Run(pressed, func(t *testing.T) {
+			got, cmd := applyMsg(t, m, key(tea.KeyRunes, pressed))
+			if cmd == nil {
+				t.Fatalf("key %q should return a tea.Cmd", pressed)
 			}
 			if got.State() != StateProjectDetail {
 				t.Fatalf("key %q changed state to %s", pressed, got.State())

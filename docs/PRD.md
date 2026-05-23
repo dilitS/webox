@@ -1,12 +1,12 @@
 # Webox — Product Requirements Document
 
-> Status: Draft · Ostatnia aktualizacja: 2026-05-22 · Właściciel: @maintainer
+> Status: Draft · Ostatnia aktualizacja: 2026-05-23 · Właściciel: @maintainer
 >
 > Pokrewne dokumenty: [DESIGN.md](./DESIGN.md) (jak to zbudować), [UX.md](./UX.md) (jak to wygląda), [ROADMAP.md](./ROADMAP.md) (co i kiedy), [SECURITY.md](./SECURITY.md) (model zaufania).
 
 ## TL;DR
 
-Webox to operatorskie TUI w Go dla deweloperów hostujących projekty na **hostingu współdzielonym**. Skraca pełny lifecycle projektu — od założenia subdomeny, przez konfigurację SSL, repo, CI/CD, po codzienne restarty i podgląd logów — z ~30 minut klikania w 4–5 zakładkach przeglądarki do <5 minut w jednym terminalu. MVP (v0.1) celuje **wyłącznie w small.pl/Devil**, ale architektura (Provider Pattern) jest gotowa na cPanel, DirectAdmin i CyberPanel od dnia 1. Webox nie jest panelem hostingowym, nie zastępuje GitHuba i nie wspiera VPS/Dockera — to świadoma decyzja, patrz [§9 Non-goals](#9-non-goals).
+Webox to operatorskie TUI w Go dla deweloperów hostujących projekty na **hostingu współdzielonym**. Skraca pełny lifecycle projektu — od założenia subdomeny, przez konfigurację SSL, repo, CI/CD, po codzienne restarty i podgląd logów — z ~30 minut klikania w 4–5 zakładkach przeglądarki do <5 minut w jednym terminalu. MVP (v0.1) celuje **wyłącznie w small.pl/Devil**, dostarcza **pełen Bento Ultra cockpit** z live log stream, GitHub Actions live panelem i Service Topology Map (eskalowane do MVP przez [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md)), a architektura (Provider Pattern) jest gotowa na cPanel, DirectAdmin i CyberPanel od dnia 1. Webox nie jest panelem hostingowym, nie zastępuje GitHuba i nie wspiera VPS/Dockera — to świadoma decyzja, patrz [§9 Non-goals](#9-non-goals).
 
 ## Spis treści
 
@@ -159,8 +159,8 @@ Priorytety: **P0** = MVP (v0.1, wyłącznie small.pl), **P1** = post-MVP (v0.2),
 | F11 | Bezpieczne sekrety (keyring) | P0 | Tak | `go-keyring` + fallback (patrz [SECURITY.md §4](./SECURITY.md#4-przechowywanie-sekret%C3%B3w)). |
 | F12 | Command Palette `/` — fuzzy search | P0 (minimalny: `/create`, `/provider`, `/import`, `/settings`) | Tak | Pełne palette → P1. |
 | F13 | Live dashboard auto-refresh co N sekund | P1 | Tak | Konfigurowalny interwał, default 10 s. |
-| F14 | Live log stream | P1 | Tak | `tail -f` przez SSH, ring buffer w UI. |
-| F15 | Deployment Monitor (GitHub Actions API) | P1 | Tak (GH-only, ale inne CI to inny temat) | Live status workflow runs + logi jobów. |
+| F14 | Live log stream | **P0** | Tak | `tail -f` przez SSH, ring buffer w UI, ANSI level coloring, redactor pre-render. **Eskalowane z P1 do P0 przez [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md).** |
+| F15 | Deployment Monitor (GitHub Actions API) | **P0** | Tak (GH-only, ale inne CI to inny temat) | Live status workflow runs + logi jobów. **Eskalowane z P1 do P0 przez [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md).** |
 | F16 | Node.js version manager | P1 | Tak (przez Provider) | Zmiana wersji Node per domena. |
 | F17 | Cert expiry monitoring + warning <14 dni | P1 | Tak | Pasek na dashboardzie + opt-in notyfikacje OS. |
 | F18 | Multi-provider w jednym configu | P1 | Tak | Działa od dnia 1 architektonicznie, w MVP UI ogranicza wybór do `smallhost`. |
