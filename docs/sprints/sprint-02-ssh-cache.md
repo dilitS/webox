@@ -40,23 +40,28 @@ Po sprincie 02:
 - **Estymata:** M
 - **Zależności:** Sprint 01 done
 - **Acceptance Criteria:**
-  - [ ] `ssh/errors.go` z sentinels: `ErrPoolBusy`, `ErrHostKeyMismatch`, `ErrHostKeyUnknown`, `ErrReconnectExhausted`.
-  - [ ] `ssh/types.go` definiuje minimalny kontrakt połączenia (`Target`, `ExecResult`, `Clock` / `Dialer` seam).
-  - [ ] Builder `ssh.ClientConfig` eksplicitnie deklaruje algorytmy z `SECURITY.md §5.5`.
-  - [ ] Host-key callback zwraca rozróżnialne błędy: unknown vs mismatch.
-  - [ ] Testy jednostkowe potwierdzają:
-    - `ssh-rsa` nie wchodzi bez explicit compat flag,
-    - unknown host key → `ErrHostKeyUnknown`,
-    - mismatch → `ErrHostKeyMismatch`.
+  - [x] `ssh/errors.go` z sentinels: `ErrPoolBusy`, `ErrHostKeyMismatch`, `ErrHostKeyUnknown`, `ErrReconnectExhausted` (+ dorzucone `ErrHostKeyDBRequired`, bo bez niego builder by milcząco akceptował `InsecureIgnoreHostKey`).
+  - [x] `ssh/types.go` definiuje minimalny kontrakt połączenia (`Target`, `ExecResult`, `Clock` z `SystemClock`, `Dialer`, `HostKeyDB`). `Target.Addr()` używa `net.JoinHostPort` dla IPv6, `Target.Key()` bucketuje pool per `(user, host, port)`.
+  - [x] Builder `ssh.ClientConfig` eksplicitnie deklaruje algorytmy z `SECURITY.md §5.5` (ed25519 → rsa-sha2-512 → rsa-sha2-256 → ecdsa-sha2-nistp256, ssh-rsa tylko z `LegacyAlgorithmCompat=true`, ssh-dss nigdy).
+  - [x] Host-key callback zwraca rozróżnialne błędy: unknown vs mismatch. Nie-`knownhosts.KeyError` propagują się bez re-mappingu (`errors.Is` przepuszcza je).
+  - [x] Testy jednostkowe potwierdzają:
+    - `ssh-rsa` nie wchodzi bez explicit compat flag (`TestBuildClientConfig_HostKeyAlgorithms`).
+    - `LegacyAlgorithmCompat=true` dorzuca `ssh-rsa` (`TestBuildClientConfig_LegacyCompatAddsSSHRSA`).
+    - unknown host key → `ErrHostKeyUnknown` (`TestBuildClientConfig_HostKeyCallback_UnknownVsMismatch/unknown_host_returns_ErrHostKeyUnknown`).
+    - mismatch → `ErrHostKeyMismatch` (`TestBuildClientConfig_HostKeyCallback_UnknownVsMismatch/mismatched_host_returns_ErrHostKeyMismatch`).
+    - dopasowany klucz → `nil` (`TestBuildClientConfig_HostKeyCallback_NilOnMatch`).
+    - nil `HostKeyDB` → `ErrHostKeyDBRequired` (`TestBuildClientConfig_RequiresHostKeyDB`).
+    - non-KeyError błędy DB nie są re-mapowane (`TestBuildClientConfig_HostKeyCallback_PreservesNonKeyError`).
 - **Pliki:**
-  - `ssh/errors.go` (new)
-  - `ssh/types.go` (new)
-  - `ssh/client_config.go` (new)
-  - `ssh/client_config_test.go` (new)
+  - `ssh/errors.go` + `ssh/errors_test.go`
+  - `ssh/types.go` + `ssh/types_test.go`
+  - `ssh/client_config.go` + `ssh/client_config_test.go`
 - **Docs:** [`DESIGN.md §5.1, §5.2`](../DESIGN.md#5-warstwa-ssh--sftp-connection-pooling), [`SECURITY.md §5.2–§5.5`](../SECURITY.md#5-host-keys-i-ssh)
 - **Notatki:**
   - Brak auto-accept. TOFU / phrase-confirm flow zostaje po stronie przyszłej TUI.
   - Zero provider-specific logiki w `ssh/`.
+  - Coverage `ssh/` = **100%**.
+  - `staticcheck` SA1019 dla `cryptossh.KeyAlgoDSA` obejdzony przez stałą `dssWireName = "ssh-dss"` — chcemy w teście jawnie zablokować ten algorytm na poziomie wire format, niezależnie od tego, że upstream go już usunął.
 
 ---
 
