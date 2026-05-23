@@ -16,6 +16,21 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `providers/smallhost/parsers.go` + `testing/fixtures/devil/`
+  (TASK-03.4) — defensive parsers for `devil www add`, `devil www
+  restart`, and `devil www list`. `stripAndNormalize` caps each
+  command output at 1 MiB, strips ANSI escapes, normalises CRLF/CR
+  to LF, and rejects non-printable bytes via
+  `providers.ErrUnknownOutputFormat`. Maps the well-known panel
+  responses onto sentinels (`ErrSubdomainExists`,
+  `ErrNodeVersionUnsupported`, `ErrAppNotFound`, `ErrAppNotNode`)
+  using named regex groups; unknown shapes fail closed without
+  echoing raw output into operator logs. Fixtures ship with
+  `.fixture.md` provenance notes (`captured: inferred` until live
+  capture replaces them), a CRLF variant, an empty-list rendering,
+  and an adversarial fixture mixing ANSI colour, NUL/BEL bytes, and
+  `$(rm -rf /)` to verify the parser never lets the substring into
+  the returned error.
 - `providers/smallhost/paths.go` (TASK-03.3) — pure path helpers
   (`GetDeployPath`, `GetLogPath`, `EnvPath`, `StoragePath`) plus
   `ValidateDomain` / `ValidateUser` with the `ErrInvalidDomain` /
