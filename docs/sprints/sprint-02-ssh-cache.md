@@ -173,13 +173,14 @@ Po sprincie 02:
 - **Estymata:** M
 - **Zależności:** TASK-02.5
 - **Acceptance Criteria:**
-  - [ ] `Invalidate(prefix string)` czyści wszystkie matching keys.
-  - [ ] Cache entries niosą `buffered age` / `isStale` metadata pod UI.
-  - [ ] TTL table z `ADR-0005` odwzorowana w kodzie helperami / stałymi.
-  - [ ] Testy invalidacji eventowej (`Restart`, `Deploy`, `SetupSSL` prefixy).
+  - [x] `Invalidate(prefix string)` czyści wszystkie matching keys.
+  - [x] Cache entries niosą `buffered age` / `isStale` metadata pod UI (`GetOrFetchMeta[T]`).
+  - [x] TTL table z `ADR-0005` odwzorowana w kodzie helperami / stałymi (`HTTPStatusTTL`, `SSHNodeTTL`, `SSLCertTTL`, `GitHubLastDeployTTL` + prefixy).
+  - [x] Testy invalidacji eventowej (`Restart`, `Deploy`, `SetupSSL` prefixy).
 - **Pliki:**
-  - `status/invalidate.go` (new)
-  - `status/invalidate_test.go` (new)
+  - `status/cache.go`
+  - `status/ttl.go`
+  - `status/invalidate_test.go`
 - **Docs:** [`ADR-0005 §Parametry cache`](../adr/0005-cache-statusow-projektow.md#parametry-cache), [`DESIGN.md §8.2, §8.3`](../DESIGN.md#8-tr%C3%B3jpoziomowy-status-cache-stale-while-revalidate)
 - **Notatki:**
   - Nie implementujemy jeszcze UI badge'a; tylko dane i kontrakt.

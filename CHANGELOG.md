@@ -16,6 +16,13 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `status/ttl.go` + invalidation metadata (TASK-02.6) — ADR-0005 TTL
+  constants and deterministic prefixes (`http:`, `ssh:node:`, `ssl:`,
+  `gh:lastDeploy:`), event-to-prefix invalidation for Restart / Deploy /
+  SSL / Node changes, `Cache.Invalidate(prefix)`,
+  `Cache.InvalidateEvent(event)`, and `GetOrFetchMeta[T]` returning
+  `Metadata{IsStale, Age, FetchedAt, ExpiresAt}` for dashboard buffered
+  badges.
 - `status/cache.go` (TASK-02.5) — generic package-level
   `GetOrFetch[T]` implementing the in-memory SWR contract from
   DESIGN §8 / ADR-0005: fresh hit returns immediately, stale hit returns

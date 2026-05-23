@@ -3,6 +3,7 @@ package status
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,6 +33,14 @@ type entry struct {
 	value     any
 	expiresAt time.Time
 	fetchedAt time.Time
+}
+
+// Metadata describes freshness of a cached value for dashboard badges.
+type Metadata struct {
+	IsStale   bool
+	Age       time.Duration
+	FetchedAt time.Time
+	ExpiresAt time.Time
 }
 
 // NewCache returns an empty in-memory status cache.
@@ -84,6 +93,49 @@ func GetOrFetch[T any](
 	}
 
 	return fetchBlocking(cache, key, ttl, fetch, ctx)
+}
+
+// GetOrFetchMeta is the metadata-rich variant used by dashboard code.
+func GetOrFetchMeta[T any](
+	cache *Cache,
+	key string,
+	ttl time.Duration,
+	fetch func(context.Context) (T, error),
+	ctx context.Context,
+) (T, Metadata, error) {
+	if cache == nil {
+		cache = NewCache(Options{})
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	now := cache.now()
+	if cached, ok := cache.lookup(key); ok {
+		value, err := cast[T](cached.value, key)
+		if err != nil {
+			var zero T
+			return zero, Metadata{}, err
+		}
+		meta := metadataFor(cached, now)
+		if meta.IsStale {
+			cache.refreshBackground(key, ttl, func(ctx context.Context) (any, error) {
+				return fetch(ctx)
+			})
+		}
+		return value, meta, nil
+	}
+
+	value, _, err := fetchBlocking(cache, key, ttl, fetch, ctx)
+	if err != nil {
+		var zero T
+		return zero, Metadata{}, err
+	}
+	cached, ok := cache.lookup(key)
+	if !ok {
+		return value, Metadata{}, nil
+	}
+	return value, metadataFor(cached, cache.now()), nil
 }
 
 func (c *Cache) lookup(key string) (entry, bool) {
@@ -149,4 +201,42 @@ func cast[T any](value any, key string) (T, error) {
 		return zero, fmt.Errorf("status: cache entry %q has unexpected type %T", key, value)
 	}
 	return typed, nil
+}
+
+func metadataFor(cached entry, now time.Time) Metadata {
+	age := now.Sub(cached.fetchedAt)
+	if age < 0 {
+		age = 0
+	}
+	return Metadata{
+		IsStale:   now.After(cached.expiresAt),
+		Age:       age,
+		FetchedAt: cached.fetchedAt,
+		ExpiresAt: cached.expiresAt,
+	}
+}
+
+// Invalidate removes all entries whose key begins with prefix and
+// returns the number of removed entries.
+func (c *Cache) Invalidate(prefix string) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	removed := 0
+	for key := range c.entries {
+		if strings.HasPrefix(key, prefix) {
+			delete(c.entries, key)
+			removed++
+		}
+	}
+	return removed
+}
+
+// InvalidateEvent removes all cache prefixes affected by event.
+func (c *Cache) InvalidateEvent(event Event) int {
+	removed := 0
+	for _, prefix := range PrefixesForEvent(event) {
+		removed += c.Invalidate(prefix)
+	}
+	return removed
 }
