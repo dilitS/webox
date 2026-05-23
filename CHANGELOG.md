@@ -16,6 +16,9 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Fixed
+- `tools/go.mod` now pins dev tooling to Go 1.26.3 instead of 1.26.2 so
+  `govulncheck` no longer runs on vulnerable `net@go1.26.2`
+  (`GO-2026-4971`) in CI.
 - `config.Validate()` now enforces two non-negotiable guardrails that the
   first Sprint 01 pass missed during review:
   - rejects secret-shaped strings anywhere in `config.json`
@@ -30,6 +33,20 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   `testdata/config/valid_v1.json` instead of the stale pre-bootstrap path.
 
 ### Added
+- `secrets/backend.go` — `Backend` interface for secret storage
+  (`Get`, `Set`, `Delete`) plus a TASK-01.7 placeholder `FallbackBackend`
+  returning `ErrFallbackUnavailable`.
+- `secrets/keyring.go` — OS keyring detection through write/read/delete probe
+  using `github.com/zalando/go-keyring`. `Detect()` now distinguishes
+  `ErrUnsupportedPlatform` (fallback) from `ErrNotFound` after a successful
+  probe write (`ErrBrokenKeyring`, with doctor hint) and cleans the probe key
+  after successful writes.
+- `secrets/keyring_test.go` and `secrets/keyring_mock_test.go` — mock-driven
+  TDD suite for happy path, unsupported platform fallback, broken keyring
+  detection, cleanup, wrapper behavior, and the `go-keyring` mock backend.
+- Dependency: `github.com/zalando/go-keyring` v0.2.8. This is the keyring
+  library already selected in `AGENTS.md §1.2`; the PR documents the dependency
+  rationale and keeps usage isolated behind `secrets.Backend`.
 - `internal/log/redact.go` — pure `Redact(input string) string` for local
   diagnostic output. It redacts SSH private key blocks, GitHub classic and
   fine-grained tokens, AWS access-key-shaped values, `Authorization: Bearer`
@@ -209,7 +226,7 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 - `go.mod` (`module github.com/dilitS/webox`, `go 1.24`) and the canonical package layout per docs/DESIGN.md §2.1: `cmd/webox`, `tui`/`tui/views`, `providers`/`smallhost`/`mock`, `ssh`, `services`, `config`, `secrets`, `status`, `wizard`, `env` (STRETCH stub), `i18n`, `assets`, `testing`, `internal/log`, `internal/version` — each with a godoc-style `doc.go` (TASK-00.1 + TASK-00.6).
 - `internal/version` exports `String()`/`Format(v, c, d)` — pure helper plus ldflags-fed package vars (`Version`/`Commit`/`Date`). 8 table-driven cases (TASK-00.5).
 - `cmd/webox` parses `--version`, `--help`/`-h`, `--debug` per ADR-0001 with manual `os.Args` parsing; `Run([]string, stdout, stderr) int` is the testable seam (`main` is a thin wrapper). Unknown args exit 2 with a hint to `--help`. Coverage 100% on `Run`/`parseArgs` (TASK-00.5).
-- `tools/go.mod` — isolated modfile pinning dev tools via Go 1.24 `tool` directive: `golangci-lint` v2.12.2, `govulncheck` v1.3.0, `gofumpt` v0.10.0, `goimports`, `goreleaser` v2.15.4. Main module stays on `go 1.24`; tools live in `go 1.26.2` with `GOTOOLCHAIN` derived from the modfile and pinned in `Makefile` so every contributor and CI runner uses bit-identical tool builds (TASK-00.2).
+- `tools/go.mod` — isolated modfile pinning dev tools via Go 1.24 `tool` directive: `golangci-lint` v2.12.2, `govulncheck` v1.3.0, `gofumpt` v0.10.0, `goimports`, `goreleaser` v2.15.4. Main module stays on `go 1.24`; tools live in the pinned tools Go version with `GOTOOLCHAIN` derived from the modfile and pinned in `Makefile` so every contributor and CI runner uses bit-identical tool builds (TASK-00.2).
 - `.golangci.yml` — golangci-lint v2 config enforcing the linter set declared in `CONTRIBUTING.md §2.1` and `AGENTS.md §2.2`: correctness (`bodyclose`, `errcheck`, `errorlint`, `govet`, `ineffassign`, `staticcheck`, `unused`), security (`gosec`), style (`dupl`, `gocritic`, `misspell`, `revive`, `whitespace`), maintainability (`gocyclo` ≤ 20 per AUDIT IMP-19, `prealloc`, `unconvert`, `unparam`), error discipline (`err113`), observability (`loggercheck`, `mnd`); test files relax `dupl`/`err113`/`gocyclo`/`gosec`/`mnd`/`unparam`. `gofumpt`+`goimports` run as v2 formatters with `local-prefixes: github.com/dilitS/webox`. `make lint` exits 0 against the current tree (TASK-00.3).
 - `.github/workflows/ci.yml` — first green CI pipeline. Five jobs (`lint`, `test`, `vulncheck`, `build`, `ci-summary`) gated by a single fan-in summary check that branch protection can pin against. Triggered on every branch `push` plus `pull_request` to `main`; PR reruns auto-cancel via `concurrency`, while `push` runs finish. `lint` runs `golangci-lint v2` plus `go vet`; `test` is a Linux/macOS matrix with coverage artifact upload (14-day retention); `vulncheck` is ubuntu-only; `build` cross-compiles `linux/darwin × amd64/arm64` with `CGO_ENABLED=0` and native smoke-tests the CLI where the runner can execute the target binary. Top-level `permissions: contents: read`; Go telemetry disabled via `GOTELEMETRY=off`. All actions pinned to full 40-char commit SHA with version comment for auditability and Dependabot-friendly bumps (TASK-00.4).
 - `.goreleaser.yml` — initial GoReleaser v2 config for Sprint 00 dry-runs: `builds` matrix `linux/darwin × amd64/arm64` with `CGO_ENABLED=0`, `archives` as `tar.gz`, `checksum.algorithm: sha256`, and a clearly marked signing placeholder that preserves the future `cosign sign-blob --bundle=...` shape without requiring real signing material yet. `goreleaser check` and `make release-dry-run` both exit 0 locally (TASK-00.8).
