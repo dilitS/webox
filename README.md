@@ -10,7 +10,7 @@
   <a href="https://github.com/dilitS/webox/actions/workflows/ci.yml"><img src="https://github.com/dilitS/webox/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
   <a href="https://github.com/dilitS/webox/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-7d56f4" alt="License: MIT"></a>
   <a href="docs/ROADMAP.md"><img src="https://img.shields.io/badge/status-docs--first%20pre--MVP-d846ef" alt="Stage: docs-first pre-MVP"></a>
-  <a href="https://pkg.go.dev/github.com/dilitS/webox"><img src="https://img.shields.io/badge/go-1.24%2B-00ADD8?logo=go" alt="Go 1.24+"></a>
+  <a href="https://pkg.go.dev/github.com/dilitS/webox"><img src="https://img.shields.io/badge/go-1.25%2B-00ADD8?logo=go" alt="Go 1.25+"></a>
   <a href="docs/ROADMAP.md"><img src="https://img.shields.io/badge/v0.1-in--design-ffb800" alt="v0.1 in design"></a>
 </p>
 
@@ -346,7 +346,7 @@ timeline
 
 | Layer | Technology | Why |
 |---|---|---|
-| **Language** | Go 1.24+ | Single binary, zero runtime deps, excellent SSH/SFTP ecosystem |
+| **Language** | Go 1.25+ | Single binary, zero runtime deps, excellent SSH/SFTP ecosystem |
 | **TUI Framework** | [Bubble Tea](https://github.com/charmbracelet/bubbletea) | MVU architecture, testable via `teatest`, active ecosystem |
 | **Styling** | [Lipgloss](https://github.com/charmbracelet/lipgloss) | Declarative terminal styling, OKLCH color space |
 | **SSH** | `golang.org/x/crypto/ssh` | Native Go SSH client — no external binary dependency |

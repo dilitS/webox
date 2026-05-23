@@ -16,6 +16,50 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `docs/sprints/sprint-03-provider-smallhost.md` — rolling-wave plan for
+  Sprint 03 (provider contracts, `smallhost` constructor, path helpers,
+  Devil parser fixtures, and smallhost method skeleton over `ssh.Exec`).
+- `docs/retros/2026-05-23-sprint-02.md` — Sprint 02 retrospective with
+  the `x/crypto/ssh` security upgrade, pool race fix, and process change
+  to run lint after each task commit.
+- `services/httpcheck/` (TASK-02.7) — dashboard probes for HTTP status
+  and TLS certificate expiry. `ProbeHTTP` returns status code, class
+  (`2xx`/`3xx`/`4xx`/`5xx`) and latency with a default 1 s timeout;
+  `ProbeTLS` performs a TLS handshake and returns leaf `NotAfter` plus
+  `DaysLeft`, also with injectable 1 s timeout / clock seams. Tests use
+  `httptest.NewServer` and `httptest.NewTLSServer`.
+- `status/ttl.go` + invalidation metadata (TASK-02.6) — ADR-0005 TTL
+  constants and deterministic prefixes (`http:`, `ssh:node:`, `ssl:`,
+  `gh:lastDeploy:`), event-to-prefix invalidation for Restart / Deploy /
+  SSL / Node changes, `Cache.Invalidate(prefix)`,
+  `Cache.InvalidateEvent(event)`, and `GetOrFetchMeta[T]` returning
+  `Metadata{IsStale, Age, FetchedAt, ExpiresAt}` for dashboard buffered
+  badges.
+- `status/cache.go` (TASK-02.5) — generic package-level
+  `GetOrFetch[T]` implementing the in-memory SWR contract from
+  DESIGN §8 / ADR-0005: fresh hit returns immediately, stale hit returns
+  buffered data while refreshing in the background, cold miss blocks on
+  fetch, and `singleflight` dedupes concurrent misses per key. Adds
+  direct dependency `golang.org/x/sync v0.20.0` after the Sprint 02
+  SSH security update raised the main module to Go 1.25.
+- `ssh/exec.go` + `ssh/keepalive.go` (TASK-02.4) — pooled `Exec`
+  helper returning `ExecResult{Stdout, Stderr, ExitCode, Duration}`,
+  per-client `keepalive@openssh.com` global request loop (default
+  15 s), and reconnect classification via `RetryPolicy` with default
+  `3s/6s/12s` backoff. `Exec` intentionally does not replay commands
+  after transport failure; providers must verify remote state first.
+- `ssh/pool.go` + `ssh/dialer.go` (TASK-02.3) — concurrency-safe SSH
+  connection pool keyed by `Target.Key()` with default `max=3` per host,
+  5 s acquire timeout, 60 s idle timeout, `Acquire`/`Release`/`Close`,
+  lazy + background idle cleanup, double-release no-op behavior, and a
+  `NetDialer` that upgrades `net.Dialer` TCP connections through
+  `golang.org/x/crypto/ssh.NewClientConn`.
+- `testing/sshmock/` (TASK-02.2) — deterministic in-process SSH server
+  for integration tests without real hosting accounts or shelling out to
+  system `ssh`. It binds localhost on a random port, generates ephemeral
+  ed25519 host/client keys per test, enforces public-key-only auth, maps
+  command strings to stdout/stderr/exit status, and injects disconnect /
+  delay failures for pool and reconnect tests.
 - `ssh/errors.go`, `ssh/types.go`, `ssh/client_config.go` (TASK-02.1) —
   foundation for the Sprint 02 connection pool. Ships five sentinel
   errors (`ErrPoolBusy`, `ErrHostKeyUnknown`, `ErrHostKeyMismatch`,
@@ -29,6 +73,12 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   distinguishable unknown / mismatch sentinels. Coverage: 100%.
 
 ### Security
+- Main module toolchain floor is now `go 1.25.0` so Webox can use
+  `golang.org/x/crypto v0.52.0`, the first `x/crypto/ssh` release that
+  fixes all `govulncheck` findings triggered by the new SSH client /
+  server code paths in Sprint 02. Keeping Go 1.24 would leave reachable
+  SSH vulnerabilities in `ssh.NetDialer`, `ssh.Exec`, keepalive, and
+  `testing/sshmock`.
 - `ssh.BuildClientConfig` refuses to construct a `ClientConfig` without
   a `HostKeyDB`, returning the typed `ErrHostKeyDBRequired` sentinel
   instead of falling back to `cryptossh.InsecureIgnoreHostKey`. This

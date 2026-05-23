@@ -70,19 +70,21 @@ Po sprincie 02:
 - **Estymata:** M
 - **Zależności:** TASK-02.1
 - **Acceptance Criteria:**
-  - [ ] `testing/sshmock/` uruchamia lokalny serwer SSH na losowym porcie.
-  - [ ] Obsługuje mapowanie `command → stdout/stderr/exit code`.
-  - [ ] Akceptuje ephemeral key auth generowany per test.
-  - [ ] Smoke test: `echo hello` → `stdout == "hello\n"`, exit code 0.
-  - [ ] Support dla injected failures (disconnect / timeout / exit code != 0).
+  - [x] `testing/sshmock/` uruchamia lokalny serwer SSH na losowym porcie.
+  - [x] Obsługuje mapowanie `command → stdout/stderr/exit code`.
+  - [x] Akceptuje ephemeral key auth generowany per test.
+  - [x] Smoke test: `echo hello` → `stdout == "hello\n"`, exit code 0.
+  - [x] Support dla injected failures (disconnect / timeout / exit code != 0).
 - **Pliki:**
-  - `testing/sshmock/doc.go` (new)
-  - `testing/sshmock/server.go` (new)
-  - `testing/sshmock/server_test.go` (new)
+  - `testing/sshmock/doc.go`
+  - `testing/sshmock/server.go`
+  - `testing/sshmock/server_test.go`
 - **Docs:** [`TESTING.md §3`](../TESTING.md#3-mockowanie-ssh), [`RISKS.md R-002`](../RISKS.md#r-002--smallpl-panel-niestabilny--api-zmiany)
 - **Notatki:**
   - To infrastruktura testowa dla sprintów 02–06.
   - Fixture capture z realnego `devil` zostaje na Sprint 03.
+  - Implementacja używa `golang.org/x/crypto/ssh`, bez dodatkowej zależności
+    typu `gliderlabs/ssh`.
 
 ---
 
@@ -91,22 +93,25 @@ Po sprincie 02:
 - **Estymata:** L
 - **Zależności:** TASK-02.1, TASK-02.2
 - **Acceptance Criteria:**
-  - [ ] `ssh/pool.go` implementuje pool z limitem `max=3` per host.
-  - [ ] `Acquire(ctx, target)` respektuje timeout i zwraca `ErrPoolBusy`.
-  - [ ] `Release(target, client)` zwraca klienta do puli; double-release nie korumpuje stanu.
-  - [ ] Idle timeout 60 s zamyka bezczynne połączenia.
-  - [ ] Tabela testów:
+  - [x] `ssh/pool.go` implementuje pool z limitem `max=3` per host (konfigurowalne przez `PoolOptions.MaxPerHost`).
+  - [x] `Acquire(ctx, target)` respektuje timeout i zwraca `ErrPoolBusy`.
+  - [x] `Release(target, client)` zwraca klienta do puli; double-release nie korumpuje stanu.
+  - [x] Idle timeout 60 s zamyka bezczynne połączenia (lazy reap + background cleanup loop).
+  - [x] Tabela testów:
     - happy path reuse,
     - limit 3 + 4th waiter timeout,
     - idle cleanup,
     - cancelled context,
     - concurrent `Acquire/Release` pod `-race`.
 - **Pliki:**
-  - `ssh/pool.go` (new)
-  - `ssh/pool_test.go` (new)
+  - `ssh/dialer.go`
+  - `ssh/pool.go`
+  - `ssh/pool_test.go`
 - **Docs:** [`DESIGN.md §5`](../DESIGN.md#5-warstwa-ssh--sftp-connection-pooling), [`RISKS.md R-005`](../RISKS.md#r-005--bubble-tea-mvu-rozje%C5%BCd%C5%BCa-si%C4%99-w-prawdziwym-%C5%BCyciu)
 - **Notatki:**
   - Najpierw testy black-box, potem ewentualne white-box branch tests dla cleanup loop.
+  - Testy używają realnego transportu SSH przez `testing/sshmock`, więc reuse / limit /
+    idle cleanup ćwiczą prawdziwe `*ssh.Client`.
 
 ---
 
@@ -115,18 +120,18 @@ Po sprincie 02:
 - **Estymata:** M
 - **Zależności:** TASK-02.3
 - **Acceptance Criteria:**
-  - [ ] Keepalive ticker co 15 s (`keepalive@openssh.com`) na aktywnych klientach.
-  - [ ] `Exec(ctx, target, command)` zwraca `ExecResult{Stdout, Stderr, ExitCode}`.
-  - [ ] Zerwane połączenie klasyfikowane pod retry policy z `DESIGN §9` (3 próby, `3s/6s/12s` + jitter seam).
-  - [ ] Komenda nie jest ślepo ponawiana; API zwraca enough context, by provider mógł wykonać state check.
-  - [ ] Testy:
+  - [x] Keepalive ticker co 15 s (`keepalive@openssh.com`) na aktywnych klientach.
+  - [x] `Exec(ctx, target, command)` zwraca `ExecResult{Stdout, Stderr, ExitCode, Duration}`.
+  - [x] Zerwane połączenie klasyfikowane pod retry policy z `DESIGN §9` (3 próby, `3s/6s/12s` + injectable sleeper seam; jitter zostaje warstwą policy ponad deterministycznym backoffem).
+  - [x] Komenda nie jest ślepo ponawiana; `Exec` kończy się wynikiem/błędem, a `Reconnect` tylko przywraca klienta — provider musi wykonać state check przed replay.
+  - [x] Testy:
     - keepalive loop stops on close,
     - one reconnect path succeeds,
     - retries exhausted → `ErrReconnectExhausted`.
 - **Pliki:**
-  - `ssh/exec.go` (new)
-  - `ssh/keepalive.go` (new)
-  - `ssh/exec_test.go` (new)
+  - `ssh/exec.go`
+  - `ssh/keepalive.go`
+  - `ssh/exec_test.go`
 - **Docs:** [`DESIGN.md §5`, `§9`](../DESIGN.md#5-warstwa-ssh--sftp-connection-pooling), [`TESTING.md §3`](../TESTING.md#3-mockowanie-ssh)
 - **Notatki:**
   - Retry logic musi mieć injectable clock / sleeper. Żadnego `time.Sleep` hardcoded w testach.
@@ -138,14 +143,14 @@ Po sprincie 02:
 - **Estymata:** L
 - **Zależności:** —
 - **Acceptance Criteria:**
-  - [ ] `status/cache.go` z `GetOrFetch[T]` jako funkcją pakietową (nie method).
-  - [ ] Semantyka:
+  - [x] `status/cache.go` z `GetOrFetch[T]` jako funkcją pakietową (nie method).
+  - [x] Semantyka:
     - cache hit fresh → natychmiast,
     - cache stale → zwrot stale + refresh w tle,
     - cache miss → blokujący fetch.
-  - [ ] `singleflight` zapewnia 1 inflight fetch per key.
-  - [ ] Czas (`now`) injectable.
-  - [ ] Testy:
+  - [x] `singleflight` zapewnia 1 inflight fetch per key.
+  - [x] Czas (`now`) injectable.
+  - [x] Testy:
     - hit / stale / miss,
     - singleflight on same key,
     - cancellation,
@@ -157,6 +162,11 @@ Po sprincie 02:
 - **Docs:** [`DESIGN.md §8`](../DESIGN.md#8-tr%C3%B3jpoziomowy-status-cache-stale-while-revalidate), [`ADR-0005`](../adr/0005-cache-statusow-projektow.md)
 - **Notatki:**
   - TDD twarde. To core logic pod dashboard i drift detection.
+  - Dodano `golang.org/x/sync v0.20.0`. Sprint 02 podbił main module do
+    `go 1.25.0`, bo nowe wywołania `golang.org/x/crypto/ssh` uruchomiły
+    realne `govulncheck` findings, a pełny fix wymaga `x/crypto v0.52.0`
+    (Go 1.25).
+  - Coverage `status/` po TASK-02.5 = **87.8%**.
 
 ---
 
@@ -165,13 +175,14 @@ Po sprincie 02:
 - **Estymata:** M
 - **Zależności:** TASK-02.5
 - **Acceptance Criteria:**
-  - [ ] `Invalidate(prefix string)` czyści wszystkie matching keys.
-  - [ ] Cache entries niosą `buffered age` / `isStale` metadata pod UI.
-  - [ ] TTL table z `ADR-0005` odwzorowana w kodzie helperami / stałymi.
-  - [ ] Testy invalidacji eventowej (`Restart`, `Deploy`, `SetupSSL` prefixy).
+  - [x] `Invalidate(prefix string)` czyści wszystkie matching keys.
+  - [x] Cache entries niosą `buffered age` / `isStale` metadata pod UI (`GetOrFetchMeta[T]`).
+  - [x] TTL table z `ADR-0005` odwzorowana w kodzie helperami / stałymi (`HTTPStatusTTL`, `SSHNodeTTL`, `SSLCertTTL`, `GitHubLastDeployTTL` + prefixy).
+  - [x] Testy invalidacji eventowej (`Restart`, `Deploy`, `SetupSSL` prefixy).
 - **Pliki:**
-  - `status/invalidate.go` (new)
-  - `status/invalidate_test.go` (new)
+  - `status/cache.go`
+  - `status/ttl.go`
+  - `status/invalidate_test.go`
 - **Docs:** [`ADR-0005 §Parametry cache`](../adr/0005-cache-statusow-projektow.md#parametry-cache), [`DESIGN.md §8.2, §8.3`](../DESIGN.md#8-tr%C3%B3jpoziomowy-status-cache-stale-while-revalidate)
 - **Notatki:**
   - Nie implementujemy jeszcze UI badge'a; tylko dane i kontrakt.
@@ -183,16 +194,17 @@ Po sprincie 02:
 - **Estymata:** M
 - **Zależności:** TASK-02.5
 - **Acceptance Criteria:**
-  - [ ] `services/httpcheck/` (lub `services/probe/`) z probe HTTP 200/3xx/5xx + latency.
-  - [ ] TLS probe zwraca `not_after` + `days_left`.
-  - [ ] Timeouty injectable, default 1 s dla HTTP / TLS handshake.
-  - [ ] Testy przez `httptest.NewServer` i lokalny TLS server.
+  - [x] `services/httpcheck/` z probe HTTP 200/3xx/5xx + latency.
+  - [x] TLS probe zwraca `not_after` + `days_left`.
+  - [x] Timeouty injectable, default 1 s dla HTTP / TLS handshake.
+  - [x] Testy przez `httptest.NewServer` i lokalny TLS server.
 - **Pliki:**
-  - `services/httpcheck/doc.go` (new)
-  - `services/httpcheck/http.go` (new)
-  - `services/httpcheck/tls.go` (new)
-  - `services/httpcheck/http_test.go` (new)
-  - `services/httpcheck/tls_test.go` (new)
+  - `services/httpcheck/doc.go`
+  - `services/httpcheck/errors.go`
+  - `services/httpcheck/http.go`
+  - `services/httpcheck/tls.go`
+  - `services/httpcheck/http_test.go`
+  - `services/httpcheck/tls_test.go`
 - **Docs:** [`PRD.md F5`](../PRD.md#6-ficzery--z-priorytetami), [`DESIGN.md §8.2`](../DESIGN.md#8-tr%C3%B3jpoziomowy-status-cache-stale-while-revalidate)
 - **Notatki:**
   - Brak GitHub deploy-status probe w tym sprincie — to zostaje przy Sprint 06.
@@ -210,25 +222,34 @@ Po sprincie 02:
 
 ---
 
-## Outcome (wypełnij po sprincie)
+## Outcome
 
-- ✅ Done: TASK-02.X, ...
-- ⏭️ Carry-over: TASK-02.X → Sprint 03
-- 📌 Decyzje: <ADR jeśli powstał>
-- 🧠 Surprises: ...
+- ✅ Done: TASK-02.1, TASK-02.2, TASK-02.3, TASK-02.4, TASK-02.5, TASK-02.6, TASK-02.7.
+- ⏭️ Carry-over: none. Sprint 03 starts from provider contracts and smallhost parser fixtures.
+- 📌 Decyzje:
+  - `testing/sshmock` uses `golang.org/x/crypto/ssh` directly instead of adding `gliderlabs/ssh`, keeping dependencies smaller and exercising the same transport stack as production code.
+  - Main module floor raised to `go 1.25.0` because new reachable `x/crypto/ssh` call paths made `govulncheck` fail on `x/crypto v0.41.0`; the full fix requires `x/crypto v0.52.0`, which declares Go 1.25.
+  - `Exec` deliberately does not retry commands. `Reconnect` only restores connectivity; providers must run idempotent state probes before replay.
+- 🧠 Surprises:
+  - `govulncheck` stayed quiet before Sprint 02 because the repo imported `x/crypto/ssh` but did not call the vulnerable symbols. Adding `sshmock`, `NetDialer`, `Exec`, and keepalive made the vulnerabilities reachable.
+  - A race appeared in `Pool.ReapIdle` from reading `len(p.hosts)` before acquiring `p.mu`. The fix moved preallocation under the lock and is covered by `go test -race ./ssh`.
+  - Avoiding `gliderlabs/ssh` was straightforward; `x/crypto/ssh.NewServerConn` was enough for deterministic session/exec tests.
 - 📊 Metryki:
-  - Coverage `ssh/`: %
-  - Coverage `status/`: %
-  - Coverage `services/httpcheck/`: %
-  - Czas faktyczny vs estymata: ratio
+  - Coverage `ssh/`: 82.7%
+  - Coverage `status/`: 83.2%
+  - Coverage `services/httpcheck/`: 88.9%
+  - Coverage `testing/sshmock/`: 79.2%
+  - Global coverage: 85.6%
 - 🔒 Security validation:
-  - [ ] `go test -race ./ssh ./status ./services/...` green
-  - [ ] Host-key mismatch nadal strict-block (brak auto-accept)
-  - [ ] No secrets in any SSH / cache logs
-- ➡️ Następny sprint: `sprint-03-provider-smallhost.md`
+  - [x] `go test -race ./ssh ./status ./services/...` green.
+  - [x] `make ci` green: lint, vet, govulncheck, race tests, coverage gate, build.
+  - [x] `govulncheck` reports `No vulnerabilities found`.
+  - [x] Host-key mismatch remains strict-block (`ErrHostKeyMismatch`, no auto-accept).
+  - [x] No secrets introduced in SSH / cache logs.
+- ➡️ Następny sprint: [`sprint-03-provider-smallhost.md`](sprint-03-provider-smallhost.md)
 
 ---
 
 ## Retro link (po sprincie)
 
-`docs/retros/YYYY-MM-DD-sprint-02.md`
+[`docs/retros/2026-05-23-sprint-02.md`](../retros/2026-05-23-sprint-02.md)
