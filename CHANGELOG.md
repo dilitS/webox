@@ -16,6 +16,12 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `ssh/pool.go` + `ssh/dialer.go` (TASK-02.3) — concurrency-safe SSH
+  connection pool keyed by `Target.Key()` with default `max=3` per host,
+  5 s acquire timeout, 60 s idle timeout, `Acquire`/`Release`/`Close`,
+  lazy + background idle cleanup, double-release no-op behavior, and a
+  `NetDialer` that upgrades `net.Dialer` TCP connections through
+  `golang.org/x/crypto/ssh.NewClientConn`.
 - `testing/sshmock/` (TASK-02.2) — deterministic in-process SSH server
   for integration tests without real hosting accounts or shelling out to
   system `ssh`. It binds localhost on a random port, generates ephemeral

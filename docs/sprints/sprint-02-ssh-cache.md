@@ -93,22 +93,25 @@ Po sprincie 02:
 - **Estymata:** L
 - **Zależności:** TASK-02.1, TASK-02.2
 - **Acceptance Criteria:**
-  - [ ] `ssh/pool.go` implementuje pool z limitem `max=3` per host.
-  - [ ] `Acquire(ctx, target)` respektuje timeout i zwraca `ErrPoolBusy`.
-  - [ ] `Release(target, client)` zwraca klienta do puli; double-release nie korumpuje stanu.
-  - [ ] Idle timeout 60 s zamyka bezczynne połączenia.
-  - [ ] Tabela testów:
+  - [x] `ssh/pool.go` implementuje pool z limitem `max=3` per host (konfigurowalne przez `PoolOptions.MaxPerHost`).
+  - [x] `Acquire(ctx, target)` respektuje timeout i zwraca `ErrPoolBusy`.
+  - [x] `Release(target, client)` zwraca klienta do puli; double-release nie korumpuje stanu.
+  - [x] Idle timeout 60 s zamyka bezczynne połączenia (lazy reap + background cleanup loop).
+  - [x] Tabela testów:
     - happy path reuse,
     - limit 3 + 4th waiter timeout,
     - idle cleanup,
     - cancelled context,
     - concurrent `Acquire/Release` pod `-race`.
 - **Pliki:**
-  - `ssh/pool.go` (new)
-  - `ssh/pool_test.go` (new)
+  - `ssh/dialer.go`
+  - `ssh/pool.go`
+  - `ssh/pool_test.go`
 - **Docs:** [`DESIGN.md §5`](../DESIGN.md#5-warstwa-ssh--sftp-connection-pooling), [`RISKS.md R-005`](../RISKS.md#r-005--bubble-tea-mvu-rozje%C5%BCd%C5%BCa-si%C4%99-w-prawdziwym-%C5%BCyciu)
 - **Notatki:**
   - Najpierw testy black-box, potem ewentualne white-box branch tests dla cleanup loop.
+  - Testy używają realnego transportu SSH przez `testing/sshmock`, więc reuse / limit /
+    idle cleanup ćwiczą prawdziwe `*ssh.Client`.
 
 ---
 
