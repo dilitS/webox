@@ -30,6 +30,20 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   `testdata/config/valid_v1.json` instead of the stale pre-bootstrap path.
 
 ### Added
+- `secrets/backend.go` — `Backend` interface for secret storage
+  (`Get`, `Set`, `Delete`) plus a TASK-01.7 placeholder `FallbackBackend`
+  returning `ErrFallbackUnavailable`.
+- `secrets/keyring.go` — OS keyring detection through write/read/delete probe
+  using `github.com/zalando/go-keyring`. `Detect()` now distinguishes
+  `ErrUnsupportedPlatform` (fallback) from `ErrNotFound` after a successful
+  probe write (`ErrBrokenKeyring`, with doctor hint) and cleans the probe key
+  after successful writes.
+- `secrets/keyring_test.go` and `secrets/keyring_mock_test.go` — mock-driven
+  TDD suite for happy path, unsupported platform fallback, broken keyring
+  detection, cleanup, wrapper behavior, and the `go-keyring` mock backend.
+- Dependency: `github.com/zalando/go-keyring` v0.2.8. This is the keyring
+  library already selected in `AGENTS.md §1.2`; the PR documents the dependency
+  rationale and keeps usage isolated behind `secrets.Backend`.
 - `internal/log/redact.go` — pure `Redact(input string) string` for local
   diagnostic output. It redacts SSH private key blocks, GitHub classic and
   fine-grained tokens, AWS access-key-shaped values, `Authorization: Bearer`

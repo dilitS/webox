@@ -210,16 +210,16 @@ Po sprincie 01:
 - **Estymata:** L
 - **Zależności:** —
 - **Acceptance Criteria:**
-  - [ ] `secrets/keyring.go` z `func Detect() (Backend, error)`.
-  - [ ] Probe: `Set("__webox_probe__", "v")` → jeśli `ErrUnsupportedPlatform` → fallback; jeśli `ErrNotFound` przy `Get` po `Set` → keyring nieprawidłowy (broken keychain); jeśli OK → cleanup probe i return `BackendOS`.
-  - [ ] Backend interface: `Get(key) ([]byte, error)`, `Set(key, value) error`, `Delete(key) error`.
-  - [ ] Implementacje: `osKeyringBackend` (wraps `go-keyring`), `FallbackBackend` (TASK-01.7).
-  - [ ] Tabela testów z **mock** `go-keyring`:
+  - [x] `secrets/keyring.go` z `func Detect() (Backend, error)`.
+  - [x] Probe: `Set("__webox_probe__", "v")` → jeśli `ErrUnsupportedPlatform` → fallback; jeśli `ErrNotFound` przy `Get` po `Set` → keyring nieprawidłowy (broken keychain); jeśli OK → cleanup probe i return `BackendOS`.
+  - [x] Backend interface: `Get(key) ([]byte, error)`, `Set(key, value) error`, `Delete(key) error`.
+  - [x] Implementacje: `osKeyringBackend` (wraps `go-keyring`), `FallbackBackend` (TASK-01.7).
+  - [x] Tabela testów z **mock** `go-keyring`:
     - happy path (OS keyring działa)
     - `ErrUnsupportedPlatform` → wybiera fallback
     - `ErrNotFound` po `Set` → error z hintem do doctor
     - cleanup probe key (nie zostawiamy śmieci)
-  - [ ] Coverage ≥ 85%.
+  - [x] Coverage ≥ 85% (`secrets` = 93.2%).
 - **Pliki:**
   - `secrets/backend.go` (new — interface)
   - `secrets/keyring.go` (new)
