@@ -151,6 +151,15 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   `LegacyAlgorithmCompat=true`; `ssh-dss` never) and wraps a
   `HostKeyCallback` that maps `knownhosts.KeyError` outcomes onto
   distinguishable unknown / mismatch sentinels. Coverage: 100%.
+- `cmd/webox` now launches the Bubble Tea TUI shell, with read-only
+  dashboard navigation, Project Detail Overview, SWR-backed status refresh
+  commands, and Sprint 04 teatest smoke coverage.
+- `docs/sprints/sprint-05-wizard-project.md` — rolling-wave plan for the
+  project wizard, first-run profile setup, provider-side provisioning, and
+  LIFO rollback with `pending_cleanups.json`.
+- `docs/retros/2026-05-23-sprint-04.md` — Sprint 04 retrospective covering
+  the `config.Load` first-run mismatch, teatest output capture, Charm v1/v2
+  import-path decision, and golden snapshot gaps.
 
 ### Security
 - Main module toolchain floor is now `go 1.25.0` so Webox can use
