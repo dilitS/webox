@@ -1,0 +1,3 @@
+Database myapp_prod created.
+Username: myapp_prod
+Password: REDACTED-NEVER-A-REAL-SECRET-aBcD1234EfGh5678

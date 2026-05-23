@@ -1,0 +1,6 @@
+domain                                       type     node_version
+api.webox-test.smallhost.pl                   nodejs   22
+app.webox-test.smallhost.pl                   nodejs   24
+docs.webox-test.smallhost.pl                  static   -
+legacy.webox-test.smallhost.pl                php      -
+sui.webox-test.smallhost.pl                   nodejs   20

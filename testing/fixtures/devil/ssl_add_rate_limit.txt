@@ -1,0 +1,1 @@
+error: lets encrypt rate limit exceeded for webox-test.smallhost.pl

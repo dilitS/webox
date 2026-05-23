@@ -1,0 +1,4 @@
+domain                                       ip               type
+api.webox-test.smallhost.pl                  203.0.113.10     nodejs
+app.webox-test.smallhost.pl                  203.0.113.10     nodejs
+docs.webox-test.smallhost.pl                 203.0.113.10     static

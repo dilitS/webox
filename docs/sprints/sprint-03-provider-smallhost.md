@@ -123,24 +123,57 @@ Po sprincie 03:
 
 ---
 
-## Outcome (wypełnij po sprincie)
+## Outcome (wypełnione 2026-05-23)
 
-- ✅ Done: TASK-03.X, ...
-- ⏭️ Carry-over: ...
-- 📌 Decyzje: ...
-- 🧠 Surprises: ...
+- ✅ Done: TASK-03.1, TASK-03.2, TASK-03.3, TASK-03.4, TASK-03.5, TASK-03.6
+- ⏭️ Carry-over: live fixture capture for `devil www add`, `devil www
+  list`, `devil mysql add`, `devil ssl www add` — all current fixtures
+  are marked `captured: inferred` and have to be re-captured against a
+  real `webox-test@small.pl` account before Sprint 06 ships GitHub
+  deploy workflow.
+- 📌 Decyzje:
+  - Use a narrow `smallhost.Executor` interface (instead of passing
+    `ssh.Pool` directly) so tests can inject a recording fake without
+    touching the transport. `NewSSHExecutor(pool, target)` wires the
+    production path.
+  - Treat `DatabaseKind` as a type alias for `string` so the canonical
+    `HostingProvider.CreateDatabase(dbType string, dbName string)`
+    signature from DESIGN §3 stays unchanged while callers can still
+    use the named constants (`DatabaseMySQL`, `DatabasePostgres`).
+  - Path helpers (`GetDeployPath`, `GetLogPath`, `EnvPath`,
+    `StoragePath`) fail closed by returning `""` for invalid domain or
+    user. Returning a broken path (e.g. collapsing to `/`) would be a
+    rsync footgun; an empty target loudly breaks the command builder
+    instead.
+- 🧠 Surprises:
+  - The `commit-msg` hook regex forbids subjects that start with
+    `TASK-...` (uppercase first letter after `:`). Subjects had to be
+    rewritten to start with imperative lowercase; the `Refs:`
+    footer still carries the task id.
+  - `golangci-lint v2`'s `err113` is strict about static error
+    creation; every `fmt.Errorf("invalid X: ...")` had to wrap a
+    pre-declared sentinel. This dovetailed naturally with the
+    `ErrInvalidDomain` / `ErrInvalidUser` design and is on net a win.
+  - `gocritic`'s `stringConcatSimplify` flagged `strings.Join` for the
+    2-element case; we switched two call sites to `a + " " + b`. Not
+    a behavior change but a useful nudge towards clearer code.
 - 📊 Metryki:
-  - Coverage `providers/`: %
-  - Coverage `providers/smallhost/`: %
-  - Fixture count: %
+  - Coverage `providers/`: 100%.
+  - Coverage `providers/smallhost/`: 89.1%.
+  - Fixture count: 16 `.txt` + 16 `.fixture.md` + 1 `README.md`.
+  - `make ci` global coverage: 86.8%.
 - 🔒 Security validation:
-  - [ ] No secrets in fixture files.
-  - [ ] Parser malicious fixtures green.
-  - [ ] `go test -race ./providers/... ./testing/...` green.
+  - [x] No secrets in fixture files (passwords use
+        `REDACTED-NEVER-A-REAL-SECRET-` tripwire prefix).
+  - [x] Parser malicious fixture green (`www_add_malicious.txt`).
+  - [x] `go test -race ./providers/... ./testing/...` green.
+  - [x] Parser errors never echo raw command output (asserted via
+        `TestParseWwwAdd_MaliciousDoesNotLeakIntoError` and
+        `TestParseDBAdd_PasswordNeverInError`).
 - ➡️ Następny sprint: `sprint-04-tui-shell.md`
 
 ---
 
 ## Retro Link
 
-`docs/retros/YYYY-MM-DD-sprint-03.md`
+[`docs/retros/2026-05-23-sprint-03.md`](../retros/2026-05-23-sprint-03.md)

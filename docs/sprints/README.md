@@ -231,8 +231,8 @@ Wszystkie powtarzalne kroki są skryptowane. Główne komendy z `Makefile`:
 | 00 | Bootstrap (repo, CI, tooling) | ✅ Done | [sprint-00-bootstrap.md](sprint-00-bootstrap.md) | [2026-05-22-sprint-00.md](../retros/2026-05-22-sprint-00.md) |
 | 01 | Foundations (config + secrets) | ✅ Done | [sprint-01-foundations.md](sprint-01-foundations.md) | [2026-05-23-sprint-01.md](../retros/2026-05-23-sprint-01.md) |
 | 02 | SSH + status cache | ✅ Done | [sprint-02-ssh-cache.md](sprint-02-ssh-cache.md) | [2026-05-23-sprint-02.md](../retros/2026-05-23-sprint-02.md) |
-| 03 | Provider abstraction + `small.pl` skeleton | 📅 Planned | [sprint-03-provider-smallhost.md](sprint-03-provider-smallhost.md) | — |
-| 04 | TUI shell (MVU, navigation, dashboard) | 📝 Outlined | — | — |
+| 03 | Provider abstraction + `small.pl` skeleton | ✅ Done | [sprint-03-provider-smallhost.md](sprint-03-provider-smallhost.md) | [2026-05-23-sprint-03.md](../retros/2026-05-23-sprint-03.md) |
+| 04 | TUI shell (MVU, navigation, dashboard) | 📅 Planned | [sprint-04-tui-shell.md](sprint-04-tui-shell.md) | — |
 | 05 | Wizard tworzenia projektu (LIFO rollback) | 📝 Outlined | — | — |
 | 06 | GitHub deploy workflow | 📝 Outlined | — | — |
 | 07 | Doctor + diagnostics + i18n | 📝 Outlined | — | — |

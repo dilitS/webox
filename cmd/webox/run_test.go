@@ -60,13 +60,14 @@ func TestRun_Debug_AcceptedAsModifier_DoesNotEscape(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		args []string
+		name       string
+		args       []string
+		useStubTUI bool
 	}{
-		{"alone", []string{"--debug"}},
-		{"before version", []string{"--debug", "--version"}},
-		{"after version", []string{"--version", "--debug"}},
-		{"twice", []string{"--debug", "--debug", "--help"}},
+		{"alone", []string{"--debug"}, true},
+		{"before version", []string{"--debug", "--version"}, false},
+		{"after version", []string{"--version", "--debug"}, false},
+		{"twice", []string{"--debug", "--debug", "--help"}, false},
 	}
 	for _, tt := range tests {
 		tt := tt
@@ -74,7 +75,15 @@ func TestRun_Debug_AcceptedAsModifier_DoesNotEscape(t *testing.T) {
 			t.Parallel()
 
 			var stdout, stderr bytes.Buffer
-			got := Run(tt.args, &stdout, &stderr)
+			var got int
+			if tt.useStubTUI {
+				got = runWithDeps(tt.args, &stdout, &stderr, runDoctor, func(stdout, stderr io.Writer) int {
+					_, _ = stdout.Write([]byte("tui started\n"))
+					return 0
+				})
+			} else {
+				got = Run(tt.args, &stdout, &stderr)
+			}
 			if got != 0 {
 				t.Fatalf("Run(%v) exit = %d, want 0; stderr=%q", tt.args, got, stderr.String())
 			}
@@ -89,12 +98,16 @@ func TestRun_NoArgs_PrintsHelpStubExitsZero(t *testing.T) {
 	t.Parallel()
 
 	var stdout, stderr bytes.Buffer
-	got := Run(nil, &stdout, &stderr)
+	stub := func(stdout, stderr io.Writer) int {
+		_, _ = stdout.Write([]byte("tui started\n"))
+		return 0
+	}
+	got := runWithDeps(nil, &stdout, &stderr, runDoctor, stub)
 	if got != 0 {
 		t.Fatalf("exit code = %d, want 0", got)
 	}
-	if stdout.Len() == 0 {
-		t.Error("stdout should not be empty (TUI stub or help)")
+	if stdout.String() != "tui started\n" {
+		t.Fatalf("stdout = %q, want TUI stub output", stdout.String())
 	}
 }
 
@@ -135,7 +148,7 @@ func TestRunWith_DoctorDispatchesText(t *testing.T) {
 	stub, calls := stubDispatcher(t, 1, false, "doctor text\n", "")
 
 	var stdout, stderr bytes.Buffer
-	got := runWith([]string{"doctor"}, &stdout, &stderr, stub)
+	got := runWithDeps([]string{"doctor"}, &stdout, &stderr, stub, brokenTUI)
 	if got != 1 {
 		t.Fatalf("runWith(doctor) exit = %d, want 1", got)
 	}
@@ -168,7 +181,7 @@ func TestRunWith_DoctorDispatchesJSON(t *testing.T) {
 			stub, calls := stubDispatcher(t, 0, true, "{\"summary\":{}}\n", "")
 
 			var stdout, stderr bytes.Buffer
-			got := runWith(tt.args, &stdout, &stderr, stub)
+			got := runWithDeps(tt.args, &stdout, &stderr, stub, brokenTUI)
 			if got != 0 {
 				t.Fatalf("runWith(%v) exit = %d, want 0; stderr=%q", tt.args, got, stderr.String())
 			}
@@ -267,6 +280,11 @@ func stubDispatcher(t *testing.T, exit int, wantJSON bool, stdoutOut, stderrOut 
 		return exit
 	}
 	return dispatch, &calls
+}
+
+func brokenTUI(stdout, stderr io.Writer) int {
+	_, _ = stderr.Write([]byte("unexpected tui dispatch"))
+	return 99
 }
 
 type stubRunner struct {

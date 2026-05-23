@@ -16,6 +16,86 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- `docs/sprints/sprint-04-tui-shell.md` — rolling-wave plan for
+  Sprint 04 (Bubble Tea / Lipgloss bootstrap, MVU shell, read-only
+  dashboard with SWR refresh, Project Detail Overview tab). Dependency
+  sign-off section enumerates the four direct deps the sprint adds.
+- `docs/retros/2026-05-23-sprint-03.md` — Sprint 03 retrospective
+  capturing the executor-seam pattern, the tripwire-prefixed fixture
+  passwords, and the `commit-msg` hook learnings.
+- `providers/smallhost/methods.go` + `executor.go` (TASK-03.6) —
+  HostingProvider method skeletons wire the Devil parsers to a
+  narrow `Executor` seam. Production wiring uses `NewSSHExecutor`
+  over `ssh.Pool`; tests inject a recording fake. Every command
+  builder uses pre-validated tokens (`ValidateDomain`,
+  `ValidateDBName`, `ValidateNodeVersion`) before concatenation so
+  shell injection is impossible at the boundary. Methods map
+  parser sentinels onto the HostingProvider contract (idempotent
+  Remove*, ErrSubdomainExists, ErrAppNotFound, ErrAppNotNode,
+  ErrDNSNotResolving, ErrRateLimitLetsEncrypt, ErrCLINotFound). The
+  fail-closed branch — methods invoked before SetExecutor — returns
+  `providers.ErrUnknownOutputFormat` wrapped with an "executor not
+  configured" sentinel so wiring bugs surface in tests instead of
+  silent no-ops.
+- `parseVhostList`, `parseSSLAdd`, `parseSSLDelete`, `parseDBAdd`,
+  `parseDBDelete` in `providers/smallhost/parsers.go` (TASK-03.5) —
+  cover the SSL provisioning round-trip (account IP lookup → cert
+  install → cert delete) and the MySQL/PostgreSQL provisioning
+  round-trip (create with panel-generated credentials → delete).
+  `parseSSLAdd` maps DNS-not-resolving and Let's Encrypt rate-limit
+  outputs onto `ErrDNSNotResolving` / `ErrRateLimitLetsEncrypt`.
+  `parseDBAdd` extracts username + password via named regex groups
+  and the test corpus asserts the password never leaks back into
+  error strings. `parseSSLDelete` / `parseDBDelete` treat "no cert" /
+  "not found" as nil so LIFO rollback can replay safely. Fixtures
+  use `REDACTED-NEVER-A-REAL-SECRET-` as a tripwire prefix the
+  redactor will catch even if a real password ever slips in.
+- `providers/smallhost/parsers.go` + `testing/fixtures/devil/`
+  (TASK-03.4) — defensive parsers for `devil www add`, `devil www
+  restart`, and `devil www list`. `stripAndNormalize` caps each
+  command output at 1 MiB, strips ANSI escapes, normalises CRLF/CR
+  to LF, and rejects non-printable bytes via
+  `providers.ErrUnknownOutputFormat`. Maps the well-known panel
+  responses onto sentinels (`ErrSubdomainExists`,
+  `ErrNodeVersionUnsupported`, `ErrAppNotFound`, `ErrAppNotNode`)
+  using named regex groups; unknown shapes fail closed without
+  echoing raw output into operator logs. Fixtures ship with
+  `.fixture.md` provenance notes (`captured: inferred` until live
+  capture replaces them), a CRLF variant, an empty-list rendering,
+  and an adversarial fixture mixing ANSI colour, NUL/BEL bytes, and
+  `$(rm -rf /)` to verify the parser never lets the substring into
+  the returned error.
+- `providers/smallhost/paths.go` (TASK-03.3) — pure path helpers
+  (`GetDeployPath`, `GetLogPath`, `EnvPath`, `StoragePath`) plus
+  `ValidateDomain` / `ValidateUser` with the `ErrInvalidDomain` /
+  `ErrInvalidUser` sentinels. The validators reject leading/trailing
+  dashes, uppercase, NUL/CR/LF/space, `..`, `/`, `\` and any label
+  longer than 63 characters before the value reaches a path or
+  command string. Helpers fail closed by returning "" for invalid
+  domain or user so the rsync target never collapses to `/`.
+- `providers/smallhost/config.go` + `methods.go` (TASK-03.2) — adapter
+  constructor and typed [`Properties`] bag for small.pl / Devil. The
+  factory rejects unsupported `restart_method`, parses `ssh_pool_max`
+  (range `[1,16]`, default 3), and `ssh_algorithms_legacy_compat`
+  (default false). Registration happens in `init()` via the new
+  registry. Method stubs implementing `HostingProvider` return a
+  `providers.ErrUnknownOutputFormat`-wrapped sentinel until TASK-03.6
+  replaces them; this keeps the interface contract testable now
+  without leaking half-finished SSH wiring into later tasks.
+- `providers/provider.go`, `providers/errors.go`, `providers/registry.go`
+  (TASK-03.1) — canonical `HostingProvider` contract, sentinel errors
+  (`ErrInvalidProviderConfig`, `ErrUnknownProvider`,
+  `ErrProviderAlreadyRegistered`, `ErrUnknownOutputFormat`,
+  `ErrOutputTooLarge`, `ErrSubdomainExists`,
+  `ErrNodeVersionUnsupported`, `ErrAppNotFound`, `ErrAppNotNode`,
+  `ErrDNSNotResolving`, `ErrRateLimitLetsEncrypt`, `ErrDBNameTaken`,
+  `ErrCLINotFound`), and a sync-guarded factory registry with
+  `Register` / `Unregister` / `Names` / `New`. `New` normalises Port
+  to 22 and Properties to non-nil before invoking the factory, runs
+  registry lookup before validation so a typo in `type` surfaces as
+  `ErrUnknownProvider` instead of being masked by validation noise,
+  and propagates factory errors via `%w` while keeping the provider
+  name in the message. Coverage: 100%.
 - `docs/sprints/sprint-03-provider-smallhost.md` — rolling-wave plan for
   Sprint 03 (provider contracts, `smallhost` constructor, path helpers,
   Devil parser fixtures, and smallhost method skeleton over `ssh.Exec`).
@@ -71,6 +151,15 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   `LegacyAlgorithmCompat=true`; `ssh-dss` never) and wraps a
   `HostKeyCallback` that maps `knownhosts.KeyError` outcomes onto
   distinguishable unknown / mismatch sentinels. Coverage: 100%.
+- `cmd/webox` now launches the Bubble Tea TUI shell, with read-only
+  dashboard navigation, Project Detail Overview, SWR-backed status refresh
+  commands, and Sprint 04 teatest smoke coverage.
+- `docs/sprints/sprint-05-wizard-project.md` — rolling-wave plan for the
+  project wizard, first-run profile setup, provider-side provisioning, and
+  LIFO rollback with `pending_cleanups.json`.
+- `docs/retros/2026-05-23-sprint-04.md` — Sprint 04 retrospective covering
+  the `config.Load` first-run mismatch, teatest output capture, Charm v1/v2
+  import-path decision, and golden snapshot gaps.
 
 ### Security
 - Main module toolchain floor is now `go 1.25.0` so Webox can use
