@@ -191,20 +191,20 @@ func runMockTUIWithTrace(stdout, stderr io.Writer, sink telemetry.Sink) int {
 // only emits a one-line warning on stderr and degrades to the no-op
 // sink. The returned cleanup closes the file (if any) and is safe
 // to defer regardless of which sink was selected.
-func openTraceSink(path string, stderr io.Writer) (telemetry.Sink, func()) {
+func openTraceSink(path string, stderr io.Writer) (sink telemetry.Sink, cleanup func()) {
 	if path == "" {
 		return telemetry.Disabled, func() {}
 	}
-	sink, err := telemetry.OpenFileSink(path, telemetry.FileSinkPolicy{})
+	opened, err := telemetry.OpenFileSink(path, telemetry.FileSinkPolicy{})
 	if err != nil {
 		fmt.Fprintf(stderr, "webox: --debug-trace disabled: %v\n", err)
 		return telemetry.Disabled, func() {}
 	}
 	fmt.Fprintf(stderr, "webox: --debug-trace writing to %s (local only, 0600)\n", path)
-	if closer, ok := sink.(io.Closer); ok {
-		return sink, func() { _ = closer.Close() }
+	if closer, ok := opened.(io.Closer); ok {
+		return opened, func() { _ = closer.Close() }
 	}
-	return sink, func() {}
+	return opened, func() {}
 }
 
 // mockEnv is the environment variable the launcher honours as an
@@ -215,20 +215,6 @@ const mockEnv = "WEBOX_MOCK"
 func mockEnvActive() bool {
 	v := os.Getenv(mockEnv)
 	return v != "" && v != "0" && v != "false" && v != "FALSE"
-}
-
-// runMockTUI boots the cockpit with deterministic in-memory data. No
-// SSH session, no HTTP probe, no GitHub call. The launcher never
-// touches the on-disk config either — `MockOptions` carries every
-// fetcher the cockpit needs.
-func runMockTUI(stdout, stderr io.Writer) int {
-	fmt.Fprintln(stderr, "webox: starting in MOCK mode — no servers are contacted")
-	program := realTeaProgram(tui.New(tui.MockOptions("")), stdout)
-	if _, err := program.Run(); err != nil {
-		fmt.Fprintf(stderr, "webox: TUI failed: %v\n", err)
-		return exitMisuse
-	}
-	return exitOK
 }
 
 // configPathResolver is the package-private seam that returns the

@@ -15,6 +15,14 @@ import (
 	"github.com/dilitS/webox/internal/log"
 )
 
+// ErrEmptyTracePath is returned by [OpenFileSink] when the caller
+// supplies an empty PATH. Exposed as a sentinel so the CLI layer
+// can branch on it (typed `errors.Is`) instead of comparing error
+// strings — keeps the err113 contract clean and lets future callers
+// distinguish "you forgot the path" from "open failed at the OS
+// level" without re-parsing the message.
+var ErrEmptyTracePath = errors.New("telemetry: empty trace path")
+
 // FileSinkPolicy parameterises the local-only JSONL trace writer
 // introduced by TASK-14.6. The defaults below — 8 KiB buffer flushed
 // every 500 ms or whenever the writer is closed — keep the trace
@@ -99,7 +107,7 @@ type FileSink struct {
 // operator.
 func OpenFileSink(path string, policy FileSinkPolicy) (Sink, error) {
 	if path == "" {
-		return Disabled, errors.New("telemetry: empty trace path")
+		return Disabled, ErrEmptyTracePath
 	}
 	resolved, err := filepath.Abs(path)
 	if err != nil {
@@ -110,6 +118,13 @@ func OpenFileSink(path string, policy FileSinkPolicy) (Sink, error) {
 			return Disabled, fmt.Errorf("telemetry: mkdir %q: %w", dir, mkErr)
 		}
 	}
+	// G304 is correct in the general case (variable file paths can
+	// be hijacked) but here the path is supplied by the operator
+	// via the `--debug-trace=PATH` CLI flag — an explicit, audited
+	// decision, not user-controlled input from a network boundary.
+	// The mode is 0600 so even an unfortunate path collision
+	// cannot widen access.
+	//nolint:gosec // explicit operator-supplied path; mode 0600.
 	f, err := os.OpenFile(resolved, os.O_APPEND|os.O_CREATE|os.O_WRONLY, traceFileMode)
 	if err != nil {
 		return Disabled, fmt.Errorf("telemetry: open %q: %w", resolved, err)
