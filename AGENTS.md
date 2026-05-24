@@ -71,6 +71,9 @@ Pełna lista w [`docs/DESIGN.md §2.1`](./docs/DESIGN.md#21-layout-repo). Najwa�
 ```text
 cmd/webox/         entrypoint
 tui/               Bubble Tea state machine
+tui/surface/       Surface contract (Sprint 13 foundation; full migration → Sprint 14)
+tui/bento/         responsive grid + height budgets + bench
+tui/components/    asciigraph topology + status bar + ring buffer
 providers/         HostingProvider interface + adapters
 ssh/               connection pool + sftp
 config/            config.json + migrations + flock
@@ -81,6 +84,7 @@ services/          GitHub API client
 i18n/              translation loader
 assets/            //go:embed workflow templates + doctor schema
 testing/           fixtures, sshmock, ghmock cassettes
+internal/e2e/      multi-tick cockpit scenarios (teatest)
 ```
 
 **Zasada cardinala:** każdy nowy pakiet ma `doc.go` z opisem co i dlaczego.
@@ -125,6 +129,8 @@ testing/           fixtures, sshmock, ghmock cassettes
 | **Każdy parser ma golden file z malicious input** | `\r\n` injection, ANSI escape, 1MB+ output, mock błędnego formatu. |
 | **`go test -race` w CI** | Brak path do merge'a bez `-race`. |
 | **TUI testy przez `teatest` snapshot** | Stripped ANSI w snapshot. Kolory walidowane manualnie pre-release. |
+| **Multi-tick TUI scenariusze w `internal/e2e/`** | Każdy nowy klawiszowy flow ma ≥ 1 e2e scenariusz (`teatest` × `sshmock`). Budget: ≤ 10 s wall clock dla całego pakietu. |
+| **Per-frame perf gate (`make bench-check`)** | `tui/bento` ma benchmark dla każdego layout tier. Próg `BENCH_MAX_NS = 5 ms`; wzrost `B/op` > 25 % bez uzasadnienia w commit msg = block. |
 | **Coverage ≥ 70% (MVP), ≥ 80% (v0.2)** | `make cover-check`. CI fails poniżej. |
 
 ### 2.4 Scope discipline

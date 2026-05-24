@@ -76,7 +76,9 @@ GA = `v1.0.0`. Wymagania (wszystkie naraz):
 | 09 | Live Log Stream | SSH `tail -f` + ring buffer + ANSI level coloring + redactor pre-render + header bar server metrics. |
 | 10 | Live CI/CD Pipeline Panel | Live GitHub Actions workflow steps, click-through do logów; nadbudowa na `services/github`. |
 | 11 | Live Service Topology Map | ASCII graph GitHub → Server → App ← DB z live edge animations. |
-| 12 | Polish + release hardening | Bug bash, RC1 → v0.1. |
+| 12 | Polish + release hardening | Bug bash, RC1 → v0.1. Chrome contract + responsive Bento + viewport scroll. |
+| 13 | RC1 hardening + Surface foundation | RC1 / GA gate, `tui/surface/` interface + dashboard adapter, `internal/e2e/`, per-frame bench + `make bench-check`. |
+| 14 | Architecture hardening (post-RC) | Migracja pozostałych powierzchni na `Surface`, per-tile scroll + focus rotation, SSH semaphore + retry, host-key modal, e2e rozbudowa, lokalny `--debug-trace`. |
 
 Pełna dekompozycja per sprint: [`sprints/`](./sprints/).
 

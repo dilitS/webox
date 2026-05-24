@@ -15,7 +15,12 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ## [Unreleased]
 
+### Changed
+- **Project rules + roadmap sync (2026-05-25).** Charter (`.cursor/rules/00-charter.mdc`) updated to reflect [ADR-0007](./docs/adr/0007-bento-ultra-eskalacja-mvp.md) — Bento Ultra, Live Log Stream, Live Service Topology, CI/CD Live Panel and header metrics are **in MVP**, not STRETCH. Added explicit no-telemetry / no-plugin-marketplace clauses, perf gate guardrail (`make bench-check` with 5 ms budget), e2e scenario requirement, and host-key UX policy (modal fallback in Sprint 14 → full `webox doctor security --update-host-key` in v0.2+). `.cursor/rules/20-bubbletea-mvu.mdc` gained the Sprint 13 chrome contract + mouse API + surface contract sections; `.cursor/rules/50-tests.mdc` documents the `internal/e2e/` layer and `make bench-check`. `AGENTS.md` repo layout reflects the new `tui/surface/`, `tui/bento/`, `internal/e2e/` packages. `docs/ROADMAP.md` adds Sprint 13 and Sprint 14 rows.
+
 ### Added
+- **Sprint 14 plan — Architecture hardening (`docs/sprints/sprint-14-architecture-hardening.md`) (2026-05-25).** 8 tasks tied directly to the post-RC code-review critique: full migration of remaining states to `surface.Surface`, per-tile scroll + focus rotation, SSH in-flight semaphore + retry, host-key mismatch modal, `internal/e2e/` expansion + nightly CI, local `--debug-trace`, structured `TileBlock` refactor, v0.2 backlog freeze. Explicitly **no telemetry**, no plugin marketplace, no AI features — Sprint 14 is technical hardening only.
+
 - **Sprint 13 — Per-frame benchmark + CI perf gate (2026-05-24).**
   - `tui/bento/engine_bench_test.go` — `BenchmarkRenderMode/{standard-100x30,ultra-120x35,ultraplus-160x45}` measures the cockpit's per-frame composition cost (`ns/op` + `B/op`) using a representative 5-tile stub (Projects + Server + Topology + CI/CD + Logs). Current baseline on Apple M4: 138 / 183 / 192 µs/op respectively — comfortably inside the 60 fps budget (~16 ms).
   - `Makefile` — new `make bench` target runs the suite verbatim; new `make bench-check` parses the output and fails when any single `ns/op` exceeds `BENCH_MAX_NS` (default 5 000 000 ns / 5 ms — 26× headroom over current baseline). A new `make ci-full` target chains `make ci` + `make bench-check` for release-candidate hardening.

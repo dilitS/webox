@@ -62,3 +62,47 @@ case tickMsg:
 ```
 
 Patrz [DESIGN §2.3](../../docs/DESIGN.md#23-zasady-przep%C5%82ywu-danych-mvu).
+
+## Chrome contract (Sprint 13+)
+
+Każda powierzchnia komponuje się w **trzech pionowo wyrównanych slotach**:
+
+1. **Top chrome** — `WEBOX vX.Y.Z [LIVE]  …` status bar pinowany przez `tui.View`.
+2. **Body** — output `renderRootBody`, sliced przez `renderViewport` przy overflow. Tylko ten slot przewija się klawiszami `PgUp/PgDn/Home/End` i kółkiem myszy (`MouseActionPress` × `MouseButtonWheel{Up,Down}`, step 3 linie).
+3. **Bottom chrome** — keybinding legend + dynamiczny `↕ scroll: PgUp/PgDn · Home/End · Mouse · (offset/max)` gdy body overflowuje.
+
+`Tiny mode` (`< 70×22`) świadomie omija chrome — "Terminal too small" musi pozostać samowystarczalne.
+
+## Mouse API (post-1.3 Bubble Tea)
+
+`MouseMsg.Type` jest **deprecated**. Używamy `MouseAction` (`Press`/`Release`/`Motion`) + `MouseButton` (`WheelUp`/`WheelDown`/`Left`/…):
+
+```go
+func (m Model) updateMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+    if msg.Action != tea.MouseActionPress {
+        return m, nil // ignore drag / release
+    }
+    switch msg.Button {
+    case tea.MouseButtonWheelUp:
+        m.scrollViewportBy(-mouseWheelStep)
+    case tea.MouseButtonWheelDown:
+        m.scrollViewportBy(mouseWheelStep)
+    }
+    return m, nil
+}
+```
+
+## Surface contract (Sprint 13+)
+
+Nowe powierzchnie implementują `tui/surface.Surface`:
+
+```go
+type Surface interface {
+    Body(ctx Context) string
+    Crumb(ctx Context) string
+    Footer(ctx Context) FooterHint
+    AcceptsScroll(ctx Context) bool
+}
+```
+
+Adaptery tworzy się per-render w `Model.surfaceFor()` — **nigdy** w globalnym registry (Model jest value-typed; stale pointer = bug). Stary `renderRootBody` switch zostaje jako fallback dopóki Sprint 14 nie domigruje wszystkich stanów.

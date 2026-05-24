@@ -11,9 +11,12 @@ Treat `AGENTS.md` (repo root) and `docs/AUDIT.md` (including §8 folded `IMP-*` 
 
 - **Sekrety nigdy w `config.json`, logach, error messages, stack trace.** Tylko keyring lub `secrets.enc`.
 - **AES-GCM nonce TYLKO z `crypto/rand.Read(12 bytes)`.** Brak `time.Now()`, brak licznika.
-- **SSH host key mismatch = strict block.** Brak auto-accept poza explicit user TUI confirmation z out-of-band phrase.
-- **MVP scope = small.pl/Devil only.** Live log stream, sound engine, Bento Ultra, env merger, topology map, fast-chord bindings, DAG-based rollback → **STRETCH v0.2+**, **nie** w MVP.
+- **SSH host key mismatch = strict block.** Brak auto-accept poza explicit user TUI confirmation z out-of-band phrase (krótkoterminowy modal fallback w Sprincie 14, pełny `webox doctor security --update-host-key` w v0.2+).
+- **MVP scope = small.pl/Devil only.** Po [ADR-0007](../../docs/adr/0007-bento-ultra-eskalacja-mvp.md) w MVP są: **Bento Ultra (`120×35`)**, **Live Log Stream**, **Live Service Topology Map**, **CI/CD Live Panel**, **header bar metrics**. STRETCH v0.2+ zostają: **Bento Ultra+ (`≥ 160×45` z dodatkowymi kafelkami)**, **Sound Engine**, **Env Merger**, **fast-chord bindings**, **DAG-based rollback**, **drugi provider**.
+- **Brak telemetrii / phone-home.** `--debug-trace` (Sprint 14) zapisuje wyłącznie lokalnie do `~/.cache/webox/trace.jsonl` z redactorem; żaden plik nigdy nie opuszcza maszyny operatora.
 - **TDD obowiązkowe** dla: parserów outputu providera, walidatorów, redaktora sekretów, status cache, maszyny stanów TUI, keyring detekcji, config migracji.
+- **Multi-tick TUI flows** (Tab → detail → Esc, etc.) MUSZĄ mieć ≥ 1 scenariusz w `internal/e2e/` (`teatest` × `sshmock`).
+- **`make bench-check` (perf gate) zielony** przed merge'em każdej zmiany w `tui/bento`. Próg `BENCH_MAX_NS = 5 ms` per layout tier.
 - **Conventional Commits 1.0.0 bez gitmoji.** `feat(scope): ...`, `fix(scope): ...`, etc.
 - **Każdy behavior-affecting PR → wpis w `CHANGELOG.md [Unreleased]`.**
 
@@ -21,10 +24,12 @@ Treat `AGENTS.md` (repo root) and `docs/AUDIT.md` (including §8 folded `IMP-*` 
 
 | Sytuacja | Postępowanie |
 |---|---|
-| Wątpliwość w MVP scope | sprawdź [ROADMAP §3.3](../../docs/ROADMAP.md) i [PRD §6 priorytety](../../docs/PRD.md) |
+| Wątpliwość w MVP scope | sprawdź [ROADMAP §3.3](../../docs/ROADMAP.md) i [PRD §6 priorytety](../../docs/PRD.md) — pamiętaj o eskalacjach z [ADR-0007](../../docs/adr/0007-bento-ultra-eskalacja-mvp.md). |
 | Konflikt między docs | wyższy priorytet: PRD > ROADMAP > DESIGN > UX |
 | Brak ADR dla architektonicznej decyzji | zatrzymaj się, zaproponuj ADR maintainerowi |
 | Nowa zależność `go.mod` | wymaga uzasadnienia w PR + sign-off maintainera |
+| Sugestia dodania telemetry / analytics / phone-home | **automatic reject** — patrz `Non-negotiable` powyżej. Lokalny `trace.jsonl` to NIE telemetry. |
+| Sugestia plugin marketplace / dynamiczne wczytywanie kodu | **automatic reject** w MVP i v0.2 — wymaga RFC + maintainer sign-off na v1.0+. |
 
 ## Mode of work
 

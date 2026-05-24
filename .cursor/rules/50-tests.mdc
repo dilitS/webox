@@ -94,6 +94,29 @@ go test -race ./...
 
 Brak path do merge'a bez `-race`.
 
+## E2E layer (multi-tick scenariusze)
+
+Od Sprintu 13 `internal/e2e/` hostuje testy które dotykają cockpitu przez prawdziwe ticki `teatest`, nie pojedyncze rendery. Stamtąd weryfikujemy:
+
+- przepływy klawiszowe spinające kilka `Update` cykli (Tab → detail → Esc, `4` → live logs, …),
+- regresje chrome contractu (status bar / body / footer) i scroll-hint indicator,
+- przejścia rozmiarów (Tiny / Standard / Ultra / Ultra+).
+
+Budget: ≤ 10 s wall clock dla całego pakietu, ≤ 2 s per scenariusz (`e2eFrameTimeout`). Wolniejsze scenariusze idą za bramę `WEBOX_E2E_LONG=1`.
+
+```bash
+go test ./internal/e2e/...   # zwykły bieg
+```
+
+## Per-frame benchmark (cockpit hot path)
+
+Sprint 13 dorzucił `tui/bento/engine_bench_test.go` + `make bench-check`. Każdy refactor który dotyka `bento.Engine.RenderMode` / `clipTileBlock` MUSI:
+
+1. zostać uruchomiony lokalnie: `make bench` (raport `ns/op` + `B/op` per layout tier),
+2. przejść bramę `make bench-check` (`BENCH_MAX_NS` = 5 000 000 ns / 5 ms — 26× margines nad bieżący baseline ≈ 200 µs).
+
+Wzrost `B/op` o > 25% bez uzasadnienia w commit message = block.
+
 ## Fixture metadata
 
 Każdy fixture w `testing/fixtures/devil/*.txt` ma towarzyszący `*.fixture.md`:
