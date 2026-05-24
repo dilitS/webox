@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 
 	"github.com/dilitS/webox/config"
+	"github.com/dilitS/webox/internal/telemetry"
 	ghsvc "github.com/dilitS/webox/services/github"
 	"github.com/dilitS/webox/status"
 	"github.com/dilitS/webox/tui/bento"
@@ -74,6 +75,12 @@ type Options struct {
 	// straight into the dashboard with the supplied config. Used
 	// exclusively by `--mock` mode today; production leaves it nil.
 	PreloadedConfig *config.Config
+	// Trace is the local-only observability sink. Production wires
+	// either [telemetry.Disabled] (default) or a [telemetry.FileSink]
+	// opened from `--debug-trace=PATH`. The cockpit emits coarse
+	// events (state transitions, refresh ticks, modal opens) without
+	// blocking — see TASK-14.6.
+	Trace telemetry.Sink
 }
 
 // HeaderMetricsSnapshot is the in-process projection of the latest SSH
@@ -132,6 +139,7 @@ type Model struct {
 	pendingPath     string
 	layoutOverride  string
 	nowFn           func() time.Time
+	trace           telemetry.Sink
 }
 
 // liveLogsForm captures the per-session state of the Sprint 09 live-log
@@ -226,6 +234,11 @@ func New(opts Options) Model {
 		cicdSnapshots = make(map[string]cicdSnapshotEntry)
 	}
 
+	trace := opts.Trace
+	if trace == nil {
+		trace = telemetry.Disabled
+	}
+
 	m := Model{
 		state:           StateDashboard,
 		activeTab:       TabOverview,
@@ -250,6 +263,7 @@ func New(opts Options) Model {
 		headerMetrics:   opts.MockHeaderMetrics,
 		nowFn:           nowFn,
 		cfg:             opts.PreloadedConfig,
+		trace:           trace,
 	}
 
 	if opts.PreloadedConfig != nil {
@@ -274,6 +288,24 @@ func New(opts Options) Model {
 	}
 
 	return m
+}
+
+// emit forwards a structured event into the local-only trace sink.
+// Production cockpits use [telemetry.Disabled] (no-op) unless
+// `--debug-trace=PATH` is set; tests substitute a recording sink to
+// assert on transitions. The method intentionally accepts loose
+// `map[string]any` fields rather than typed structs so add-events
+// stay a one-liner — the trace is for human debugging, not API
+// contracts.
+//
+// The call is non-blocking by design: [telemetry.FileSink.Record]
+// drops events when the queue is full so the Update hot path is
+// never stalled by disk pressure.
+func (m Model) emit(name string, fields map[string]any) {
+	if m.trace == nil || !m.trace.Enabled() {
+		return
+	}
+	m.trace.Record(m.ctx, telemetry.Event{Name: name, Fields: fields})
 }
 
 // applyMockStatuses copies a slice of [ProjectStatus] into the

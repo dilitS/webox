@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -12,6 +13,22 @@ import (
 	"github.com/dilitS/webox/tui/components"
 	"github.com/dilitS/webox/tui/theme"
 )
+
+// classifyContextErr keeps the trace label distinct from "other" so
+// operators can tell when a cancellation came from the cockpit shut-
+// down vs a transient SSH error. Used by `classifyErrForTrace` and
+// will be reused once more emit-call-sites land in TASK-14.6 follow-up.
+//
+//nolint:unused // wired in TASK-14.6 follow-up batch.
+func classifyContextErr(err error) string {
+	if errors.Is(err, context.Canceled) {
+		return "context_canceled"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "context_deadline"
+	}
+	return ""
+}
 
 // hostKeyModal renders a blocking, informational modal whenever an
 // SSH operation surfaces a host-key mismatch. It is the Sprint-14
@@ -76,6 +93,29 @@ func classifyHostKeyErr(err error) string {
 		return hostKeyKindUnknown
 	default:
 		return ""
+	}
+}
+
+// classifyErrForTrace returns a short category label suitable for the
+// `--debug-trace` JSONL stream. The label is intentionally coarse
+// (e.g. `host_key_mismatch`, `pool_busy`, `context_canceled`) so the
+// trace never embeds the underlying error message — which could
+// contain hostnames, file paths, or even quoted secrets. The label
+// "other" is the safe fallback for unknown error chains.
+func classifyErrForTrace(err error) string {
+	switch {
+	case err == nil:
+		return "none"
+	case errors.Is(err, ssh.ErrHostKeyMismatch):
+		return "host_key_mismatch"
+	case errors.Is(err, ssh.ErrHostKeyUnknown):
+		return "host_key_unknown"
+	case errors.Is(err, ssh.ErrPoolBusy):
+		return "pool_busy"
+	case errors.Is(err, ssh.ErrReconnectExhausted):
+		return "reconnect_exhausted"
+	default:
+		return "other"
 	}
 }
 

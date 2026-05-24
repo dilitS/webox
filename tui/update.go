@@ -102,7 +102,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:gocyclo // To
 		}
 		return m, nil
 	case StatusRefreshFailedMsg:
+		m.emit("status.refresh_failed", map[string]any{
+			"err_class": classifyErrForTrace(msg.Err),
+		})
 		if m.tryRaiseHostKeyModal(msg.Err) {
+			m.emit("modal.hostkey_open", map[string]any{"kind": m.hostKeyModal.Kind})
 			return m, scheduleRefresh(m.refreshInterval)
 		}
 		m.alert = "status refresh failed; showing cached data"

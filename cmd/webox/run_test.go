@@ -377,6 +377,41 @@ func TestParseArgs_GithubBeforeDoctorIsMisuse(t *testing.T) {
 	}
 }
 
+func TestParseArgs_DebugTracePathRoundtrip(t *testing.T) {
+	t.Parallel()
+
+	parsed, errMsg := parseArgs([]string{"--debug-trace=/tmp/webox-trace.jsonl"})
+	if errMsg != "" {
+		t.Fatalf("unexpected errMsg = %q", errMsg)
+	}
+	if parsed.debugTracePath != "/tmp/webox-trace.jsonl" {
+		t.Errorf("debugTracePath = %q, want /tmp/webox-trace.jsonl", parsed.debugTracePath)
+	}
+}
+
+func TestParseArgs_DebugTraceEmptyPathIsMisuse(t *testing.T) {
+	t.Parallel()
+
+	_, errMsg := parseArgs([]string{"--debug-trace="})
+	if !strings.Contains(errMsg, "requires a non-empty PATH") {
+		t.Fatalf("errMsg = %q, want non-empty PATH hint", errMsg)
+	}
+}
+
+func TestParseArgs_DebugTraceAlongsideDoctor(t *testing.T) {
+	t.Parallel()
+
+	// --debug-trace is a global modifier so it must compose with
+	// any of the other commands (doctor, --mock, --version even).
+	parsed, errMsg := parseArgs([]string{"--debug-trace=/tmp/x.jsonl", "doctor", "--json"})
+	if errMsg != "" {
+		t.Fatalf("errMsg = %q", errMsg)
+	}
+	if !parsed.doctor || !parsed.doctorJSON || parsed.debugTracePath != "/tmp/x.jsonl" {
+		t.Errorf("composition broken: %+v", parsed)
+	}
+}
+
 func TestRunTUIWith_ResolveConfigFailureReturnsMisuse(t *testing.T) {
 	t.Parallel()
 

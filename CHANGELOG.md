@@ -16,6 +16,16 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- **Sprint 14 — `--debug-trace=PATH` local JSONL trace (TASK-14.6, 2026-05-25).** New CLI flag (and `telemetry.FileSink`) record structured cockpit events to a local file for offline debugging. Strict guarantees:
+  - **Local-only.** No network, no auto-upload, no fallback transport. The package `internal/telemetry/file_sink.go` is grep-clean — there is literally no `net/http` import.
+  - **Mode 0600** on the file + `O_APPEND|O_CREATE` so multiple runs accumulate without widening access. Parent dir created with `0700` if missing.
+  - **Redactor on every line.** The encode → redact → write pipeline runs the canonical JSON envelope through `internal/log.Redact` before disk hits, catching `ghp_*` / `github_pat_*` / Authorization headers / `mysql://user:pw@…` / `"password":"…"` (`TestFileSink_RedactsSecretsBeforeWrite` pins this on a real-world payload).
+  - **Drop on backpressure**, not block. Bounded channel + background drain goroutine; full queue drops the event and bumps an atomic counter (`DroppedEvents()`) instead of stalling the cockpit's Update hot path (`TestFileSink_DropOnFullQueue` with 1k producers).
+  - **Coarse error labels in trace.** `classifyErrForTrace` maps the SSH error chain to short categories (`host_key_mismatch`, `host_key_unknown`, `pool_busy`, `reconnect_exhausted`, `other`) so the trace never embeds raw error messages that could leak paths or hostnames.
+  - **First emit-call-sites in the cockpit.** `tui/update.go` emits `status.refresh_failed` (with `err_class`) and `modal.hostkey_open` (with `kind`); further call sites land in TASK-14.6 follow-up batches. `Options.Trace` defaults to `telemetry.Disabled` so production runs without the flag are bit-for-bit identical.
+  - **CLI surface.** `webox --debug-trace=/tmp/webox.jsonl` (also composes with `--mock`, `doctor`, `--json`). Empty path is a CLI misuse error. Tests: `TestParseArgs_DebugTracePathRoundtrip`, `TestParseArgs_DebugTraceEmptyPathIsMisuse`, `TestParseArgs_DebugTraceAlongsideDoctor`.
+  - **Compile-time guards.** `var _ Sink = (*FileSink)(nil)` and `var _ io.Closer = (*FileSink)(nil)` so the contract drift is caught at `go build`, not at runtime.
+
 - **Sprint 14 — `ssh.ExecWithRetry` + `ExecMetrics` (TASK-14.3, 2026-05-25).** `ssh/retry.go` adds a thin retry layer on top of `ssh.Exec` that distinguishes "pool exhausted, back off and try again" from "terminal error, surface it now". Behaviour highlights:
   - Retries **only** on `ssh.ErrPoolBusy`; terminal sentinels (`ErrHostKeyMismatch`, `ErrHostKeyUnknown`, command exit codes, auth failures) bypass the loop so the host-key modal / wizard parser see the original error in one tick.
   - Backoff is exponential (`BaseBackoff << attempt`) clamped at `MaxBackoff`, with ±20 % jitter to prevent the thundering-herd pattern when the cockpit's periodic status refresh wakes every project goroutine simultaneously.
