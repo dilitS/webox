@@ -84,3 +84,4 @@ go.work.sum
 *.cosign.pem
 *.sig
 /landing
+/main-view-mock.png
