@@ -54,6 +54,13 @@ func cicdPipelineCacheKey(ref ghsvc.RepoRef, workflow string) string {
 // scheduleCICDTick emits the next CICDTickMsg after `interval`.
 // Polling at GitHubStepsTTL keeps the badge fresh without exhausting
 // the gh CLI auth quota (5000/h ≫ 6 polls/min/project).
+//
+// The interval parameter is kept (even though every call site passes
+// [status.GitHubStepsTTL]) to leave room for a future
+// per-project override; the existing fan-out is the only place that
+// needs to change to wire it up.
+//
+//nolint:unparam // see godoc — interval is a planned extensibility seam.
 func scheduleCICDTick(interval time.Duration) tea.Cmd {
 	if interval <= 0 {
 		interval = status.GitHubStepsTTL

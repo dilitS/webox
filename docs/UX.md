@@ -219,39 +219,51 @@ W kafelku Bento dedykowanym dla topologii (dostępnym w trybie Bento Grid przy s
 
 > 🔵 **MVP (v0.1)** — Bento Ultra przy `120×35` eskalowane do MVP przez [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md). Dostarczane w Sprincie 08 (layout engine + theme), Sprint 09 (live logs + header bar metrics), Sprint 10 (CI/CD panel), Sprint 11 (topology map). Dla `100×30 ≤ width < 120×35` (Standard Cockpit) renderujemy zubożony layout split-pane. Dla `width ≥ 160×45` (Bento Ultra+) dorzucamy dodatkowe kafelki — to **🔶 STRETCH (v0.2+)** (multi-server agregator, TTL panels).
 
-Gdy rozmiar okna terminala przekracza próg komfortu (`120×35`), Webox automatycznie transformuje interfejs w pełnoprawny, pięciomodułowy pulpit nawigacyjny. Aktywny panel (w tym przypadku *Projects*) jest podświetlony ramką o grubości 2 znaków (tutaj symbolicznie podwójną) i fioletowym kolorem.
+Gdy rozmiar okna terminala przekracza próg komfortu (`120×35`), Webox transformuje interfejs w pięcio­modułowy pulpit:
+
+1. **Status bar** (full-width, top) — `WEBOX vX.Y.Z [LIVE]` brand-pill po lewej + pipe-delimited stream metryk po prawej (`HH:MM:SS · profile · Uptime · Load · RAM · Ping`). Pill `LIVE/STALE/PENDING/OFFLINE` zmienia kolor w zależności od świeżości danych (`status.GitHubStepsTTL` + `ssh:metrics:` cache).
+2. **Active Projects** (lewa kolumna, magenta ramka) — lista projektów z kropkami stanu (`●` Success / Warning / Error / Muted) i zaokrąglonym pillem selekcji.
+3. **SERVER: `<project>`** (prawa kolumna góra, magenta ramka) — iconified key-value (Profile / Stack / Node.js / Status / HTTP / SSL / Repo / Last Deploy) + per-line status dot.
+4. **CI/CD PIPELINE: Main Branch** (prawa kolumna dół, cyan ramka) — `Build #N: STATUS` badge + ponumerowane kroki z badgami `✓ ✗ ⏳ … ⊘ ⊗ ?` + skróty `[F8] View logs · [Enter] Open run`.
+5. **Live Server Logs** (full-width, dół, magenta ramka) — timestampowane linie z kolorowanym poziomem (`INFO` cyan, `WARN` warning, `ERROR` red, `DEBUG` accent) i adnotacją `(redacted)` gdy redaktor sekretów coś przepuścił.
+
+Aktywny panel jest podświetlony grubszą ramką w kolorze swojego akcentu.
 
 ```text
-╭─────────────────────────────────────────────── Webox Cockpit v1.0 ─────────────────────────────────────────────────────────╮
-│ [Profile: main · s1.small.pl · latency: 14ms]                                                                 [/] 20:17:50 │
-│                                                                                                                            │
-│  ╭─────────────────────────── Projects ──╮ ╭──────────────────────────────────────── sui.biuromody.smallhost.pl ───────────╮ │
-│  │                                       │ │                                                                               │ │
-│  │  ▶ sui.biuromody             🟢       │ │  ╭───────────╮                                                                │ │
-│  │    makspomoc                 🟢       │ │  │  ONLINE   │  Node Version: v24.15.0                                        │ │
-│  │    si                        🟡       │ │  ╰───────────╯  SSL Status:   󰏚 Valid (27 days remaining)                     │ │
-│  │    legacy                    STALE    │ │                                                                               │ │
-│  │                                       │ │  Domain Path:   /usr/home/biuromody/domains/sui.biuromody.smallhost.pl/       │ │
-│  │  ───────────────────────────────────  │ │  GitHub Repo:   dilitS/mockupweb  (Branch: main)                              │ │
-│  │  [n] New Project                      │ │  Last Deploy:   2h ago by dilitS ✓ (Commit: 3fdc34d)                          │ │
-│  │  [i] Import Existing                  │ │                                                                               │ │
-│  │                                       │ │  [r] Restart Application    [s] SSL Renew    [d] Manual Trigger Deploy        │ │
-│  ╰───────────────────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────╯ │
-│  ╭──────────────────────── Quick Metrics ──╮ ╭─────────────────────────────── CI/CD Pipeline (GHA) ──────────────────────────╮ │
-│  │                                       │ │                                                                               │ │
-│  │  HTTP Health: 200 OK                  │ │  󰄬 Setup Build Workspace    ✓ 12s                                             │ │
-│  │  Ping Latency: 42 ms                  │ │  󰄬 Production Build (Vite)   ✓ 45s                                             │ │
-│  │  Active DBs:  🐬 Connected            │ │  ▶ Deploying SFTP Assets     ⏳ 14s (In Progress...)                           │ │
-│  ╰───────────────────────────────────────╯ ╰───────────────────────────────────────────────────────────────────────────────╯ │
-│  ╭────────────────────────────────────────────────── Live Micro-Logs ──────────────────────────────────────────────────────╮ │
-│  │  [20:15:02] INFO: Production Express server running on port 3000                                                        │ │
-│  │  [20:15:30] GET /api/v1/health_check - 200 OK (5ms)                                                                     │ │
-│  │  [20:16:12] GET /assets/index-D8gH9s.js - 200 OK (2ms)                                                                  │ │
-│  ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯ │
-│                                                                                                                            │
-│  q:quit  ↑↓:navigate  →/Tab:cockpit focus  n:new  /:command  ?:help                                                        │
-╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ WEBOX v0.1.0 [LIVE]    14:32:01 │ us-east-1 │ Uptime: 24d 11h │ Load: 0.12, 0.28, 0.31 │ RAM: 3.4/8.0 GB (42%) │ Ping: 18ms │
+├────────────────────────────────────────────────┬───────────────────────────────────────────────────────────────────────────┤
+│ ╭─[Active Projects]──────────────────────────╮ │ ╭─[SERVER: ShopEase-Web]────────────────────────────────────────────────╮ │
+│ │  ( ShopEase-Web                  )       ● │ │ │ ⊟ Profile:     us-east-1                                              │ │
+│ │    API-Gateway                           ● │ │ │ ◎ Stack:       node-express                                            │ │
+│ │    Auth-Service                          ● │ │ │ ◆ Node.js:     v20.11.0 ●                                              │ │
+│ │    Dashboard                             ● │ │ │ ✓ Status:      ONLINE ●                                                │ │
+│ │    Dashboard-Admin                       ● │ │ │ ⇄ HTTP:        200 OK                                                  │ │
+│ │    Payment-UI                            ● │ │ │ ⚿ SSL:         Valid (114 days remaining) ●                            │ │
+│ ╰────────────────────────────────────────────╯ │ │ ⌬ Repo:        dilitS-demo/shopease-web                                │ │
+│                                                │ │ ⏱ Last Deploy: 2h ago · success                                        │ │
+│                                                │ ╰────────────────────────────────────────────────────────────────────────╯ │
+│                                                │ ╭─[CI/CD PIPELINE: Main Branch]─────────────────────────────────────────╮ │
+│                                                │ │ Build #412  SUCCESS ✓  (1m 42s)                                        │ │
+│                                                │ │ [1] Git Checkout      ✓                                                │ │
+│                                                │ │ [2] Install Deps      ✓                                                │ │
+│                                                │ │ [3] Code Lint         ✓                                                │ │
+│                                                │ │ [4] Build Artifact    ✓                                                │ │
+│                                                │ │ [5] Unit Tests        ✓                                                │ │
+│                                                │ │ [6] Deploy (Prod)     ✓     [F8] View logs · [Enter] Open run          │ │
+│                                                │ ╰────────────────────────────────────────────────────────────────────────╯ │
+├────────────────────────────────────────────────┴───────────────────────────────────────────────────────────────────────────┤
+│ ╭─[Live Server Logs]───────────────────────────────────────────────────────────────────────────────────────────────────╮  │
+│ │ [14:32:10] INFO  - API-Gateway:  Incoming GET /users (status: 200)                                                   │  │
+│ │ [14:32:11] WARN  - Auth-Service: High latency detected (450ms)                                                       │  │
+│ │ [14:32:12] INFO  - ShopEase-Web: Served /products in 88ms                                                            │  │
+│ │ [14:32:14] DEBUG - Worker #2:    Cache hit for key 'prod:list'                                                       │  │
+│ ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯  │
+│ q:quit  ↑↓:navigate  →/Tab:cockpit focus  n:new  /:command  ?:help                                                          │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+> **Offline preview.** Cały powyższy layout można obejrzeć bez serwera komendą `webox --mock` (lub `WEBOX_MOCK=1 webox`). Mock dostarcza deterministyczne dane (sześć projektów, jeden pipeline SUCCESS, sześć linii logów, fixed clock `14:32:01 UTC`) i nie wykonuje żadnych połączeń sieciowych.
 
 ---
 

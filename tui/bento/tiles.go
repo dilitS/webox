@@ -8,19 +8,35 @@ import (
 	"github.com/dilitS/webox/tui/theme"
 )
 
-// projectsTile renders the dashboard project list inside the Ultra grid.
-// In Sprint 09+ the tile gains inline status badges; for now it consumes
-// the same pre-formatted strings that the Standard cockpit uses so the
-// two layouts stay visually consistent.
-type projectsTile struct {
-	rows []string
+// ProjectRowSnapshot is the renderable projection of one row in the
+// projects tile. Rendering is deferred to the tile so the data layer
+// (`tui/view.go`) does not have to know about lipgloss styling.
+type ProjectRowSnapshot struct {
+	// Name is the project display label (typically the domain).
+	Name string
+	// State is the upper-cased status badge value (ONLINE/OFFLINE/
+	// STALE/BUILDING/DEGRADED/UNKNOWN). The renderer maps each
+	// value to the matching dot colour from the theme.
+	State string
+	// Selected marks the currently focused row; the renderer wraps
+	// it in a subtle pill so the operator can spot the cursor at
+	// a glance.
+	Selected bool
 }
 
-// NewProjectsTile builds the top-left projects tile. Pass already
-// formatted rows (e.g. `"> alpha.example.com [ONLINE]"`) so the tile
-// remains presentation-agnostic.
-func NewProjectsTile(rows []string) BentoTile {
-	return &projectsTile{rows: append([]string(nil), rows...)}
+// projectsTile renders the dashboard project list inside the Ultra grid.
+// Each row is a `name + coloured dot` cell; the active row is wrapped
+// in a thin primary-coloured pill (matches the reference image).
+type projectsTile struct {
+	rows  []ProjectRowSnapshot
+	width int
+}
+
+// NewProjectsTile builds the top-left projects tile from a per-row
+// snapshot. The tile owns the visual styling (dot colour + selection
+// pill) so the data layer remains presentation-agnostic.
+func NewProjectsTile(rows []ProjectRowSnapshot) BentoTile {
+	return &projectsTile{rows: append([]ProjectRowSnapshot(nil), rows...)}
 }
 
 // ID satisfies [BentoTile].
@@ -29,36 +45,121 @@ func (t *projectsTile) ID() string { return "projects" }
 // Slot satisfies [BentoTile].
 func (t *projectsTile) Slot() Slot { return SlotProjects }
 
+// WithWidth satisfies [WidthAware] so the bento engine can stretch
+// the projects column to fill its allocated horizontal slice.
+func (t *projectsTile) WithWidth(w int) BentoTile {
+	clone := *t
+	clone.width = w
+	return &clone
+}
+
 // Render satisfies [BentoTile].
 func (t *projectsTile) Render(mode Mode, focused bool) string {
-	body := strings.Join(t.rows, "\n")
 	if len(t.rows) == 0 {
-		body = "No projects yet.\nPress [n] to start the new-project wizard."
+		return renderTilePanel(tilePanelOptions{
+			Header:   "[Active Projects]",
+			Body:     "No projects yet.\nPress [n] to start the new-project wizard.",
+			Mode:     mode,
+			Focused:  focused,
+			Accent:   AccentPrimary,
+			MinWidth: t.width,
+		})
 	}
+	tokens := theme.Default()
+
+	rendered := make([]string, 0, len(t.rows))
+	for _, row := range t.rows {
+		dot := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(stateColor(row.State, tokens))).
+			Render("●")
+		name := row.Name
+		if row.Selected {
+			pill := lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color(tokens.TextBright)).
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color(tokens.Primary)).
+				Padding(0, 1).
+				Render(name)
+			rendered = append(rendered, lipgloss.JoinHorizontal(
+				lipgloss.Top,
+				pill,
+				lipgloss.NewStyle().PaddingLeft(1).PaddingTop(1).Render(dot),
+			))
+			continue
+		}
+		row := lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			lipgloss.NewStyle().Foreground(lipgloss.Color(tokens.TextBright)).Render(name),
+			lipgloss.NewStyle().PaddingLeft(1).Render(dot),
+		)
+		rendered = append(rendered, "  "+row)
+	}
+	body := strings.Join(rendered, "\n")
 	return renderTilePanel(tilePanelOptions{
-		Header:    "[Projects]",
-		Body:      body,
-		Mode:      mode,
-		Focused:   focused,
-		EmptyHint: "",
+		Header:   "[Active Projects]",
+		Body:     body,
+		Mode:     mode,
+		Focused:  focused,
+		Accent:   AccentPrimary,
+		MinWidth: t.width,
 	})
 }
 
-// overviewTile renders the per-project overview pane: HTTP, SSL, Node,
-// repository, last deploy. Lines are pre-rendered by view.go so the tile
-// does not depend on `config.Project`.
-type overviewTile struct {
-	domain string
-	lines  []string
+// stateColor maps a status badge value (ONLINE/OFFLINE/STALE/...) to
+// the theme colour the dot should render in. UNKNOWN falls back to
+// the muted colour so the cockpit never shows a colour-less hole.
+func stateColor(state string, tokens theme.Theme) string {
+	switch strings.ToUpper(state) {
+	case "ONLINE":
+		return tokens.Success
+	case "BUILDING":
+		return tokens.Warning
+	case "OFFLINE":
+		return tokens.Error
+	case "STALE":
+		return tokens.Muted
+	case "DEGRADED":
+		return tokens.Degraded
+	default:
+		return tokens.TextDim
+	}
 }
 
-// NewOverviewTile builds the project-overview tile. Pass an empty domain
-// when no project is selected; the tile shows a "select a project" hint.
-func NewOverviewTile(domain string, lines []string) BentoTile {
-	return &overviewTile{
-		domain: domain,
-		lines:  append([]string(nil), lines...),
-	}
+// ServerOverviewSnapshot is the rich projection rendered inside the
+// `[SERVER: <project>]` tile. Lines is the iconified body (one entry
+// per row); ProjectAlias drives the tile header. Producers fill only
+// the fields they have — missing entries are skipped so the tile
+// never shows blank rows.
+type ServerOverviewSnapshot struct {
+	ProjectAlias string
+	Lines        []ServerOverviewLine
+}
+
+// ServerOverviewLine is one icon-prefixed row in the server tile.
+// Status (optional) lets the renderer paint a coloured dot at the
+// end of the line — e.g. "Node.js: v20.11.0 ●" with a success-tinted
+// dot when the project is online.
+type ServerOverviewLine struct {
+	Icon   string
+	Label  string
+	Value  string
+	Status string
+}
+
+// overviewTile renders the per-project server overview pane. The new
+// design (2026-05-24 refresh) uses iconified key-value rows that match
+// the reference image's `[SERVER: <alias>]` panel.
+type overviewTile struct {
+	snap  ServerOverviewSnapshot
+	width int
+}
+
+// NewOverviewTile builds the project-overview tile from a snapshot.
+// Callers are expected to compute the snapshot from `config.Project`
+// + the latest `status.Cache` lookup before each frame.
+func NewOverviewTile(snap ServerOverviewSnapshot) BentoTile {
+	return &overviewTile{snap: snap}
 }
 
 // ID satisfies [BentoTile].
@@ -67,63 +168,91 @@ func (t *overviewTile) ID() string { return "overview" }
 // Slot satisfies [BentoTile].
 func (t *overviewTile) Slot() Slot { return SlotOverview }
 
+// WithWidth satisfies [WidthAware].
+func (t *overviewTile) WithWidth(w int) BentoTile {
+	clone := *t
+	clone.width = w
+	return &clone
+}
+
 // Render satisfies [BentoTile].
 func (t *overviewTile) Render(mode Mode, focused bool) string {
-	var body strings.Builder
-	if t.domain != "" {
-		body.WriteString(t.domain)
-		body.WriteString("\n")
+	tokens := theme.Default()
+	header := "[SERVER: " + nonEmpty(t.snap.ProjectAlias, "(no project)") + "]"
+
+	if len(t.snap.Lines) == 0 {
+		return renderTilePanel(tilePanelOptions{
+			Header:   header,
+			Body:     "Select a project to inspect status.",
+			Mode:     mode,
+			Focused:  focused,
+			Accent:   AccentPrimary,
+			MinWidth: t.width,
+		})
 	}
-	body.WriteString(strings.Join(t.lines, "\n"))
+
+	rows := make([]string, 0, len(t.snap.Lines))
+	for _, line := range t.snap.Lines {
+		icon := nonEmpty(line.Icon, "·")
+		row := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(tokens.Accent)).
+			Render(icon) + " " +
+			lipgloss.NewStyle().Foreground(lipgloss.Color(tokens.TextDim)).Render(line.Label+":") + " " +
+			lipgloss.NewStyle().Foreground(lipgloss.Color(tokens.TextBright)).Render(line.Value)
+		if line.Status != "" {
+			dot := lipgloss.NewStyle().
+				Foreground(lipgloss.Color(stateColor(line.Status, tokens))).
+				Render("●")
+			row += " " + dot
+		}
+		rows = append(rows, row)
+	}
 	return renderTilePanel(tilePanelOptions{
-		Header:  "[Overview]",
-		Body:    body.String(),
-		Mode:    mode,
-		Focused: focused,
+		Header:   header,
+		Body:     strings.Join(rows, "\n"),
+		Mode:     mode,
+		Focused:  focused,
+		Accent:   AccentPrimary,
+		MinWidth: t.width,
 	})
 }
 
-// placeholderTile is the bento cell stub used in Sprint 08 to lock the
-// Ultra silhouette in place before Sprints 09-11 wire the live data.
-// Each placeholder advertises the sprint that will fill it so the
-// operator can answer "what is this empty box?" at a glance.
-type placeholderTile struct {
-	id      string
-	slot    Slot
-	header  string
-	subtext []string
-}
-
-// ID satisfies [BentoTile].
-func (t *placeholderTile) ID() string { return t.id }
-
-// Slot satisfies [BentoTile].
-func (t *placeholderTile) Slot() Slot { return t.slot }
-
-// Render satisfies [BentoTile].
-func (t *placeholderTile) Render(mode Mode, focused bool) string {
-	return renderTilePanel(tilePanelOptions{
-		Header:  t.header,
-		Body:    strings.Join(t.subtext, "\n"),
-		Mode:    mode,
-		Focused: focused,
-	})
-}
+// Placeholder tiles are now bespoke types (metricsPlaceholderTile,
+// placeholderCICDTile, logsPlaceholderTile, topologyPlaceholderTile)
+// so each can carry its own header label and accent. The previous
+// generic placeholderTile struct was removed in the 2026-05-24 design
+// refresh.
 
 // NewMetricsPlaceholderTile returns the header-metrics placeholder used
 // when no live metrics snapshot is available yet (initial render before
 // the first SSH poll completes). Once metrics arrive, the view layer
 // swaps it for [NewHeaderMetricsTile].
+//
+// As of the 2026-05-24 design refresh, metrics also surface in the
+// cockpit-wide status bar rendered above the bento grid. The tile is
+// retained for terminals where the status bar is suppressed (Standard
+// fallback < 120 cols) and for unit-test parity.
 func NewMetricsPlaceholderTile() BentoTile {
-	return &placeholderTile{
-		id:     "header-metrics",
-		slot:   SlotMetrics,
-		header: "[Header Metrics]",
-		subtext: []string{
-			"CPU / RAM / Disk pulse",
-			"Awaiting first SSH poll…",
-		},
-	}
+	return &metricsPlaceholderTile{}
+}
+
+type metricsPlaceholderTile struct{}
+
+// ID satisfies [BentoTile].
+func (metricsPlaceholderTile) ID() string { return "header-metrics" }
+
+// Slot satisfies [BentoTile].
+func (metricsPlaceholderTile) Slot() Slot { return SlotMetrics }
+
+// Render satisfies [BentoTile].
+func (metricsPlaceholderTile) Render(mode Mode, focused bool) string {
+	return renderTilePanel(tilePanelOptions{
+		Header:  "[Header Metrics]",
+		Body:    "CPU / RAM / Disk pulse\nAwaiting first SSH poll…",
+		Mode:    mode,
+		Focused: focused,
+		Accent:  AccentPrimary,
+	})
 }
 
 // HeaderMetricsSnapshot is the view-layer projection of
@@ -159,22 +288,32 @@ func (t *headerMetricsTile) Slot() Slot { return SlotMetrics }
 
 // Render satisfies [BentoTile].
 func (t *headerMetricsTile) Render(mode Mode, focused bool) string {
-	indicator := "[LIVE]"
+	tokens := theme.Default()
+	indicator := "LIVE"
+	indicatorBg := tokens.Success
 	if t.snap.Stale {
-		indicator = "[STALE]"
+		indicator = "STALE"
+		indicatorBg = tokens.Warning
 	}
+	pill := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(tokens.SurfaceBase)).
+		Background(lipgloss.Color(indicatorBg)).
+		Padding(0, 1).
+		Render(indicator)
 	body := strings.Join([]string{
-		indicator + " " + nonEmpty(t.snap.ProfileAlias, "(no profile)"),
+		pill + " " + nonEmpty(t.snap.ProfileAlias, "(no profile)"),
 		"Uptime: " + nonEmpty(t.snap.UptimeLabel, "—"),
-		"Load: " + nonEmpty(t.snap.LoadLabel, "—"),
-		"RAM: " + nonEmpty(t.snap.RAMLabel, "—"),
-		"Ping: " + nonEmpty(t.snap.RTTLabel, "—"),
+		"Load:   " + nonEmpty(t.snap.LoadLabel, "—"),
+		"RAM:    " + nonEmpty(t.snap.RAMLabel, "—"),
+		"Ping:   " + nonEmpty(t.snap.RTTLabel, "—"),
 	}, "\n")
 	return renderTilePanel(tilePanelOptions{
 		Header:  "[Header Metrics]",
 		Body:    body,
 		Mode:    mode,
 		Focused: focused,
+		Accent:  AccentPrimary,
 	})
 }
 
@@ -183,16 +322,39 @@ func (t *headerMetricsTile) Render(mode Mode, focused bool) string {
 // first poll is still in flight). The view layer swaps it for
 // [NewCICDPipelineTile] once a [CICDPipelineSnapshot] is available.
 func NewCICDPlaceholderTile() BentoTile {
-	return &placeholderTile{
-		id:     "cicd-pipeline",
-		slot:   SlotCICD,
-		header: "[CI/CD Pipeline]",
-		subtext: []string{
-			"GitHub Actions stream",
-			"No GitHub-linked project selected.",
-			"Press [n] to create a new project.",
-		},
-	}
+	return &placeholderCICDTile{}
+}
+
+// placeholderCICDTile is the cyan-accented placeholder shown until the
+// first pipeline poll completes. Kept as a dedicated type so it can
+// carry the [CI/CD PIPELINE: Main Branch] header and AccentCyan.
+type placeholderCICDTile struct {
+	width int
+}
+
+// ID satisfies [BentoTile].
+func (*placeholderCICDTile) ID() string { return "cicd-pipeline" }
+
+// Slot satisfies [BentoTile].
+func (*placeholderCICDTile) Slot() Slot { return SlotCICD }
+
+// WithWidth satisfies [WidthAware].
+func (t *placeholderCICDTile) WithWidth(w int) BentoTile {
+	clone := *t
+	clone.width = w
+	return &clone
+}
+
+// Render satisfies [BentoTile].
+func (t *placeholderCICDTile) Render(mode Mode, focused bool) string {
+	return renderTilePanel(tilePanelOptions{
+		Header:   "[CI/CD PIPELINE: Main Branch]",
+		Body:     "GitHub Actions stream\nNo GitHub-linked project selected.\nPress [n] to create a new project.",
+		Mode:     mode,
+		Focused:  focused,
+		Accent:   AccentCyan,
+		MinWidth: t.width,
+	})
 }
 
 // CICDStatus enumerates the badge rendering modes used by
@@ -245,7 +407,8 @@ type CICDPipelineSnapshot struct {
 }
 
 type cicdPipelineTile struct {
-	snap CICDPipelineSnapshot
+	snap  CICDPipelineSnapshot
+	width int
 }
 
 // NewCICDPipelineTile renders the live GitHub Actions tile. The
@@ -262,18 +425,35 @@ func (t *cicdPipelineTile) ID() string { return "cicd-pipeline" }
 // Slot satisfies [BentoTile].
 func (t *cicdPipelineTile) Slot() Slot { return SlotCICD }
 
+// WithWidth satisfies [WidthAware].
+func (t *cicdPipelineTile) WithWidth(w int) BentoTile {
+	clone := *t
+	clone.width = w
+	return &clone
+}
+
 // Render satisfies [BentoTile].
 func (t *cicdPipelineTile) Render(mode Mode, focused bool) string {
+	tokens := theme.Default()
 	var b strings.Builder
 
 	indicator := "[LIVE]"
+	indicatorTone := tokens.Success
 	if t.snap.Stale {
 		indicator = "[STALE]"
+		indicatorTone = tokens.Warning
 	}
 	if t.snap.RateLimited {
 		indicator = "[LIMITED]"
+		indicatorTone = tokens.Warning
 	}
-	headerLine := indicator + " " + nonEmpty(t.snap.ProjectAlias, "(no project)")
+	pill := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(tokens.SurfaceBase)).
+		Background(lipgloss.Color(indicatorTone)).
+		Padding(0, 1).
+		Render(strings.Trim(indicator, "[]"))
+	headerLine := pill + " " + nonEmpty(t.snap.ProjectAlias, "(no project)")
 	if t.snap.WorkflowName != "" {
 		headerLine += " · " + t.snap.WorkflowName
 	}
@@ -292,7 +472,11 @@ func (t *cicdPipelineTile) Render(mode Mode, focused bool) string {
 	}
 
 	if t.snap.RunNumber > 0 {
-		runLine := "Build #" + intString(t.snap.RunNumber) + ": " + cicdStatusLabel(t.snap.RunStatus)
+		runLabel := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color(tokens.TextBright)).
+			Render("Build #" + intString(t.snap.RunNumber))
+		runLine := runLabel + ": " + cicdStatusLabelStyled(t.snap.RunStatus, tokens)
 		if t.snap.Duration != "" {
 			runLine += " · " + t.snap.Duration
 		}
@@ -305,25 +489,93 @@ func (t *cicdPipelineTile) Render(mode Mode, focused bool) string {
 		b.WriteString("No workflow run yet for main branch.\n")
 	}
 
+	if len(t.snap.Steps) > 0 {
+		b.WriteString(lipgloss.NewStyle().
+			Foreground(lipgloss.Color(tokens.TextDim)).
+			Render("Pipeline Steps:"))
+		b.WriteString("\n")
+	}
 	for _, step := range t.snap.Steps {
-		stepLine := "[" + intString(step.Number) + "] " + step.Name + " " + cicdStatusBadge(step.Status)
+		numberCell := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(tokens.Accent)).
+			Render("[" + intString(step.Number) + "]")
+		badge := cicdStatusBadgeStyled(step.Status, tokens)
+		stepLine := numberCell + " " +
+			lipgloss.NewStyle().Foreground(lipgloss.Color(tokens.TextBright)).Render(step.Name) + " " +
+			badge
 		if step.Duration != "" {
-			stepLine += " · " + step.Duration
+			stepLine += " " + lipgloss.NewStyle().
+				Foreground(lipgloss.Color(tokens.TextDim)).
+				Render("· "+step.Duration)
 		}
 		b.WriteString(stepLine)
 		b.WriteString("\n")
 	}
 
 	if len(t.snap.Steps) > 0 {
-		b.WriteString("\n[F8] View logs · [Enter] Open run")
+		b.WriteString("\n")
+		b.WriteString(lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color(tokens.Accent)).
+			Render("View Details (F8)"))
+		b.WriteString(" ")
+		b.WriteString(lipgloss.NewStyle().
+			Foreground(lipgloss.Color(tokens.TextDim)).
+			Render("· [Enter] Open run"))
 	}
 
 	return renderTilePanel(tilePanelOptions{
-		Header:  "[CI/CD Pipeline]",
-		Body:    strings.TrimRight(b.String(), "\n"),
-		Mode:    mode,
-		Focused: focused,
+		Header:   "[CI/CD PIPELINE: Main Branch]",
+		Body:     strings.TrimRight(b.String(), "\n"),
+		Mode:     mode,
+		Focused:  focused,
+		Accent:   AccentCyan,
+		MinWidth: t.width,
 	})
+}
+
+// cicdStatusBadgeStyled returns the per-step badge as a styled string
+// (coloured glyph + bold). The 2026-05-24 refresh paints the badge in
+// the matching status tone so the CI/CD tile reads at a glance.
+func cicdStatusBadgeStyled(s CICDStatus, tokens theme.Theme) string {
+	colour := tokens.TextDim
+	switch s {
+	case CICDStatusSuccess:
+		colour = tokens.Success
+	case CICDStatusFailure:
+		colour = tokens.Error
+	case CICDStatusInProgress, CICDStatusQueued:
+		colour = tokens.Warning
+	case CICDStatusSkipped, CICDStatusCancelled:
+		colour = tokens.Muted
+	case CICDStatusUnknown:
+		colour = tokens.TextDim
+	}
+	return lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(colour)).
+		Render(cicdStatusBadge(s))
+}
+
+// cicdStatusLabelStyled returns the run-header label coloured by tone.
+func cicdStatusLabelStyled(s CICDStatus, tokens theme.Theme) string {
+	colour := tokens.TextDim
+	switch s {
+	case CICDStatusSuccess:
+		colour = tokens.Success
+	case CICDStatusFailure:
+		colour = tokens.Error
+	case CICDStatusInProgress, CICDStatusQueued:
+		colour = tokens.Warning
+	case CICDStatusSkipped, CICDStatusCancelled:
+		colour = tokens.Muted
+	case CICDStatusUnknown:
+		colour = tokens.TextDim
+	}
+	return lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(colour)).
+		Render(cicdStatusLabel(s))
 }
 
 // cicdStatusBadge returns the per-step badge string. The mapping
@@ -401,29 +653,56 @@ func intString(n int) string {
 // project is selected (or before the first stream line arrives). The
 // view layer swaps it for [NewMicroLogsTile] once tail data flows.
 func NewLogsPlaceholderTile() BentoTile {
-	return &placeholderTile{
-		id:     "live-logs",
-		slot:   SlotLogs,
-		header: "[Live Micro-Logs]",
-		subtext: []string{
-			"SSH tail with secret redaction",
-			"Select a project to start streaming.",
-		},
-	}
+	return &logsPlaceholderTile{}
+}
+
+type logsPlaceholderTile struct {
+	width int
+}
+
+// ID satisfies [BentoTile].
+func (*logsPlaceholderTile) ID() string { return "live-logs" }
+
+// Slot satisfies [BentoTile].
+func (*logsPlaceholderTile) Slot() Slot { return SlotLogs }
+
+// WithWidth satisfies [WidthAware].
+func (t *logsPlaceholderTile) WithWidth(w int) BentoTile {
+	clone := *t
+	clone.width = w
+	return &clone
+}
+
+// Render satisfies [BentoTile].
+func (t *logsPlaceholderTile) Render(mode Mode, focused bool) string {
+	return renderTilePanel(tilePanelOptions{
+		Header:   "[Live Server Logs]",
+		Body:     "SSH tail with secret redaction\nSelect a project to start streaming.",
+		Mode:     mode,
+		Focused:  focused,
+		Accent:   AccentPrimary,
+		MinWidth: t.width,
+	})
 }
 
 // MicroLogLine is the view-layer projection of one tail entry. The
 // bento package intentionally avoids depending on `services/sshtail`
 // directly so the layout engine remains pure.
 type MicroLogLine struct {
-	Level    string
-	Text     string
-	Redacted bool
+	// Timestamp is the formatted clock prefix (e.g. "14:32:10").
+	// Empty strings are skipped so unit tests can feed legacy data
+	// without timing fixtures.
+	Timestamp string
+	Level     string
+	Source    string
+	Text      string
+	Redacted  bool
 }
 
 type microLogsTile struct {
 	domain string
 	lines  []MicroLogLine
+	width  int
 }
 
 // NewMicroLogsTile renders the bottom-centre live-tail tile populated
@@ -436,6 +715,23 @@ func NewMicroLogsTile(domain string, lines []MicroLogLine) BentoTile {
 	return &microLogsTile{domain: domain, lines: cp}
 }
 
+// NewMicroLogsTileWithWidth is the wide variant used in the cockpit's
+// bottom row, where the tile spans the full grid width. The min-width
+// keeps the panel from collapsing to the longest line when the buffer
+// shrinks to a handful of rows.
+func NewMicroLogsTileWithWidth(domain string, lines []MicroLogLine, width int) BentoTile {
+	tile := NewMicroLogsTile(domain, lines).(*microLogsTile)
+	tile.width = width
+	return tile
+}
+
+// WithWidth satisfies [WidthAware].
+func (t *microLogsTile) WithWidth(w int) BentoTile {
+	clone := *t
+	clone.width = w
+	return &clone
+}
+
 // ID satisfies [BentoTile].
 func (t *microLogsTile) ID() string { return "live-logs" }
 
@@ -444,40 +740,104 @@ func (t *microLogsTile) Slot() Slot { return SlotLogs }
 
 // Render satisfies [BentoTile].
 func (t *microLogsTile) Render(mode Mode, focused bool) string {
+	tokens := theme.Default()
 	if len(t.lines) == 0 {
 		return renderTilePanel(tilePanelOptions{
-			Header:  "[Live Micro-Logs]",
-			Body:    "Streaming " + nonEmpty(t.domain, "—") + " — waiting for first line.",
-			Mode:    mode,
-			Focused: focused,
+			Header:   "[Live Server Logs]",
+			Body:     "Streaming " + nonEmpty(t.domain, "—") + " — waiting for first line.",
+			Mode:     mode,
+			Focused:  focused,
+			Accent:   AccentPrimary,
+			MinWidth: t.width,
 		})
 	}
-	rows := make([]string, 0, len(t.lines)+1)
-	rows = append(rows, "Stream: "+nonEmpty(t.domain, "—"))
+	rows := make([]string, 0, len(t.lines))
 	for _, line := range t.lines {
-		marker := "·"
-		switch line.Level {
-		case "ERROR":
-			marker = "✗"
-		case "WARN":
-			marker = "!"
-		case "DEBUG":
-			marker = "›"
-		case "INFO":
-			marker = "·"
-		}
-		row := marker + " " + line.Text
-		if line.Redacted {
-			row += "  (redacted)"
-		}
-		rows = append(rows, row)
+		rows = append(rows, renderLogLine(line, tokens))
 	}
 	return renderTilePanel(tilePanelOptions{
-		Header:  "[Live Micro-Logs]",
-		Body:    strings.Join(rows, "\n"),
-		Mode:    mode,
-		Focused: focused,
+		Header:   "[Live Server Logs]",
+		Body:     strings.Join(rows, "\n"),
+		Mode:     mode,
+		Focused:  focused,
+		Accent:   AccentPrimary,
+		MinWidth: t.width,
 	})
+}
+
+// renderLogLine formats one log entry as
+// `[HH:MM:SS] LEVEL - source: message`, painting the level cell in
+// the matching theme tone. Source/Timestamp are optional.
+func renderLogLine(line MicroLogLine, tokens theme.Theme) string {
+	var b strings.Builder
+	if line.Timestamp != "" {
+		b.WriteString(lipgloss.NewStyle().
+			Foreground(lipgloss.Color(tokens.TextDim)).
+			Render("[" + line.Timestamp + "] "))
+	}
+	level := strings.ToUpper(strings.TrimSpace(line.Level))
+	if level == "" {
+		level = "INFO"
+	}
+	b.WriteString(styleLevelCell(level, tokens))
+	b.WriteString(lipgloss.NewStyle().
+		Foreground(lipgloss.Color(tokens.TextDim)).
+		Render(" - "))
+	if line.Source != "" {
+		b.WriteString(lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color(tokens.TextBright)).
+			Render(line.Source))
+		b.WriteString(lipgloss.NewStyle().
+			Foreground(lipgloss.Color(tokens.TextDim)).
+			Render(": "))
+	}
+	b.WriteString(lipgloss.NewStyle().
+		Foreground(lipgloss.Color(tokens.TextBright)).
+		Render(line.Text))
+	if line.Redacted {
+		b.WriteString(" ")
+		b.WriteString(lipgloss.NewStyle().
+			Faint(true).
+			Foreground(lipgloss.Color(tokens.Muted)).
+			Render("(redacted)"))
+	}
+	return b.String()
+}
+
+// styleLevelCell renders the four supported log levels as fixed-width
+// coloured tokens. Unknown levels fall back to a dim INFO so the layout
+// never jumps if a producer emits an unexpected level.
+func styleLevelCell(level string, tokens theme.Theme) string {
+	const cellWidth = 5
+	pad := func(s string) string {
+		if len(s) >= cellWidth {
+			return s
+		}
+		return s + strings.Repeat(" ", cellWidth-len(s))
+	}
+	switch level {
+	case "ERROR":
+		return lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color(tokens.Error)).
+			Render(pad("ERROR"))
+	case "WARN":
+		return lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color(tokens.Warning)).
+			Render(pad("WARN"))
+	case "DEBUG":
+		return lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color(tokens.Degraded)).
+			Render(pad("DEBUG"))
+	default:
+		return lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color(tokens.Accent)).
+			Render(pad("INFO"))
+	}
 }
 
 // nonEmpty returns fallback when value is the empty string.
@@ -491,16 +851,57 @@ func nonEmpty(value, fallback string) string {
 // NewTopologyPlaceholderTile returns the service-topology placeholder
 // scheduled to ship in Sprint 11 (ASCII graph with live status pulse).
 func NewTopologyPlaceholderTile() BentoTile {
-	return &placeholderTile{
-		id:     "topology",
-		slot:   SlotTopology,
-		header: "[Topology]",
-		subtext: []string{
-			"Service dependency graph",
-			"Live wiring: Sprint 11",
-		},
-	}
+	return &topologyPlaceholderTile{}
 }
+
+type topologyPlaceholderTile struct {
+	width int
+}
+
+// ID satisfies [BentoTile].
+func (*topologyPlaceholderTile) ID() string { return "topology" }
+
+// Slot satisfies [BentoTile].
+func (*topologyPlaceholderTile) Slot() Slot { return SlotTopology }
+
+// WithWidth satisfies [WidthAware].
+func (t *topologyPlaceholderTile) WithWidth(w int) BentoTile {
+	clone := *t
+	clone.width = w
+	return &clone
+}
+
+// Render satisfies [BentoTile].
+func (t *topologyPlaceholderTile) Render(mode Mode, focused bool) string {
+	return renderTilePanel(tilePanelOptions{
+		Header:   "[Topology]",
+		Body:     "Service dependency graph\nLive wiring: Sprint 11",
+		Mode:     mode,
+		Focused:  focused,
+		Accent:   AccentCyan,
+		MinWidth: t.width,
+	})
+}
+
+// TileAccent picks the border / header colour of a bento tile. The
+// cockpit groups tiles into two visual columns:
+//   - AccentPrimary  → magenta-violet (Projects, Server, Logs)
+//   - AccentCyan     → cyan (CI/CD pipeline)
+//
+// Other accents are reserved for future surfaces (e.g. AccentDegraded
+// for a "stale data" overlay).
+type TileAccent int
+
+const (
+	// AccentPrimary paints the cockpit's primary column tiles.
+	AccentPrimary TileAccent = iota
+	// AccentCyan paints the CI/CD column tile.
+	AccentCyan
+	// AccentWarning paints attention-grabbing tiles (e.g. stale).
+	AccentWarning
+	// AccentError paints error states (e.g. offline server).
+	AccentError
+)
 
 // tilePanelOptions captures the per-call presentation knobs. Keeping a
 // single options struct (rather than a long positional argument list)
@@ -510,22 +911,46 @@ type tilePanelOptions struct {
 	Body      string
 	Mode      Mode
 	Focused   bool
+	Accent    TileAccent
 	EmptyHint string
+	// MinWidth, when > 0, forces the tile to expand to that width so
+	// sibling cells in the same row align even when the body is
+	// short. The renderer never truncates content below MinWidth.
+	MinWidth int
+}
+
+// accentColor returns the hex string for the requested tile accent.
+// Returning hex (not lipgloss.Color) lets tests assert on it directly.
+func accentColor(t TileAccent, tokens theme.Theme) string {
+	switch t {
+	case AccentCyan:
+		return tokens.Accent
+	case AccentWarning:
+		return tokens.Warning
+	case AccentError:
+		return tokens.Error
+	default:
+		return tokens.Primary
+	}
 }
 
 // renderTilePanel composes a single bento cell: header line + body, wrapped
-// in a rounded-border panel. The border color tracks the focus state so
-// the operator always knows which tile reacts to keystrokes.
+// in a rounded-border panel. The border color tracks the accent so the
+// cockpit can visually group tiles into role columns; the focus state
+// brightens the same accent without swapping it.
 func renderTilePanel(opts tilePanelOptions) string {
 	tokens := theme.Default()
-	border := lipgloss.Color(tokens.Muted)
-	if opts.Focused {
-		border = lipgloss.Color(tokens.Primary)
-	}
+	accentHex := accentColor(opts.Accent, tokens)
+	// 2026-05-24 refresh: tiles keep their accent border in both
+	// focus states so the operator can identify panels by colour
+	// alone. Focus is communicated through the brighter header
+	// foreground; the border stays accented.
+	border := lipgloss.Color(accentHex)
+	_ = opts.Focused
 
 	header := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color(tokens.Primary)).
+		Foreground(lipgloss.Color(accentHex)).
 		Render(opts.Header)
 
 	body := opts.Body
@@ -537,9 +962,12 @@ func renderTilePanel(opts tilePanelOptions) string {
 		Foreground(lipgloss.Color(tokens.TextBright)).
 		Render(body)
 
-	return lipgloss.NewStyle().
+	style := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(border).
-		Padding(0, 1).
-		Render(content)
+		Padding(0, 1)
+	if opts.MinWidth > 0 {
+		style = style.Width(opts.MinWidth)
+	}
+	return style.Render(content)
 }

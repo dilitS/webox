@@ -61,9 +61,16 @@ func TestEngineRendersUltraSurfacesAllBentoTiles(t *testing.T) {
 	t.Parallel()
 
 	registry := bento.NewRegistry()
-	registry.Register(bento.NewProjectsTile([]string{"> app.example.com [ONLINE]"}))
-	registry.Register(bento.NewOverviewTile("app.example.com", []string{"HTTP: 200", "SSL: 30 days"}))
-	registry.Register(bento.NewMetricsPlaceholderTile())
+	registry.Register(bento.NewProjectsTile([]bento.ProjectRowSnapshot{
+		{Name: "app.example.com", State: "ONLINE", Selected: true},
+	}))
+	registry.Register(bento.NewOverviewTile(bento.ServerOverviewSnapshot{
+		ProjectAlias: "app.example.com",
+		Lines: []bento.ServerOverviewLine{
+			{Icon: "⇄", Label: "HTTP", Value: "200 OK"},
+			{Icon: "⚿", Label: "SSL", Value: "Valid (30d)"},
+		},
+	}))
 	registry.Register(bento.NewCICDPlaceholderTile())
 	registry.Register(bento.NewLogsPlaceholderTile())
 	registry.Register(bento.NewTopologyPlaceholderTile())
@@ -74,15 +81,13 @@ func TestEngineRendersUltraSurfacesAllBentoTiles(t *testing.T) {
 	needles := []string{
 		"Webox Cockpit v0.1",
 		"[BENTO Ultra]",
-		"[Projects]",
-		"[Overview]",
-		"[Header Metrics]",
-		"[CI/CD Pipeline]",
-		"[Live Micro-Logs]",
-		"[Topology]",
+		"[Active Projects]",
+		"[SERVER: app.example.com]",
+		"[CI/CD PIPELINE: Main Branch]",
+		"[Live Server Logs]",
 		"app.example.com",
-		"> app.example.com [ONLINE]",
-		"HTTP: 200",
+		"200 OK",
+		"Valid (30d)",
 	}
 	for _, needle := range needles {
 		if !strings.Contains(out, needle) {
@@ -95,8 +100,8 @@ func TestEngineRendersUltraPlusGetsExtraSection(t *testing.T) {
 	t.Parallel()
 
 	engine := bento.NewEngine("Webox Cockpit v0.1", []bento.BentoTile{
-		bento.NewProjectsTile([]string{}),
-		bento.NewOverviewTile("", []string{"empty"}),
+		bento.NewProjectsTile(nil),
+		bento.NewOverviewTile(bento.ServerOverviewSnapshot{}),
 		bento.NewMetricsPlaceholderTile(),
 		bento.NewCICDPlaceholderTile(),
 		bento.NewLogsPlaceholderTile(),
@@ -106,6 +111,28 @@ func TestEngineRendersUltraPlusGetsExtraSection(t *testing.T) {
 
 	if !strings.Contains(out, "[BENTO Ultra+]") {
 		t.Fatalf("UltraPlus mode marker missing\n--- output ---\n%s", out)
+	}
+	if !strings.Contains(out, "[Topology]") {
+		t.Fatalf("UltraPlus should show topology tile\n--- output ---\n%s", out)
+	}
+}
+
+func TestEngineWithStatusBarReplacesGradientHeader(t *testing.T) {
+	t.Parallel()
+
+	engine := bento.NewEngine("Webox Cockpit v0.1", []bento.BentoTile{
+		bento.NewProjectsTile([]bento.ProjectRowSnapshot{{Name: "alpha.example.com", State: "ONLINE"}}),
+		bento.NewOverviewTile(bento.ServerOverviewSnapshot{ProjectAlias: "alpha.example.com"}),
+		bento.NewCICDPlaceholderTile(),
+		bento.NewLogsPlaceholderTile(),
+	}).WithStatusBar("WEBOX v0.1 [LIVE]   14:32 · Uptime 1h")
+
+	out := engine.Render(120, 35)
+	if !strings.Contains(out, "WEBOX v0.1 [LIVE]") {
+		t.Fatalf("custom status bar missing in render\n%s", out)
+	}
+	if strings.Contains(out, "[BENTO Ultra]") {
+		t.Fatalf("status bar should suppress default badge header\n%s", out)
 	}
 }
 

@@ -45,13 +45,13 @@ func TestCockpitSnapshots(t *testing.T) {
 			name:    "bento-ultra-120x35",
 			width:   120,
 			height:  35,
-			needles: []string{"[BENTO Ultra]", "[Projects]", "[Overview]", "[CI/CD Pipeline]"},
+			needles: []string{"WEBOX", "[Active Projects]", "[SERVER:", "[CI/CD PIPELINE: Main Branch]"},
 		},
 		{
 			name:    "bento-ultraplus-160x45",
 			width:   160,
 			height:  45,
-			needles: []string{"[BENTO Ultra+]", "Deep-dive strip"},
+			needles: []string{"WEBOX", "[Topology]"},
 		},
 		{
 			name:    "tiny-fallback-60x18",
@@ -167,6 +167,44 @@ func TestSprint09Snapshots(t *testing.T) {
 		0o600,
 	); err != nil {
 		t.Fatalf("write sprint09 snapshot: %v", err)
+	}
+}
+
+// TestMockCockpitSnapshot renders the offline mock cockpit (`webox
+// --mock` equivalent) and, when WEBOX_SNAPSHOT=1, writes the result
+// to docs/screenshots/ so reviewers can validate the 2026-05-24
+// design refresh without booting an SSH session.
+func TestMockCockpitSnapshot(t *testing.T) {
+	m := New(MockOptions(""))
+	out := m.View()
+	for _, needle := range []string{
+		"WEBOX",
+		"LIVE",
+		"[Active Projects]",
+		"ShopEase-Web",
+		"[SERVER: ShopEase-Web]",
+		"[CI/CD PIPELINE: Main Branch]",
+		"Build #412",
+		"[Live Server Logs]",
+	} {
+		if !strings.Contains(out, needle) {
+			t.Fatalf("mock cockpit snapshot missing %q\n--- frame ---\n%s", needle, out)
+		}
+	}
+
+	if os.Getenv("WEBOX_SNAPSHOT") != "1" {
+		return
+	}
+	outDir := filepath.Join("..", "docs", "screenshots")
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		t.Fatalf("create snapshot dir: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(outDir, "mock-cockpit-140x40.txt"),
+		[]byte(stripANSI(out)),
+		0o600,
+	); err != nil {
+		t.Fatalf("write mock snapshot: %v", err)
 	}
 }
 

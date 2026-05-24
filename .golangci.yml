@@ -120,6 +120,15 @@ linters:
           - gosec
           - mnd
           - unparam
+      # Mock-data fixtures (e.g. tui/mockdata.go) are hand-written
+      # demo payloads with lots of small cosmetic literals (build
+      # numbers, SSL day counters, step durations). Treat them the
+      # same as test fixtures: magic numbers are intentional and
+      # pulling them into named constants would harm readability.
+      - path: mockdata\.go
+        linters:
+          - mnd
+          - dupl
 
 formatters:
   enable:

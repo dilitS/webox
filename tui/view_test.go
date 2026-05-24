@@ -40,7 +40,7 @@ func TestViewRendersInitWizardDashboardAndProjectDetail(t *testing.T) {
 				withStatuses(map[string]ProjectStatus{
 					"p1": {ProjectID: "p1", State: ProjectOnline, HTTPHealth: "200 OK", SSLDaysLeft: 27, NodeVersion: "v24.15.0", LastDeploy: "2h ago"},
 				}),
-			needles: []string{"[BENTO Ultra]", "[Projects]", "[Overview]", "[CI/CD Pipeline]", "[Live Micro-Logs]"},
+			needles: []string{"WEBOX", "[Active Projects]", "[SERVER: sui.demo.smallhost.pl]", "[CI/CD PIPELINE: Main Branch]", "[Live Server Logs]"},
 		},
 		{
 			name: "dashboard bento ultra plus",
@@ -50,11 +50,10 @@ func TestViewRendersInitWizardDashboardAndProjectDetail(t *testing.T) {
 					"p1": {ProjectID: "p1", State: ProjectOnline, HTTPHealth: "200 OK", SSLDaysLeft: 27, NodeVersion: "v24.15.0", LastDeploy: "2h ago"},
 				}),
 			needles: []string{
-				"[BENTO Ultra+]",
-				"[Projects]",
-				"[Overview]",
+				"WEBOX",
+				"[Active Projects]",
+				"[SERVER: sui.demo.smallhost.pl]",
 				"[Topology]",
-				"Deep-dive strip",
 			},
 		},
 		{

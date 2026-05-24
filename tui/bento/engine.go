@@ -17,6 +17,10 @@ const (
 	tinyFallbackPaddingY = 1
 	tinyFallbackPaddingX = 2
 	defaultStandardWidth = 100
+	// ultraProjectsMinWidth is the floor for the Projects column so
+	// the longest demo project name (`Dashboard-Admin`) always fits
+	// inside the rounded border with room for the selection pill.
+	ultraProjectsMinWidth = 28
 )
 
 // Engine renders a slice of [BentoTile] into a single multi-line string.
@@ -25,17 +29,27 @@ const (
 // the latest tile snapshot. Callers should re-create tiles every frame
 // rather than mutating in place (matches Bubble Tea's MVU pattern).
 type Engine struct {
-	title string
-	tiles []BentoTile
+	title     string
+	statusBar string
+	tiles     []BentoTile
 }
 
 // NewEngine returns an engine pre-loaded with `tiles`. The title appears
-// in the header bar above the grid.
+// in the gradient header inside the cockpit when no status bar is
+// supplied.
 func NewEngine(title string, tiles []BentoTile) *Engine {
 	return &Engine{
 		title: title,
 		tiles: append([]BentoTile(nil), tiles...),
 	}
+}
+
+// WithStatusBar attaches a fully rendered status bar string (produced by
+// [components.RenderStatusBar]) that the engine paints above the grid.
+// Passing the empty string falls back to the legacy gradient header.
+func (e *Engine) WithStatusBar(rendered string) *Engine {
+	e.statusBar = rendered
+	return e
 }
 
 // Render composes the cockpit for the given viewport. The width/height
@@ -111,37 +125,98 @@ func (e *Engine) renderStandardFallback(width int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, append([]string{header}, rendered...)...)
 }
 
-// renderUltraGrid arranges the registered tiles into a 2x3 grid. Tiles
-// are routed by [Slot]; any tile whose slot is not represented in the
-// grid is appended as a deep-dive row underneath. UltraPlus widens the
-// header band and emits an extra hint strip.
+// renderUltraGrid composes the cockpit using the 2026-05-24 design
+// refresh layout:
+//
+//	┌────────── status bar (full width) ───────────┐
+//	│                                              │
+//	│ ┌──────────┐ ┌──────────────────────────┐    │
+//	│ │ Projects │ │      Server tile         │    │
+//	│ │  (full   │ ├──────────────────────────┤    │
+//	│ │ height)  │ │      CI/CD tile          │    │
+//	│ └──────────┘ └──────────────────────────┘    │
+//	│ ┌──────────────────────────────────────┐     │
+//	│ │           Live Server Logs           │     │
+//	│ └──────────────────────────────────────┘     │
+//	└──────────────────────────────────────────────┘
+//
+// UltraPlus appends a deep-dive strip below the logs for the optional
+// `≥160×45` tier.
 func (e *Engine) renderUltraGrid(width, _ int, mode Mode) string {
 	if width <= 0 {
 		width = ultraMinWidth
 	}
 
-	header := renderHeader(e.title, mode, width)
-
 	bySlot := indexTilesBySlot(e.tiles)
 
-	topRow := joinRow(
-		width, mode,
-		bySlot[SlotProjects],
-		bySlot[SlotOverview],
-		bySlot[SlotMetrics],
+	// Column proportions follow the reference cockpit at 1024 px:
+	// Projects column ≈ 36%, Server/CICD stack ≈ 64%. Each tile then
+	// inherits the column width (minus the 2-char rounded border) via
+	// the optional `WithWidth` capability so the right column visibly
+	// dominates the cockpit, matching the design brief.
+	const (
+		projectsRatioNumerator   = 36
+		projectsRatioDenominator = 100
+		tileBorderOverhead       = 2
 	)
-	bottomRow := joinRow(
-		width, mode,
-		bySlot[SlotCICD],
-		bySlot[SlotLogs],
-		bySlot[SlotTopology],
-	)
+	projectsCol := (width * projectsRatioNumerator) / projectsRatioDenominator
+	if projectsCol < ultraProjectsMinWidth {
+		projectsCol = ultraProjectsMinWidth
+	}
+	rightCol := width - projectsCol
+	if rightCol < ultraProjectsMinWidth {
+		rightCol = ultraProjectsMinWidth
+	}
 
-	sections := []string{header, topRow, bottomRow}
-	if mode == ModeUltraPlus {
+	projects := renderTileWithWidth(bySlot[SlotProjects], mode, projectsCol-tileBorderOverhead)
+	overview := renderTileWithWidth(bySlot[SlotOverview], mode, rightCol-tileBorderOverhead)
+	cicd := renderTileWithWidth(bySlot[SlotCICD], mode, rightCol-tileBorderOverhead)
+
+	rightStack := lipgloss.JoinVertical(lipgloss.Left, overview, cicd)
+	mainRow := lipgloss.JoinHorizontal(lipgloss.Top, projects, rightStack)
+	logsRow := renderTileWithWidth(bySlot[SlotLogs], mode, width-tileBorderOverhead)
+
+	// Capacity: status bar + main row + logs row + optional topology
+	// row (Ultra+ only).
+	const maxSections = 4
+	sections := make([]string, 0, maxSections)
+	if e.statusBar != "" {
+		sections = append(sections, e.statusBar)
+	} else {
+		sections = append(sections, renderHeader(e.title, mode, width))
+	}
+	sections = append(sections, mainRow, logsRow)
+
+	if topology := bySlot[SlotTopology]; topology != nil && mode == ModeUltraPlus {
+		sections = append(sections, topology.Render(mode, false))
+	} else if mode == ModeUltraPlus {
 		sections = append(sections, renderDeepDiveStrip(width))
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
+}
+
+// WidthAware is the optional capability tiles can implement to learn
+// the column width the bento engine has allocated for them. Tiles that
+// do not implement it fall back to their natural, content-dictated
+// width — the legacy behaviour kept for compatibility with tests that
+// pre-date the 2026-05-24 design refresh.
+type WidthAware interface {
+	WithWidth(int) BentoTile
+}
+
+// renderTileWithWidth tells the tile what column width it has been
+// granted, then renders it. When the tile is nil or does not implement
+// [WidthAware] we fall back to the natural-width render.
+func renderTileWithWidth(tile BentoTile, mode Mode, width int) string {
+	if tile == nil {
+		return emptyTilePlaceholder()
+	}
+	if width > 0 {
+		if w, ok := tile.(WidthAware); ok {
+			return w.WithWidth(width).Render(mode, false)
+		}
+	}
+	return tile.Render(mode, false)
 }
 
 // indexTilesBySlot turns the linear tile slice into a slot lookup. When
@@ -155,27 +230,10 @@ func indexTilesBySlot(tiles []BentoTile) map[Slot]BentoTile {
 	return out
 }
 
-// joinRow renders up to three tiles side-by-side, distributing the
-// available width evenly. nil tiles get replaced by an empty filler so
-// the grid keeps its 3-column rhythm even when a slot is unregistered.
-//
-// totalWidth is accepted (and currently unused) so future sprints can
-// implement explicit per-column sizing without changing the call sites.
-func joinRow(_ int, mode Mode, tiles ...BentoTile) string {
-	if len(tiles) == 0 {
-		return ""
-	}
-
-	parts := make([]string, 0, len(tiles))
-	for _, tile := range tiles {
-		if tile == nil {
-			parts = append(parts, emptyTilePlaceholder())
-			continue
-		}
-		parts = append(parts, tile.Render(mode, false))
-	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, parts...)
-}
+// joinRow was the 3-column horizontal joiner used by the legacy 2x3
+// bento grid. The 2026-05-24 design refresh replaced it with a
+// Projects-left / Server+CICD-right composition rendered directly in
+// [Engine.renderUltraGrid].
 
 // emptyTilePlaceholder returns a neutral filler used when a slot has no
 // registered tile (e.g. during early sprints before the cell is wired).

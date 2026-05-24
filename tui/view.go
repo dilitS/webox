@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/dilitS/webox/internal/version"
 	"github.com/dilitS/webox/tui/bento"
 	"github.com/dilitS/webox/tui/components"
 	"github.com/dilitS/webox/tui/theme"
@@ -46,7 +47,9 @@ func (m Model) renderDashboard(screen views.Screen) string {
 		base = bento.NewEngine("Webox Cockpit v0.1", nil).
 			RenderMode(screen.Width, screen.Height, mode)
 	default:
+		statusBar := components.RenderStatusBar(m.dashboardStatusBar(screen.Width))
 		base = bento.NewEngine("Webox Cockpit v0.1", m.dashboardBentoTiles()).
+			WithStatusBar(statusBar).
 			RenderMode(screen.Width, screen.Height, mode)
 	}
 	if !m.cicdModal.Open {
@@ -54,6 +57,50 @@ func (m Model) renderDashboard(screen views.Screen) string {
 	}
 	overlay := renderCICDLogsModal(m.cicdModal, screen.Width)
 	return base + "\n" + overlay
+}
+
+// dashboardStatusBar composes the StatusBar snapshot rendered above the
+// Bento grid. The snapshot pulls from the active profile + the latest
+// SSH metrics cache; missing fields collapse to "—" so the bar never
+// shows blank cells.
+func (m Model) dashboardStatusBar(width int) components.StatusBarOptions {
+	now := m.nowFn()
+	tone := components.ToneSuccess
+	live := "LIVE"
+	stale := m.metricsAreStale()
+	if stale {
+		tone = components.ToneWarning
+		live = "STALE"
+	}
+	if !m.metricsHaveAnyData() {
+		tone = components.ToneInfo
+		live = "PENDING"
+	}
+
+	sections := []string{now.Format("15:04:05")}
+	if profile := m.activeProfileAlias(); profile != "" {
+		sections = append(sections, profile)
+	}
+	if m.headerMetrics.UptimeLabel != "" {
+		sections = append(sections, "Uptime: "+m.headerMetrics.UptimeLabel)
+	}
+	if m.headerMetrics.LoadLabel != "" {
+		sections = append(sections, "Load: "+m.headerMetrics.LoadLabel)
+	}
+	if m.headerMetrics.RAMLabel != "" {
+		sections = append(sections, "RAM: "+m.headerMetrics.RAMLabel)
+	}
+	if m.headerMetrics.RTTLabel != "" {
+		sections = append(sections, "Ping: "+m.headerMetrics.RTTLabel)
+	}
+
+	return components.StatusBarOptions{
+		Brand:     "WEBOX " + version.Short(),
+		LiveLabel: live,
+		Tone:      tone,
+		Sections:  sections,
+		Width:     width,
+	}
 }
 
 // renderCICDLogsModal builds the F8 logs viewer. The modal uses the
@@ -154,73 +201,160 @@ func cicdModalStatusVerb(s bento.CICDStatus) string {
 func (m Model) dashboardBentoTiles() []bento.BentoTile {
 	registry := bento.NewRegistry()
 	registry.Register(bento.NewProjectsTile(m.dashboardProjectRows()))
+	registry.Register(bento.NewOverviewTile(m.dashboardServerSnapshot()))
 
-	domain, overview := m.dashboardOverviewSnapshot()
-	registry.Register(bento.NewOverviewTile(domain, overview))
-
-	registry.Register(bento.NewMetricsPlaceholderTile())
 	if snap, ok := buildCICDPipelineSnapshot(m); ok {
 		registry.Register(bento.NewCICDPipelineTile(snap))
 	} else {
 		registry.Register(bento.NewCICDPlaceholderTile())
 	}
-	registry.Register(bento.NewLogsPlaceholderTile())
+	registry.Register(m.dashboardLiveLogsTile())
 	registry.Register(bento.NewTopologyPlaceholderTile())
 
 	return registry.Tiles()
 }
 
-func (m Model) dashboardProjectRows() []string {
+func (m Model) dashboardProjectRows() []bento.ProjectRowSnapshot {
 	projects := cfgProjects(m.cfg)
 	if len(projects) == 0 {
 		return nil
 	}
-	rows := make([]string, 0, len(projects))
+	rows := make([]bento.ProjectRowSnapshot, 0, len(projects))
 	for idx, project := range projects {
-		marker := " "
-		if idx == m.selectedIndex {
-			marker = ">"
-		}
 		state := ProjectUnknown
 		if status, ok := m.statuses[project.ID]; ok {
 			state = status.State
 		}
-		rows = append(rows, fmt.Sprintf("%s %s [%s]", marker, project.Domain, state))
+		rows = append(rows, bento.ProjectRowSnapshot{
+			Name:     project.Domain,
+			State:    string(state),
+			Selected: idx == m.selectedIndex,
+		})
 	}
 	return rows
 }
 
-func (m Model) dashboardOverviewSnapshot() (domain string, lines []string) {
+func (m Model) dashboardServerSnapshot() bento.ServerOverviewSnapshot {
 	projects := cfgProjects(m.cfg)
 	if len(projects) == 0 || m.selectedIndex < 0 || m.selectedIndex >= len(projects) {
-		return "", []string{"Select a project to inspect status."}
+		return bento.ServerOverviewSnapshot{ProjectAlias: ""}
 	}
-
 	project := projects[m.selectedIndex]
-	status, ok := m.statuses[project.ID]
-	if !ok {
-		return project.Domain, []string{
-			"HTTP: pending",
-			"SSL: unknown",
-			"Node: " + fallbackString(project.NodeVersion, "unknown"),
-			"Repo: " + fallbackString(project.Repo, "not linked"),
-			"Last deploy: pending",
-		}
+	status, hasStatus := m.statuses[project.ID]
+
+	state := "UNKNOWN"
+	if hasStatus {
+		state = string(status.State)
 	}
 
 	ssl := "unknown"
-	if status.SSLDaysLeft >= 0 {
-		ssl = fmt.Sprintf("%d days remaining", status.SSLDaysLeft)
+	sslState := ""
+	if hasStatus && status.SSLDaysLeft >= 0 {
+		ssl = fmt.Sprintf("Valid (%d days remaining)", status.SSLDaysLeft)
+		sslState = "ONLINE"
+	} else if hasStatus {
+		sslState = "STALE"
 	}
 
-	return project.Domain, []string{
-		"Status: " + string(status.State),
-		"HTTP: " + fallbackString(status.HTTPHealth, "pending"),
-		"SSL: " + ssl,
-		"Node: " + fallbackString(status.NodeVersion, fallbackString(project.NodeVersion, "unknown")),
-		"Repo: " + fallbackString(project.Repo, "not linked"),
-		"Last deploy: " + fallbackString(status.LastDeploy, "—"),
+	httpHealth := "pending"
+	if hasStatus {
+		httpHealth = fallbackString(status.HTTPHealth, "pending")
 	}
+	nodeVer := fallbackString(
+		valueIfStatus(hasStatus, status.NodeVersion),
+		fallbackString(project.NodeVersion, "unknown"),
+	)
+
+	lines := []bento.ServerOverviewLine{
+		{Icon: "⊟", Label: "Profile", Value: fallbackString(project.ProfileAlias, "(unbound)")},
+		{Icon: "◎", Label: "Stack", Value: fallbackString(project.Stack, "—")},
+		{Icon: "◆", Label: "Node.js", Value: nodeVer, Status: state},
+		{Icon: "✓", Label: "Status", Value: state, Status: state},
+		{Icon: "⇄", Label: "HTTP", Value: httpHealth},
+		{Icon: "⚿", Label: "SSL", Value: ssl, Status: sslState},
+		{Icon: "⌬", Label: "Repo", Value: fallbackString(project.Repo, "not linked")},
+		{Icon: "⏱", Label: "Last Deploy", Value: fallbackString(valueIfStatus(hasStatus, status.LastDeploy), "—")},
+	}
+	return bento.ServerOverviewSnapshot{
+		ProjectAlias: project.Domain,
+		Lines:        lines,
+	}
+}
+
+// valueIfStatus returns value when hasStatus is true, otherwise the
+// empty string. Helper to keep the snapshot builder readable.
+func valueIfStatus(hasStatus bool, value string) string {
+	if !hasStatus {
+		return ""
+	}
+	return value
+}
+
+// dashboardLiveLogsTile renders the bottom-row Live Server Logs tile.
+// When no live stream is active (no project selected, or producer not
+// yet running), the placeholder fills the slot so the cockpit silhouette
+// never collapses.
+func (m Model) dashboardLiveLogsTile() bento.BentoTile {
+	mode := m.BentoMode()
+	tailCap := liveLogsTailCap(mode)
+	if m.liveLogs.Buffer == nil || m.liveLogs.Buffer.Len() == 0 {
+		return bento.NewLogsPlaceholderTile()
+	}
+	raw := m.liveLogs.Buffer.Tail(tailCap)
+	lines := make([]bento.MicroLogLine, 0, len(raw))
+	for _, line := range raw {
+		lines = append(lines, bento.MicroLogLine{
+			Timestamp: extractTimestamp(line.Text),
+			Level:     line.Level,
+			Source:    extractSource(line.Text),
+			Text:      stripParsedPrefix(line.Text),
+			Redacted:  line.Redacted,
+		})
+	}
+	// Subtract the two side gutters reserved by [bento.Engine] when
+	// it composes the cockpit grid.
+	const sideGutters = 2
+	return bento.NewMicroLogsTileWithWidth(m.liveLogs.Domain, lines, m.width-sideGutters)
+}
+
+// timestamp / source parsing keeps the cockpit's log tile resilient to
+// the mixed log formats SSH `tail -f` emits in the wild. When the
+// optional prefix is not present we leave the cells empty so the
+// renderer falls back to a level-only row.
+//
+// The parser is intentionally conservative: missing prefixes never
+// raise an error, and the original text is preserved so the operator
+// can scroll the raw payload if needed.
+func extractTimestamp(text string) string {
+	if len(text) >= 10 && text[0] == '[' && text[9] == ']' {
+		return text[1:9]
+	}
+	return ""
+}
+
+func extractSource(text string) string {
+	idx := strings.Index(text, " - ")
+	if idx < 0 {
+		return ""
+	}
+	colon := strings.Index(text[idx+3:], ":")
+	if colon < 0 {
+		return ""
+	}
+	return text[idx+3 : idx+3+colon]
+}
+
+// stripParsedPrefix returns the message body after `[timestamp] LEVEL - source: `.
+// When no prefix is present the original text is returned untouched.
+func stripParsedPrefix(text string) string {
+	idx := strings.Index(text, ": ")
+	if extractTimestamp(text) == "" {
+		return text
+	}
+	if idx < 0 {
+		return text
+	}
+	return text[idx+2:]
 }
 
 func fallbackString(value, def string) string {
