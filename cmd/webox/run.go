@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -23,6 +24,7 @@ const helpText = `webox — keyboard-driven cockpit for shared-hosting deploymen
 
 Usage:
   webox                       launch the cockpit (TUI; arrives with v0.1 MVP)
+  webox --mock                launch the cockpit with seeded demo data (offline)
   webox doctor                run local diagnostics and print a text report
   webox doctor --json         run local diagnostics and print JSON
   webox doctor github         run read-only GitHub integration diagnostics
@@ -32,6 +34,10 @@ Usage:
 
 Flags:
   --debug          enable verbose diagnostic logging
+  --mock           boot the cockpit with deterministic mock data;
+                   no SSH, no HTTP probes, no GitHub calls. Useful
+                   for demos, screenshots, and offline UI iteration.
+                   Equivalent to WEBOX_MOCK=1.
 
 Documentation:
   https://github.com/dilitS/webox/tree/main/docs
@@ -45,6 +51,7 @@ type opts struct {
 	showVersion  bool
 	showHelp     bool
 	debug        bool
+	mock         bool
 	doctor       bool
 	doctorJSON   bool
 	doctorTarget string // "" | "github"
@@ -111,7 +118,35 @@ func runWithFullDeps(
 	// as `webox --debug --version` work today) but log-level routing lands
 	// with the diagnostics wiring.
 	_ = parsed.debug
+
+	if parsed.mock || mockEnvActive() {
+		return runMockTUI(stdout, stderr)
+	}
 	return startTUI(stdout, stderr)
+}
+
+// mockEnv is the environment variable the launcher honours as an
+// alternative to the `--mock` CLI flag. Setting it to any non-empty
+// value other than "0" / "false" boots the cockpit in mock mode.
+const mockEnv = "WEBOX_MOCK"
+
+func mockEnvActive() bool {
+	v := os.Getenv(mockEnv)
+	return v != "" && v != "0" && v != "false" && v != "FALSE"
+}
+
+// runMockTUI boots the cockpit with deterministic in-memory data. No
+// SSH session, no HTTP probe, no GitHub call. The launcher never
+// touches the on-disk config either — `MockOptions` carries every
+// fetcher the cockpit needs.
+func runMockTUI(stdout, stderr io.Writer) int {
+	fmt.Fprintln(stderr, "webox: starting in MOCK mode — no servers are contacted")
+	program := realTeaProgram(tui.New(tui.MockOptions("")), stdout)
+	if _, err := program.Run(); err != nil {
+		fmt.Fprintf(stderr, "webox: TUI failed: %v\n", err)
+		return exitMisuse
+	}
+	return exitOK
 }
 
 // configPathResolver is the package-private seam that returns the
@@ -244,6 +279,8 @@ func parseArgs(args []string) (parsed opts, errMsg string) {
 			parsed.showHelp = true
 		case "--debug":
 			parsed.debug = true
+		case "--mock":
+			parsed.mock = true
 		case "--json":
 			parsed.doctorJSON = true
 		default:

@@ -51,6 +51,18 @@ go install github.com/dilitS/webox/cmd/webox@latest   # planned
 
 Track release readiness in [`docs/ROADMAP.md`](docs/ROADMAP.md) and the pre-implementation audit in [`docs/AUDIT.md`](docs/AUDIT.md).
 
+### Try it offline (no server required)
+
+The repository ships a **mock-data mode** that boots the full cockpit with deterministic demo content — six demo projects, a SUCCESS pipeline, live-log fixtures — without making a single SSH/HTTP/GitHub call. Use it for screenshots, UX iteration, or just to feel the UI before you connect a real profile.
+
+```bash
+make build                        # produces ./bin/webox
+./bin/webox --mock                # boots the Bento Ultra dashboard offline
+WEBOX_MOCK=1 ./bin/webox          # equivalent env-var toggle
+```
+
+The mock fixtures live in [`tui/mockdata.go`](tui/mockdata.go) and contain only synthetic data (`shop-ease.io`, fake commit SHAs, fake build numbers). Nothing here resembles a real secret, so the redactor regression corpus stays intact.
+
 ---
 
 ## 📐 Architecture

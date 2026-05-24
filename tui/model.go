@@ -53,6 +53,42 @@ type Options struct {
 	// LayoutOverride mirrors `WEBOX_LAYOUT` for tests: when non-empty
 	// it bypasses the env-var lookup performed by [New].
 	LayoutOverride string
+	// Now is the time source used by the cockpit's status bar +
+	// header. Tests inject a deterministic stub; production leaves
+	// it nil so [New] falls back to [time.Now].
+	Now func() time.Time
+	// MockHeaderMetrics seeds the cockpit's metrics snapshot at boot.
+	// Production callers leave it zero; the mock launcher populates
+	// it so the offline demo shows realistic numbers immediately.
+	MockHeaderMetrics HeaderMetricsSnapshot
+	// MockLiveLogLines seeds the live-log ring buffer at boot. Used
+	// by the mock launcher so the "Live Server Logs" tile is
+	// non-empty without an SSH connection.
+	MockLiveLogLines []LiveLogLine
+	// MockCICDSnapshots seeds the per-project CI/CD snapshot map.
+	// Keyed by project ID; the renderer renders straight from the
+	// map without an HTTP/GitHub call.
+	MockCICDSnapshots map[string]cicdSnapshotEntry
+	// PreloadedConfig short-circuits the on-disk config loader. When
+	// non-nil [Init] skips [loadConfigCmd] and the cockpit boots
+	// straight into the dashboard with the supplied config. Used
+	// exclusively by `--mock` mode today; production leaves it nil.
+	PreloadedConfig *config.Config
+}
+
+// HeaderMetricsSnapshot is the in-process projection of the latest SSH
+// metrics poll consumed by the status bar and (in fallback layouts)
+// the header-metrics tile. Production fills it from the
+// `services/sshmetrics` poller; the mock launcher hardcodes plausible
+// values so the offline demo stays in motion.
+type HeaderMetricsSnapshot struct {
+	ProfileAlias string
+	UptimeLabel  string
+	LoadLabel    string
+	RAMLabel     string
+	RTTLabel     string
+	UpdatedAt    time.Time
+	Stale        bool
 }
 
 // Model contains all mutable TUI state. It is copied by value by Update,
@@ -84,6 +120,7 @@ type Model struct {
 	actionForm      projectActionForm
 	importForm      importPreviewForm
 	liveLogs        liveLogsForm
+	headerMetrics   HeaderMetricsSnapshot
 	cicdSnapshots   map[string]cicdSnapshotEntry
 	cicdModal       cicdLogsModalForm
 	cicdFetcher     GitHubPipelineFetcher
@@ -92,6 +129,7 @@ type Model struct {
 	wizardStack     *wizardStackSlot
 	pendingPath     string
 	layoutOverride  string
+	nowFn           func() time.Time
 }
 
 // liveLogsForm captures the per-session state of the Sprint 09 live-log
@@ -176,7 +214,17 @@ func New(opts Options) Model {
 	mode := bento.Resolve(width, height, override)
 	spin := components.NewAdaptiveSpinner(mode.String())
 
-	return Model{
+	nowFn := opts.Now
+	if nowFn == nil {
+		nowFn = time.Now
+	}
+
+	cicdSnapshots := opts.MockCICDSnapshots
+	if cicdSnapshots == nil {
+		cicdSnapshots = make(map[string]cicdSnapshotEntry)
+	}
+
+	m := Model{
 		state:           StateDashboard,
 		activeTab:       TabOverview,
 		width:           width,
@@ -194,10 +242,85 @@ func New(opts Options) Model {
 		wizardRunner:    opts.WizardRunner,
 		initForm:        newInitWizardForm(),
 		layoutOverride:  override,
-		cicdSnapshots:   make(map[string]cicdSnapshotEntry),
+		cicdSnapshots:   cicdSnapshots,
 		cicdFetcher:     opts.GitHubPipeline,
 		cicdLogsFetcher: opts.GitHubLogs,
+		headerMetrics:   opts.MockHeaderMetrics,
+		nowFn:           nowFn,
+		cfg:             opts.PreloadedConfig,
 	}
+
+	if opts.PreloadedConfig != nil {
+		m.selectedIndex = clampIndex(0, len(cfgProjects(opts.PreloadedConfig)))
+		if opts.FetchStatuses != nil {
+			if seeded, err := opts.FetchStatuses(ctx, cfgProjects(opts.PreloadedConfig), opts.Cache); err == nil {
+				m = m.applyMockStatuses(seeded)
+			}
+		}
+	}
+
+	if len(opts.MockLiveLogLines) > 0 {
+		buf := components.NewRingBuffer[LiveLogLine](liveLogsCapacity)
+		for _, line := range opts.MockLiveLogLines {
+			buf.Push(line)
+		}
+		m.liveLogs = liveLogsForm{
+			AutoScroll: true,
+			Buffer:     buf,
+			Connected:  true,
+		}
+	}
+
+	return m
+}
+
+// applyMockStatuses copies a slice of [ProjectStatus] into the
+// keyed status map. Exposed only for the mock launcher; production
+// status messages route through [Update] / [StatusRefreshedMsg].
+func (m Model) applyMockStatuses(statuses []ProjectStatus) Model {
+	for _, s := range statuses {
+		m.statuses[s.ProjectID] = s
+	}
+	return m
+}
+
+// metricsAreStale reports whether the cached metrics snapshot is older
+// than the SSH poll TTL. The cockpit status bar uses it to switch the
+// LIVE pill to STALE without dimming the cells.
+func (m Model) metricsAreStale() bool {
+	if m.headerMetrics.Stale {
+		return true
+	}
+	if m.headerMetrics.UpdatedAt.IsZero() {
+		return false
+	}
+	if m.nowFn == nil {
+		return false
+	}
+	return m.nowFn().Sub(m.headerMetrics.UpdatedAt) > defaultRefreshInterval
+}
+
+// metricsHaveAnyData reports whether at least one cell in the header
+// metrics snapshot is populated. When false, the status bar paints a
+// "PENDING" pill instead of the green LIVE one.
+func (m Model) metricsHaveAnyData() bool {
+	h := m.headerMetrics
+	return h.UptimeLabel != "" || h.LoadLabel != "" || h.RAMLabel != "" || h.RTTLabel != "" || h.ProfileAlias != ""
+}
+
+// activeProfileAlias returns the alias of the profile bound to the
+// currently selected project. Empty when no project is selected or the
+// project has no matching profile (defensive: should not happen in
+// production but the mock launcher seeds projects without profiles).
+func (m Model) activeProfileAlias() string {
+	if h := m.headerMetrics.ProfileAlias; h != "" {
+		return h
+	}
+	project, ok := m.selectedProject()
+	if !ok {
+		return ""
+	}
+	return project.ProfileAlias
 }
 
 // BentoMode returns the resolved Bento mode for the current viewport

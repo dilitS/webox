@@ -104,9 +104,17 @@ func DefaultPendingPath() (string, error) {
 }
 
 // Init returns the initial config-load command for Bubble Tea.
+//
+// When a [Options.PreloadedConfig] was supplied (mock mode), Init
+// skips the on-disk load and immediately kicks the refresh ticker so
+// the dashboard tiles paint with the seeded statuses.
 func (m Model) Init() tea.Cmd {
 	if m.cfg != nil {
-		return nil
+		cmds := []tea.Cmd{m.spinner.Tick, scheduleRefresh(m.refreshInterval)}
+		if m.cicdFetcher != nil {
+			cmds = append(cmds, scheduleCICDTick(status.GitHubStepsTTL))
+		}
+		return tea.Batch(cmds...)
 	}
 	return tea.Batch(loadConfigCmd(m.ctx, m.configPath), loadPendingCmd(m.pendingPath))
 }

@@ -10,16 +10,19 @@ import (
 func TestProjectsTileRendersHeaderAndRows(t *testing.T) {
 	t.Parallel()
 
-	tile := bento.NewProjectsTile([]string{
-		"> alpha.example.com [ONLINE]",
-		"  beta.example.com [STALE]",
+	tile := bento.NewProjectsTile([]bento.ProjectRowSnapshot{
+		{Name: "alpha.example.com", State: "ONLINE", Selected: true},
+		{Name: "beta.example.com", State: "STALE"},
 	})
 
 	out := tile.Render(bento.ModeUltra, true)
-	for _, needle := range []string{"[Projects]", "alpha.example.com", "beta.example.com"} {
+	for _, needle := range []string{"[Active Projects]", "alpha.example.com", "beta.example.com"} {
 		if !strings.Contains(out, needle) {
 			t.Fatalf("Projects tile missing %q\n--- output ---\n%s", needle, out)
 		}
+	}
+	if !strings.Contains(out, "●") {
+		t.Fatalf("Projects tile should render colored dot indicators\n%s", out)
 	}
 }
 
@@ -36,26 +39,30 @@ func TestProjectsTileEmptyShowsHint(t *testing.T) {
 	}
 }
 
-func TestOverviewTileRendersDomainAndLines(t *testing.T) {
+func TestOverviewTileRendersServerLines(t *testing.T) {
 	t.Parallel()
 
-	tile := bento.NewOverviewTile("app.example.com", []string{
-		"Status: ONLINE",
-		"HTTP: 200 OK",
+	tile := bento.NewOverviewTile(bento.ServerOverviewSnapshot{
+		ProjectAlias: "app.example.com",
+		Lines: []bento.ServerOverviewLine{
+			{Icon: "✓", Label: "Status", Value: "ONLINE", Status: "ONLINE"},
+			{Icon: "⇄", Label: "HTTP", Value: "200 OK"},
+			{Icon: "⚿", Label: "SSL", Value: "Valid (30d)", Status: "ONLINE"},
+		},
 	})
 
 	out := tile.Render(bento.ModeUltra, false)
-	for _, needle := range []string{"[Overview]", "app.example.com", "Status: ONLINE", "HTTP: 200 OK"} {
+	for _, needle := range []string{"[SERVER: app.example.com]", "Status:", "ONLINE", "HTTP:", "200 OK", "SSL:", "Valid (30d)"} {
 		if !strings.Contains(out, needle) {
-			t.Fatalf("Overview tile missing %q\n--- output ---\n%s", needle, out)
+			t.Fatalf("Server tile missing %q\n--- output ---\n%s", needle, out)
 		}
 	}
 }
 
-func TestOverviewTileEmptyDomainShowsSelectionHint(t *testing.T) {
+func TestOverviewTileEmptyShowsSelectionHint(t *testing.T) {
 	t.Parallel()
 
-	tile := bento.NewOverviewTile("", []string{"Select a project to inspect status."})
+	tile := bento.NewOverviewTile(bento.ServerOverviewSnapshot{})
 	out := tile.Render(bento.ModeUltra, false)
 	if !strings.Contains(out, "Select a project") {
 		t.Fatalf("expected selection hint, got:\n%s", out)
@@ -80,13 +87,13 @@ func TestPlaceholderTilesShowMeaningfulFallbackCopy(t *testing.T) {
 		{
 			name:   "logs placeholder (no project selected)",
 			tile:   bento.NewLogsPlaceholderTile(),
-			header: "[Live Micro-Logs]",
+			header: "[Live Server Logs]",
 			hints:  []string{"Select a project to start streaming"},
 		},
 		{
 			name:   "cicd placeholder (no GitHub-linked project)",
 			tile:   bento.NewCICDPlaceholderTile(),
-			header: "[CI/CD Pipeline]",
+			header: "[CI/CD PIPELINE: Main Branch]",
 			hints:  []string{"No GitHub-linked project selected", "[n]"},
 		},
 		{
@@ -124,7 +131,7 @@ func TestHeaderMetricsTileRendersLiveAndStaleIndicator(t *testing.T) {
 		RAMLabel:     "3.4G/8.0G (42%)",
 		RTTLabel:     "18ms",
 	}).Render(bento.ModeUltra, true)
-	for _, needle := range []string{"[Header Metrics]", "[LIVE]", "main", "Uptime: 24d 11h", "Load: 0.12", "RAM: 3.4G", "Ping: 18ms"} {
+	for _, needle := range []string{"[Header Metrics]", "LIVE", "main", "Uptime: 24d 11h", "Load:", "0.12", "RAM:", "3.4G", "Ping:", "18ms"} {
 		if !strings.Contains(live, needle) {
 			t.Fatalf("live header missing %q\n%s", needle, live)
 		}
@@ -132,27 +139,37 @@ func TestHeaderMetricsTileRendersLiveAndStaleIndicator(t *testing.T) {
 
 	stale := bento.NewHeaderMetricsTile(bento.HeaderMetricsSnapshot{ProfileAlias: "main", Stale: true}).
 		Render(bento.ModeUltra, true)
-	if !strings.Contains(stale, "[STALE]") {
-		t.Fatalf("stale tile missing [STALE] marker\n%s", stale)
+	if !strings.Contains(stale, "STALE") {
+		t.Fatalf("stale tile missing STALE marker\n%s", stale)
 	}
 }
 
-func TestMicroLogsTileShowsTailWithLevelMarkers(t *testing.T) {
+func TestMicroLogsTileShowsTimestampedLevels(t *testing.T) {
 	t.Parallel()
 
 	out := bento.NewMicroLogsTile("app.example.com", []bento.MicroLogLine{
-		{Level: "INFO", Text: "starting worker pool=4"},
-		{Level: "WARN", Text: "queue depth 87%", Redacted: false},
-		{Level: "ERROR", Text: "db connect failed", Redacted: true},
+		{Timestamp: "14:32:10", Level: "INFO", Source: "API-Gateway", Text: "GET /users 200"},
+		{Timestamp: "14:32:11", Level: "WARN", Source: "Auth-Service", Text: "High latency 450ms"},
+		{Timestamp: "14:32:14", Level: "DEBUG", Source: "Worker", Text: "cache hit"},
+		{Timestamp: "14:32:15", Level: "ERROR", Source: "DB", Text: "connect failed", Redacted: true},
 	}).Render(bento.ModeUltra, false)
 
-	for _, needle := range []string{"[Live Micro-Logs]", "Stream: app.example.com", "starting worker pool=4", "queue depth", "db connect failed", "(redacted)"} {
+	for _, needle := range []string{
+		"[Live Server Logs]",
+		"14:32:10",
+		"INFO",
+		"API-Gateway",
+		"GET /users 200",
+		"WARN",
+		"High latency",
+		"DEBUG",
+		"ERROR",
+		"connect failed",
+		"(redacted)",
+	} {
 		if !strings.Contains(out, needle) {
 			t.Fatalf("micro-logs missing %q\n%s", needle, out)
 		}
-	}
-	if !strings.Contains(out, "✗") {
-		t.Fatalf("ERROR rows should use ✗ marker\n%s", out)
 	}
 }
 
@@ -179,20 +196,20 @@ func TestCICDPipelineTileRendersHeaderAndSteps(t *testing.T) {
 	out := bento.NewCICDPipelineTile(snap).Render(bento.ModeUltra, true)
 
 	for _, needle := range []string{
-		"[CI/CD Pipeline]",
-		"[LIVE]",
+		"[CI/CD PIPELINE: Main Branch]",
+		"LIVE",
 		"app.example.com",
 		"deploy.yml",
 		"Build #412",
 		"SUCCESS ✓",
 		"14:12 GMT",
-		"[1] Git Checkout ✓",
-		"[2] Install Deps ✓",
-		"[3] Code Lint ✗",
-		"[4] Build Artifact ⊘",
-		"[5] Unit Tests ⏳",
-		"[6] Deploy …",
-		"[F8] View logs",
+		"[1]",
+		"Git Checkout",
+		"[3]",
+		"Code Lint",
+		"[6]",
+		"Deploy",
+		"View Details (F8)",
 	} {
 		if !strings.Contains(out, needle) {
 			t.Fatalf("CI/CD tile missing %q\n--- output ---\n%s", needle, out)
@@ -211,8 +228,8 @@ func TestCICDPipelineTileRendersStaleAndRateLimited(t *testing.T) {
 			{Number: 1, Name: "Lint", Status: bento.CICDStatusSuccess},
 		},
 	}).Render(bento.ModeUltra, false)
-	if !strings.Contains(stale, "[STALE]") {
-		t.Fatalf("stale tile missing [STALE] marker\n%s", stale)
+	if !strings.Contains(stale, "STALE") {
+		t.Fatalf("stale tile missing STALE marker\n%s", stale)
 	}
 
 	limited := bento.NewCICDPipelineTile(bento.CICDPipelineSnapshot{
@@ -220,7 +237,7 @@ func TestCICDPipelineTileRendersStaleAndRateLimited(t *testing.T) {
 		RateLimited:   true,
 		RateLimitHint: "Reset in 12min",
 	}).Render(bento.ModeUltra, false)
-	for _, needle := range []string{"[LIMITED]", "GitHub rate limit reached", "Reset in 12min"} {
+	for _, needle := range []string{"LIMITED", "GitHub rate limit reached", "Reset in 12min"} {
 		if !strings.Contains(limited, needle) {
 			t.Fatalf("rate-limited tile missing %q\n%s", needle, limited)
 		}
@@ -252,7 +269,7 @@ func TestTileIDsAreStableAndUniquePerSlot(t *testing.T) {
 
 	tiles := []bento.BentoTile{
 		bento.NewProjectsTile(nil),
-		bento.NewOverviewTile("", nil),
+		bento.NewOverviewTile(bento.ServerOverviewSnapshot{}),
 		bento.NewMetricsPlaceholderTile(),
 		bento.NewHeaderMetricsTile(bento.HeaderMetricsSnapshot{}),
 		bento.NewCICDPlaceholderTile(),
@@ -262,8 +279,6 @@ func TestTileIDsAreStableAndUniquePerSlot(t *testing.T) {
 		bento.NewTopologyPlaceholderTile(),
 	}
 
-	// IDs are unique per slot — placeholder + live wiring share the
-	// slot's identity by design (the renderer swaps them in place).
 	bySlot := map[bento.Slot]map[string]bool{}
 	for _, tile := range tiles {
 		id := tile.ID()
@@ -274,8 +289,6 @@ func TestTileIDsAreStableAndUniquePerSlot(t *testing.T) {
 		if bySlot[slot] == nil {
 			bySlot[slot] = map[string]bool{}
 		}
-		// Allow placeholder ↔ live sharing one ID per slot, but
-		// reject duplicates with different IDs in the same slot.
 		bySlot[slot][id] = true
 		if len(bySlot[slot]) > 1 {
 			t.Errorf("slot %v has multiple distinct tile IDs: %v", slot, bySlot[slot])

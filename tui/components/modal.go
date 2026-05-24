@@ -29,9 +29,15 @@ type ModalOptions struct {
 }
 
 // ModalTone selects the border/title accent. The cockpit standardises on
-// three tones so wizards, doctor checks, and rollback warnings share
-// visual grammar.
+// four tones so wizards, doctor checks, status pills, and rollback
+// warnings share visual grammar.
 type ModalTone int
+
+// Tone aliases [ModalTone] so callers outside the modal renderer
+// (status bar, badge pills, tile borders) read with intent. Both names
+// resolve to the same numeric values so existing call sites keep
+// compiling.
+type Tone = ModalTone
 
 const (
 	// ToneInfo is the default neutral accent (primary purple).
@@ -40,6 +46,9 @@ const (
 	ToneWarning
 	// ToneError surfaces rollback or auth failures (red border).
 	ToneError
+	// ToneSuccess paints the LIVE indicator in the status bar and
+	// the SUCCESS badge on CI/CD tiles.
+	ToneSuccess
 )
 
 // RenderModal composes a double-border centred dialog. The function does
@@ -62,6 +71,10 @@ func RenderModal(opts ModalOptions) string {
 		accent = tokens.Warning
 	case ToneError:
 		accent = tokens.Error
+	case ToneSuccess:
+		accent = tokens.Success
+	case ToneInfo:
+		// Inherit the default primary accent.
 	}
 
 	titleLine := ""

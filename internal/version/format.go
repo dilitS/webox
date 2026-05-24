@@ -45,3 +45,13 @@ func Format(version, commit, date string) string {
 func String() string {
 	return Format(Version, Commit, Date)
 }
+
+// Short returns just the version segment (e.g. "v0.1.0" or
+// "v0.0.0-dev") for surfaces that need a compact label — e.g. the
+// cockpit status bar where the full Format line would not fit.
+func Short() string {
+	if Version == "" {
+		return DefaultVersion
+	}
+	return Version
+}
