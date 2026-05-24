@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -236,6 +237,14 @@ func (m Model) renderDashboardBody(screen views.Screen) string {
 		base = bento.NewEngine("Webox Cockpit v0.1", m.dashboardBentoTiles()).
 			WithStatusBar(statusBar).
 			RenderMode(screen.Width, screen.Height, mode)
+	}
+	// Host-key modal takes precedence: the cockpit is unsafe to
+	// continue while an SSH dial is being refused; we paint it over
+	// anything else so the operator's first interaction is the
+	// remediation flow, not the CI/CD logs they were viewing.
+	if m.hostKeyModal.Open {
+		overlay := renderHostKeyModal(m.hostKeyModal, screen.Width, defaultKnownHostsPath(os.Getenv("HOME")))
+		return base + "\n" + overlay
 	}
 	if !m.cicdModal.Open {
 		return base

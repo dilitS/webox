@@ -124,6 +124,7 @@ type Model struct {
 	headerMetrics   HeaderMetricsSnapshot
 	cicdSnapshots   map[string]cicdSnapshotEntry
 	cicdModal       cicdLogsModalForm
+	hostKeyModal    hostKeyModalForm
 	cicdFetcher     GitHubPipelineFetcher
 	cicdLogsFetcher GitHubLogsFetcher
 	wizardRunner    WizardRunner

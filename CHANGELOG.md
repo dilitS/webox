@@ -15,6 +15,15 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ## [Unreleased]
 
+### Security
+- **Sprint 14 — Host-key mismatch / unknown-key modal (TASK-14.4, 2026-05-25).** When any SSH operation surfaces `ssh.ErrHostKeyMismatch` or `ssh.ErrHostKeyUnknown`, the cockpit now opens a strict-block modal (`tui/host_key_modal.go`) instead of swallowing the failure into a dismissible alert toast. The modal:
+  - **Never** renders the offered key, its fingerprint, SHA-256, MD5, or any cryptographic material — that policy is locked behind `TestRenderHostKeyModal_NeverLeaksKeyMaterial`, which asserts the absence of `AAAAB3`, `ssh-ed25519`, `ssh-rsa`, `ecdsa-sha2`, `SHA256:`, `MD5:` substrings.
+  - Surfaces the exact recovery command (`ssh-keygen -R <host> -f <known_hosts>`), the literal `known_hosts` path, and a brief MITM-aware warning citing `SECURITY §5`.
+  - Blocks all keyboard input except `Esc`/`Enter` (close) and `q`/`Ctrl+C` (quit) — `TestUpdate_HostKeyModal_BlocksKeysAndDismissesOnEsc` verifies cursor / Tab / Right cannot move the selection while the modal is open, so the operator cannot accidentally re-trigger an SSH command on top of a refused connection.
+  - Distinguishes `Kind=mismatch` (red border, "potential man-in-the-middle attack" copy) from `Kind=unknown` (warning border, "first connection — verify out-of-band before accepting" copy).
+  - Does **not** continue the connection on its own; closing returns control without retrying. The next user-triggered SSH op picks up cleanly once the operator runs `ssh-keygen -R`.
+  - Wired into `Update` via `tryRaiseHostKeyModal(err)` from `StatusRefreshFailedMsg`; additional call sites (`ProjectActionCompletedMsg`, `ImportScanCompletedMsg`, wizard preflight) will be hooked in TASK-14.4 follow-up. The legacy alert-toast path keeps working for non-host-key errors (`TestUpdate_StatusRefreshFailed_NonHostKeyKeepsLegacyAlert`).
+
 ### Changed
 - **Project rules + roadmap sync (2026-05-25).** Charter (`.cursor/rules/00-charter.mdc`) updated to reflect [ADR-0007](./docs/adr/0007-bento-ultra-eskalacja-mvp.md) — Bento Ultra, Live Log Stream, Live Service Topology, CI/CD Live Panel and header metrics are **in MVP**, not STRETCH. Added explicit no-telemetry / no-plugin-marketplace clauses, perf gate guardrail (`make bench-check` with 5 ms budget), e2e scenario requirement, and host-key UX policy (modal fallback in Sprint 14 → full `webox doctor security --update-host-key` in v0.2+). `.cursor/rules/20-bubbletea-mvu.mdc` gained the Sprint 13 chrome contract + mouse API + surface contract sections; `.cursor/rules/50-tests.mdc` documents the `internal/e2e/` layer and `make bench-check`. `AGENTS.md` repo layout reflects the new `tui/surface/`, `tui/bento/`, `internal/e2e/` packages. `docs/ROADMAP.md` adds Sprint 13 and Sprint 14 rows.
 
