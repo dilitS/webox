@@ -164,7 +164,7 @@ Spinner Webox to nie tylko statyczny zestaw klatek. Jego prędkość (Tick Durat
 
 ### 3.4 Wizualny Graf Topologii Usług (Live Service Topology Map)
 
-> 🔵 **MVP (v0.1) — dostarczone w Sprincie 11.** Kafelek `🌐 [Live Service Topology]` renderuje się w Ultra (`120×35`) **i** Ultra+ (`160×45`) — eskalowane z Ultra+-only po code review reference cockpit image. Dla terminali `<120×35` (Standard Cockpit fallback) topology degraduje się do tabelarycznej listy `Connections:` wewnątrz kafelka `Overview` (zaplanowane na Sprint 12 TASK-12.1).
+> 🔵 **MVP (v0.1) — dostarczone w Sprincie 11, dopracowane w Sprincie 12.** Kafelek `🌐 [Live Service Topology]` renderuje się w Ultra (`120×35`) i Ultra+ (`160×45`) jako **lewa dolna karta** pod `📂 [Active Projects]` i po lewej od `🚀 [CI/CD PIPELINE]`. Dla terminali `<120×35` (Standard Cockpit fallback) topology degraduje się do tabelarycznej listy `Connections:` wewnątrz kafelka `Overview`.
 
 Renderer to czysta funkcja w `tui/components/asciigraph/asciigraph.go`. Producer (`tui/topology.go::buildTopologySnapshot`) folduje `config.Project` + `ProjectStatus` + `cicdSnapshotEntry` w jeden `asciigraph.Graph`. Pulse jest sterowany przez `m.nowFn().Second()%2`, więc edge'y BUILDING/OFFLINE migoczą na tick refresh dashboardu bez dodatkowego timera (i bez ryzyka leak goroutine).
 
@@ -241,12 +241,15 @@ Renderer **nie jest** generic DAG layout engine — to świadoma decyzja. Hard-c
 Gdy rozmiar okna terminala przekracza próg komfortu (`120×35`), Webox transformuje interfejs w pięcio­modułowy pulpit:
 
 1. **Status bar** (full-width, top) — `WEBOX vX.Y.Z [LIVE]` brand-pill po lewej + pipe-delimited stream metryk po prawej (`HH:MM:SS · profile · Uptime · Load · RAM · Ping`). Pill `LIVE/STALE/PENDING/OFFLINE` zmienia kolor w zależności od świeżości danych (`status.GitHubStepsTTL` + `ssh:metrics:` cache).
-2. **Active Projects** (lewa kolumna, magenta ramka) — lista projektów z kropkami stanu (`●` Success / Warning / Error / Muted) i zaokrąglonym pillem selekcji.
-3. **SERVER: `<project>`** (prawa kolumna góra, magenta ramka) — iconified key-value (Profile / Stack / Node.js / Status / HTTP / SSL / Repo / Last Deploy) + per-line status dot.
-4. **CI/CD PIPELINE: Main Branch** (prawa kolumna dół, cyan ramka) — `Build #N: STATUS` badge + ponumerowane kroki z badgami `✓ ✗ ⏳ … ⊘ ⊗ ?` + skróty `[F8] View logs · [Enter] Open run`.
-5. **Live Server Logs** (full-width, dół, magenta ramka) — timestampowane linie z kolorowanym poziomem (`INFO` cyan, `WARN` warning, `ERROR` red, `DEBUG` accent) i adnotacją `(redacted)` gdy redaktor sekretów coś przepuścił.
+2. **Active Projects** (lewa kolumna, górny rząd, magenta ramka) — lista projektów z kropkami stanu (`●` Success / Warning / Error / Muted) i zaokrąglonym pillem selekcji.
+3. **SERVER: `<project>`** (prawa kolumna, górny rząd, magenta ramka) — iconified key-value (Profile / Stack / Node.js / Status / HTTP / SSL / Repo / Last Deploy) + per-line status dot.
+4. **Live Service Topology** (lewa kolumna, drugi rząd, cyan ramka) — graf `📦 Repo → 🖥 Server → 🌐 App`, zsynchronizowany semantycznie z `Connections:` fallbackiem w Standard Cockpit.
+5. **CI/CD PIPELINE: Main Branch** (prawa kolumna, drugi rząd, cyan ramka) — `Build #N: STATUS` badge + ponumerowane kroki z badgami `✓ ✗ ⏳ … ⊘ ⊗ ?` + skróty `[F8] View logs · [Enter] Open run`.
+6. **Live Server Logs** (full-width, dół, magenta ramka) — timestampowane linie z kolorowanym poziomem (`INFO` cyan, `WARN` warning, `ERROR` red, `DEBUG` accent) i adnotacją `(redacted)` gdy redaktor sekretów coś przepuścił.
 
-Aktywny panel jest podświetlony grubszą ramką w kolorze swojego akcentu.
+Aktywny panel jest podświetlony grubszą ramką w kolorze swojego akcentu. Jeśli pełny frame ma więcej linii niż wysokość terminala, operator przewija **wyłącznie część korpusu** (slot `body` w kontrakcie chrome — patrz [DESIGN §2.5 Chrome contract](./DESIGN.md#25-chrome-contract-status-bar--body--footer)) przez `PgUp` / `PgDn` / `Home` / `End` lub kółko myszy; **status bar (top chrome)** i **footer z hintem nawigacji (bottom chrome)** pozostają przyklejone do krawędzi terminala. Gdy body przekracza dostępną wysokość, footer pokazuje pasek `↕ scroll: PgUp/PgDn · Home/End · Mouse · (offset/max)`. Każdy kafelek niezależnie respektuje **height budget** — rzędy są wyrównywane do siebie (Topology = wysokości CI/CD, Server = wysokości Active Projects), a kafelek, którego treść przekracza budżet, zamiast pchać sąsiada w dół, zwraca dyskretny pasek `┃ … +N more lines · scroll inside tab/modal ┃`, zachowując pionowe bordery `┃` zgodne z kolorem akcentu kafelka.
+
+Borderowanie infrastruktury wewnątrz topology map (`[Live Service Topology]`) używa **lekkich** glifów (`┌─┐└─┘`), żeby hierarchia czytała się jako *grid > tile > nodes* zamiast trzech konkurujących wag ramek; chrome kafelka pozostaje grubą ramką (`┏━┓`).
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -260,11 +263,11 @@ Aktywny panel jest podświetlony grubszą ramką w kolorze swojego akcentu.
 │ │    Dashboard-Admin                       ● │ │ │ ⇄ HTTP:        200 OK                                                  │ │
 │ │    Payment-UI                            ● │ │ │ ⚿ SSL:         Valid (114 days remaining) ●                            │ │
 │ ╰────────────────────────────────────────────╯ │ │ ⌬ Repo:        dilitS-demo/shopease-web                                │ │
-│                                                │ │ ⏱ Last Deploy: 2h ago · success                                        │ │
-│                                                │ ╰────────────────────────────────────────────────────────────────────────╯ │
-│                                                │ ╭─[CI/CD PIPELINE: Main Branch]─────────────────────────────────────────╮ │
-│                                                │ │ Build #412  SUCCESS ✓  (1m 42s)                                        │ │
-│                                                │ │ [1] Git Checkout      ✓                                                │ │
+│ ╭─[Live Service Topology]───────────────────╮ │ │ ⏱ Last Deploy: 2h ago · success                                        │ │
+│ │ [ GitHub Repo ] ──▶ [ Production Server ] │ │ ╰────────────────────────────────────────────────────────────────────────╯ │
+│ │        │                                  │ │ ╭─[CI/CD PIPELINE: Main Branch]─────────────────────────────────────────╮ │
+│ │        └────▶ [ ShopEase-Web ]            │ │ │ Build #412  SUCCESS ✓  (1m 42s)                                        │ │
+│ ╰────────────────────────────────────────────╯ │ │ [1] Git Checkout      ✓                                                │ │
 │                                                │ │ [2] Install Deps      ✓                                                │ │
 │                                                │ │ [3] Code Lint         ✓                                                │ │
 │                                                │ │ [4] Build Artifact    ✓                                                │ │
@@ -455,6 +458,9 @@ Dla zaawansowanych użytkowników (Power-Users) Webox 2.0 wprowadza skróty akor
 | `?` | Otwarcie pełnoekranowej pomocy z listą wszystkich skrótów. |
 | `Esc` | Zamknięcie modali, powrót do ekranu nadrzędnego. |
 | `Ctrl+R` | Natychmiastowe unieważnienie pamięci podręcznej (Cache Invalidation) i pełny przeładunek sieciowy. |
+| `PgUp` / `PgDn` | Przewijanie korpusu (body slot) w górę / w dół jednym ekranem. Status bar i footer pozostają przyklejone. |
+| `Home` / `End` | Skok do początku / końca aktualnego korpusu (zachowuje top + bottom chrome). |
+| `Mouse Wheel` | Przewijanie korpusu krokiem 3 linii (`MouseActionPress` na `WheelUp/WheelDown` — drag/long-press nie zapętla scrolla). |
 
 #### W zakładce Szczegółów Projektu (Cockpit Focus)
 

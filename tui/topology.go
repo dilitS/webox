@@ -1,12 +1,15 @@
 package tui
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/dilitS/webox/config"
 	"github.com/dilitS/webox/tui/bento"
 	"github.com/dilitS/webox/tui/components/asciigraph"
 )
+
+const connectionDetailMaxParts = 2
 
 // buildTopologySnapshot composes the per-frame topology projection
 // from the active project + cached status + CI/CD entry. Pure
@@ -83,6 +86,17 @@ func buildTopologySnapshot(project config.Project, status ProjectStatus, hasStat
 		Graph:    graph,
 		Pulse:    pulse,
 		HelpHint: "↻ live · " + projectStateLabel(status.State, hasStatus),
+	}
+}
+
+// buildTopologyConnections renders the Standard Cockpit textual fallback
+// (`Connections:` block in Overview). It reuses the same topology
+// builder as the Ultra tile so both layouts stay semantically aligned.
+func buildTopologyConnections(project config.Project, status ProjectStatus, hasStatus bool, ci cicdSnapshotEntry, hasCI bool) []string {
+	snap := buildTopologySnapshot(project, status, hasStatus, ci, hasCI, false)
+	return []string{
+		"GitHub → Server : " + connectionSummary(snap.Graph.RepoToServer.State, cicdConnectionDetail(status, ci, hasCI)),
+		"Server → App    : " + connectionSummary(snap.Graph.ServerToSubdomain.State, appConnectionDetail(status, hasStatus)),
 	}
 }
 
@@ -172,6 +186,60 @@ func projectStateLabel(s ProjectState, has bool) string {
 	default:
 		return string(s)
 	}
+}
+
+func connectionSummary(state asciigraph.EdgeState, detail string) string {
+	summary := "? Pending"
+	switch state {
+	case asciigraph.EdgeOnline:
+		summary = "✓ Active"
+	case asciigraph.EdgeBuilding:
+		summary = "▶ Building"
+	case asciigraph.EdgeDegraded:
+		summary = "⚠ Degraded"
+	case asciigraph.EdgeOffline:
+		summary = "✗ Offline"
+	}
+	if detail == "" {
+		return summary
+	}
+	return summary + " (" + detail + ")"
+}
+
+func cicdConnectionDetail(status ProjectStatus, ci cicdSnapshotEntry, hasCI bool) string {
+	parts := make([]string, 0, connectionDetailMaxParts)
+	if status.LastDeploy != "" {
+		parts = append(parts, status.LastDeploy)
+	}
+	if !hasCI || ci.Run == nil {
+		if len(parts) == 0 {
+			return "no run yet"
+		}
+		return strings.Join(parts, ", ")
+	}
+
+	conclusion := strings.TrimSpace(strings.ToLower(ci.Run.Conclusion))
+	if conclusion == "" {
+		conclusion = strings.TrimSpace(strings.ToLower(ci.Run.Status))
+	}
+	if conclusion != "" {
+		parts = append(parts, conclusion)
+	}
+	if len(parts) == 0 {
+		return "no run yet"
+	}
+	return strings.Join(parts, ", ")
+}
+
+func appConnectionDetail(status ProjectStatus, has bool) string {
+	if !has {
+		return "awaiting first probe"
+	}
+	parts := []string{nonEmptyTopo(status.HTTPHealth, "pending")}
+	if status.SSLDaysLeft >= 0 && status.SSLDaysLeft < 14 {
+		parts = append(parts, "SSL "+strconv.Itoa(status.SSLDaysLeft)+"d")
+	}
+	return strings.Join(parts, ", ")
 }
 
 func stack(p config.Project) string {

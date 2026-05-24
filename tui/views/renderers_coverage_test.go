@@ -46,8 +46,11 @@ func TestRenderDashboard_NoProjects_RendersOnboardingHint(t *testing.T) {
 	cfg.Projects = nil
 	s := baseScreen(100, 30, cfg)
 	out := views.RenderDashboard(s)
+	// As of Sprint 13 the cockpit chrome (status bar + footer
+	// hints) is owned by `tui.View`, so this renderer only emits
+	// the body. We assert the body needles only.
 	for _, needle := range []string{
-		"Webox Cockpit", "Projects", "No projects yet", "Overview", "n:new", "i:import",
+		"[Active Projects]", "No projects yet", "[SERVER:",
 	} {
 		if !strings.Contains(out, needle) {
 			t.Fatalf("missing needle %q\n--- output ---\n%s", needle, out)
@@ -57,6 +60,12 @@ func TestRenderDashboard_NoProjects_RendersOnboardingHint(t *testing.T) {
 
 func TestRenderDashboard_WithProjects_HighlightsSelectionAndStatuses(t *testing.T) {
 	t.Parallel()
+	// As of the Sprint 13 cockpit-consistency pass, project rows
+	// use the same `name + coloured dot` cell as the bento
+	// projects tile; the per-row badge moved to the dot so the
+	// per-row OFFLINE/ONLINE text is no longer rendered on the
+	// project list itself. The selected project's badge text is
+	// still surfaced in the right-hand SERVER pane.
 	cfg := sampleConfig()
 	s := baseScreen(110, 30, cfg)
 	s.SelectedIndex = 0 // selecting p-1 so its `5m ago` LastDeploy is rendered
@@ -66,7 +75,7 @@ func TestRenderDashboard_WithProjects_HighlightsSelectionAndStatuses(t *testing.
 	}
 	out := views.RenderDashboard(s)
 	for _, needle := range []string{
-		"app.demo.smallhost.pl", "blog.demo.smallhost.pl", "ONLINE", "OFFLINE", "5m ago",
+		"app.demo.smallhost.pl", "blog.demo.smallhost.pl", "ONLINE", "5m ago",
 		"HTTP Health", "SSL", "Last Deploy", "Repo", "Node",
 	} {
 		if !strings.Contains(out, needle) {
@@ -77,15 +86,20 @@ func TestRenderDashboard_WithProjects_HighlightsSelectionAndStatuses(t *testing.
 
 func TestRenderDashboard_HelpAndAlertVisible(t *testing.T) {
 	t.Parallel()
+	// As of Sprint 13 the alert + help banner live in the cockpit
+	// chrome (status bar + footer hints) composed by `tui.View`,
+	// not in the renderer body. The renderer still exposes the
+	// per-project Restart / SSL Renew / Tail Logs cheatsheet in
+	// the overview pane, so we assert that here.
 	s := baseScreen(100, 30, sampleConfig())
 	s.HelpVisible = true
 	s.Alert = "profile saved"
 	out := views.RenderDashboard(s)
-	if !strings.Contains(out, "profile saved") {
-		t.Fatalf("alert missing:\n%s", out)
+	if !strings.Contains(out, "Restart") {
+		t.Fatalf("per-project Restart hint missing:\n%s", out)
 	}
-	if !strings.Contains(out, "restart") {
-		t.Fatalf("help banner missing action hints:\n%s", out)
+	if !strings.Contains(out, "SSL Renew") {
+		t.Fatalf("per-project SSL Renew hint missing:\n%s", out)
 	}
 }
 

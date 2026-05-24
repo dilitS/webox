@@ -9,91 +9,225 @@ import (
 	"github.com/dilitS/webox/internal/version"
 	"github.com/dilitS/webox/tui/bento"
 	"github.com/dilitS/webox/tui/components"
+	"github.com/dilitS/webox/tui/surface"
 	"github.com/dilitS/webox/tui/theme"
 	"github.com/dilitS/webox/tui/views"
 )
 
 // View renders the current model without mutating it.
 //
-// Every full-screen surface is wrapped with [chromeWrap] so the
-// operator sees the same status bar + footer hint strip on the init
-// wizard, the dashboard, project detail, and the wizard flows.
-// Modals (CI/CD F8, doctor errors) keep their existing overlay
-// rendering — they paint on top of the wrapped surface.
+// As of Sprint 13 the cockpit composes the visible frame in three
+// pinned slots:
+//
+//  1. Top chrome: a one-line cockpit status bar (`WEBOX vX.Y.Z [LIVE]`
+//     + clock / profile / uptime / load / RAM / ping). The dashboard
+//     reuses the bento engine's own status bar (composed via
+//     [WithStatusBar]) so we do not stack two pills; every other
+//     state gets a pinned status bar from [renderChromeTop].
+//  2. Body: the active screen's rendered content. When the body is
+//     taller than the available height it is sliced through
+//     [renderViewport]; PgUp / PgDn / Home / End / mouse-wheel keys
+//     scroll only this slot — the bottom footer stays glued to the
+//     terminal edge so the operator never loses the keybinding hint
+//     while scrolling.
+//  3. Bottom chrome: keybinding hint line that surfaces the scroll
+//     affordance (`↕ scroll: PgUp/PgDn (offset/max)`) whenever the
+//     body overflows the viewport.
+//
+// Tiny viewports get the raw body (no chrome) so the resize warning
+// stays self-contained.
 func (m Model) View() string {
 	screen := m.screen()
+	mode := bento.DetectMode(screen.Width, screen.Height)
+	if mode == bento.ModeTiny {
+		return m.renderRootBody(screen)
+	}
+
+	body := m.renderRootBody(screen)
+	totalLines := len(viewportLines(body))
+
+	// Dashboard owns its own top status bar via the bento engine, so
+	// we keep the body as-is and only pin a footer underneath.
+	if m.state == StateDashboard {
+		available := screen.Height - 1
+		if available < 1 {
+			available = 1
+		}
+		bodyView := renderViewport(body, available, m.viewportOffsetY)
+		bottom := m.renderChromeBottom(screen.Width, totalLines, available, m.viewportOffsetY)
+		return lipgloss.JoinVertical(lipgloss.Left, bodyView, bottom)
+	}
+
+	top := m.renderChromeTop(screen, m.surfaceCrumb())
+	available := screen.Height - lipgloss.Height(top) - 1
+	if available < 1 {
+		available = 1
+	}
+	bodyView := renderViewport(body, available, m.viewportOffsetY)
+	bottom := m.renderChromeBottom(screen.Width, totalLines, available, m.viewportOffsetY)
+
+	return lipgloss.JoinVertical(lipgloss.Left, top, bodyView, bottom)
+}
+
+// surfaceCrumb is the per-state breadcrumb the status bar shows
+// before the live clock. Dashboard renders no crumb (the bento engine
+// already prints the cockpit brand), wizards/preview/detail surfaces
+// get a descriptive label so the operator never wonders what screen
+// they are on.
+func (m Model) surfaceCrumb() string {
 	switch m.state {
 	case StateInitWizard:
-		return m.chromeWrap(screen, "Init Wizard", views.RenderInitWizard(screen))
-	case StateDashboard:
-		return m.renderDashboard(screen)
+		return "Init Wizard"
 	case StateProjectDetail:
 		if m.activeTab == TabLogs {
-			return m.chromeWrap(screen, "Live Logs", views.RenderLiveLogs(screen))
+			return "Live Logs"
 		}
-		return m.chromeWrap(screen, "Project Detail", views.RenderProjectDetail(screen))
+		return "Project Detail"
 	case StateProjectWizard:
-		return m.chromeWrap(screen, "Project Wizard", views.RenderProjectWizard(screen))
+		return "Project Wizard"
 	case StateResumeWizard:
-		return m.chromeWrap(screen, "Resume Wizard", views.RenderResumeWizard(screen))
+		return "Resume Wizard"
 	case StateImportPreview:
-		return m.chromeWrap(screen, "Import Preview", views.RenderImportPreview(screen))
+		return "Import Preview"
+	default:
+		return ""
+	}
+}
+
+// renderRootBody returns the active screen's body (no chrome). Per
+// the Sprint 13 chrome contract, top/bottom strips are composed by
+// [View]; surfaces only describe their scrollable content.
+//
+// As of the Sprint 13 surface-foundation pass, the function first
+// asks `m.surfaceFor()` whether a [surface.Surface] adapter exists
+// for the current state. Migrated states (today: `dashboard`) flow
+// through the surface contract; everything else falls back to the
+// legacy switch below until Sprint 14 finishes the migration. This
+// gives us a single seam to walk states off the god-package without
+// a flag-day refactor.
+func (m Model) renderRootBody(screen views.Screen) string {
+	if s := m.surfaceFor(); s != nil {
+		return s.Body(surface.Context{Screen: screen})
+	}
+	switch m.state {
+	case StateInitWizard:
+		return views.RenderInitWizard(screen)
+	case StateDashboard:
+		return m.renderDashboardBody(screen)
+	case StateProjectDetail:
+		if m.activeTab == TabLogs {
+			return views.RenderLiveLogs(screen)
+		}
+		return views.RenderProjectDetail(screen)
+	case StateProjectWizard:
+		return views.RenderProjectWizard(screen)
+	case StateResumeWizard:
+		return views.RenderResumeWizard(screen)
+	case StateImportPreview:
+		return views.RenderImportPreview(screen)
 	default:
 		return m.styles.Panel.Render(fmt.Sprintf("%s is not enabled", m.state))
 	}
 }
 
-// chromeWrap paints the cockpit-wide chrome (status bar + footer
-// hints) around any non-dashboard view. The dashboard renders its
-// own status bar inside the bento engine, so we skip the wrap there.
-//
-// crumb is the surface name displayed in the status-bar breadcrumb
-// cell (e.g. "Init Wizard", "Project Detail"). The wrap is a no-op
-// when the terminal is below the Standard threshold so the cockpit
-// falls back to the legacy split-pane silhouette.
-func (m Model) chromeWrap(screen views.Screen, crumb, body string) string {
-	if screen.Width < bentoStandardMinWidth || screen.Height < bentoStandardMinHeight {
-		return body
-	}
+// renderChromeTop builds the persistent top-of-frame status bar.
+// crumb is prefixed to the existing sections so the operator can
+// always tell which surface is active.
+func (m Model) renderChromeTop(screen views.Screen, crumb string) string {
 	opts := m.dashboardStatusBar(screen.Width)
 	if crumb != "" {
 		opts.Sections = append([]string{crumb}, opts.Sections...)
 	}
-	statusBar := components.RenderStatusBar(opts)
-	footer := m.renderFooterHints(screen.Width)
-	parts := []string{statusBar, body}
-	if footer != "" {
-		parts = append(parts, footer)
-	}
-	return lipgloss.JoinVertical(lipgloss.Left, parts...)
+	return components.RenderStatusBar(opts)
 }
 
-// bentoStandardMinWidth/Height mirror [bento.DetectMode]'s Standard
-// threshold. Below it the cockpit hides the chrome and renders the
-// raw view (Standard fallback owns its own header).
-const (
-	bentoStandardMinWidth  = 100
-	bentoStandardMinHeight = 30
-)
-
-// renderFooterHints draws the global keybinding strip below every
-// chrome-wrapped surface. We keep the hint set tight (≤80 cols) so
-// even Standard Cockpit renders it without wrapping.
-func (m Model) renderFooterHints(width int) string {
+// renderChromeBottom builds the pinned footer hint. When the body
+// overflows the viewport the footer surfaces the scroll affordance
+// inline so the operator does not have to memorise the keymap or
+// guess that there is more content below the fold.
+func (m Model) renderChromeBottom(width, total, available, offset int) string {
 	tokens := theme.Default()
 	hints := "  [q] quit · [?] help · [/] command palette · [Tab] cycle panels"
-	style := lipgloss.NewStyle().
+	if total > available && available > 0 {
+		maxOffset := total - available
+		hints += fmt.Sprintf("  ·  ↕ scroll: PgUp/PgDn (%d/%d)", offset, maxOffset)
+	}
+	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color(tokens.TextDim)).
-		Width(width)
-	return style.Render(hints)
+		Width(width).
+		Render(hints)
 }
 
-func (m Model) renderDashboard(screen views.Screen) string {
+// renderViewport returns the visible slice of rendered for the current
+// terminal height. When the full frame fits, the function is a no-op.
+// The frame is sliced line-wise (never mid-line), matching how a
+// terminal viewport behaves.
+func renderViewport(rendered string, height, offset int) string {
+	if height <= 0 {
+		return rendered
+	}
+	lines := viewportLines(rendered)
+	if len(lines) <= height {
+		return strings.Join(lines, "\n")
+	}
+	start := clampViewportOffset(offset, height, len(lines))
+	end := start + height
+	return strings.Join(lines[start:end], "\n")
+}
+
+func viewportLines(rendered string) []string {
+	trimmed := strings.TrimRight(rendered, "\n")
+	if trimmed == "" {
+		return nil
+	}
+	return strings.Split(trimmed, "\n")
+}
+
+func clampViewportOffset(offset, height, total int) int {
+	maxOffset := total - height
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if offset < 0 {
+		return 0
+	}
+	if offset > maxOffset {
+		return maxOffset
+	}
+	return offset
+}
+
+// maxViewportOffset reports how far the body can be scrolled before
+// hitting the bottom. The body excludes the pinned chrome (top status
+// bar + bottom footer) which is always 2 lines, matching [View]'s
+// composition above.
+func (m Model) maxViewportOffset() int {
+	const chromeLines = 2
+	body := m.renderRootBody(m.screen())
+	lines := viewportLines(body)
+	available := m.height - chromeLines
+	if available < 1 {
+		available = 1
+	}
+	if len(lines) <= available {
+		return 0
+	}
+	return len(lines) - available
+}
+
+// renderDashboardBody returns the dashboard body — either the bento
+// cockpit (Ultra / Ultra+ / Tiny) or the Standard cockpit two-pane
+// fallback. The body owns its own top status bar (bento engine via
+// `WithStatusBar`, Standard via a Sprint-13 inline header) so [View]
+// can pin only the footer hint around it.
+func (m Model) renderDashboardBody(screen views.Screen) string {
 	mode := m.BentoMode()
 	var base string
 	switch mode {
 	case bento.ModeStandard:
-		base = views.RenderDashboard(screen)
+		statusBar := components.RenderStatusBar(m.dashboardStatusBar(screen.Width))
+		body := views.RenderDashboard(screen)
+		base = lipgloss.JoinVertical(lipgloss.Left, statusBar, body)
 	case bento.ModeTiny:
 		base = bento.NewEngine("Webox Cockpit v0.1", nil).
 			RenderMode(screen.Width, screen.Height, mode)
@@ -479,7 +613,18 @@ func (m Model) screen() views.Screen {
 		ActionForm:    actionFormSnapshot(m.actionForm),
 		ImportForm:    importFormSnapshot(m),
 		LiveLogs:      liveLogsSnapshot(m),
+		Connections:   dashboardConnectionsSnapshot(m),
 	}
+}
+
+func dashboardConnectionsSnapshot(m Model) []string {
+	project, ok := m.selectedProject()
+	if !ok {
+		return nil
+	}
+	status, hasStatus := m.statuses[project.ID]
+	ci, hasCI := m.cicdSnapshots[project.ID]
+	return buildTopologyConnections(project, status, hasStatus, ci, hasCI)
 }
 
 // liveLogsSnapshot is the pure view-layer projection of [liveLogsForm].

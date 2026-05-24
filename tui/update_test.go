@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -228,6 +229,44 @@ func TestRefreshTickSchedulesNextRefresh(t *testing.T) {
 	}
 }
 
+func TestUpdateViewportScrollMovesOverflowingImportPreview(t *testing.T) {
+	t.Parallel()
+
+	m := New(Options{InitialWidth: 100, InitialHeight: 24}).withConfig(fixtureConfig())
+	m.state = StateImportPreview
+	rows := make([]ImportRow, 0, 24)
+	for i := 0; i < 24; i++ {
+		rows = append(rows, ImportRow{
+			Domain:       "app-" + string(rune('a'+(i%26))) + ".demo.smallhost.pl",
+			ProfileAlias: "main",
+			Type:         "nodejs",
+			NodeVersion:  "24",
+			Managed:      i%2 == 0,
+		})
+	}
+	m.importForm = importPreviewForm{
+		Rows: rows,
+	}
+
+	before := m.View()
+	if got, want := renderedLineCount(before), 24; got != want {
+		t.Fatalf("initial viewport line count = %d, want %d\n--- frame ---\n%s", got, want, before)
+	}
+
+	scrolled, _ := applyMsg(t, m, key(tea.KeyPgDown, ""))
+	if scrolled.viewportOffsetY <= 0 {
+		t.Fatalf("expected viewportOffsetY to increase after pgdown, got %d", scrolled.viewportOffsetY)
+	}
+
+	after := scrolled.View()
+	if before == after {
+		t.Fatalf("expected viewport frame to change after pgdown")
+	}
+	if got, want := renderedLineCount(after), 24; got != want {
+		t.Fatalf("scrolled viewport line count = %d, want %d\n--- frame ---\n%s", got, want, after)
+	}
+}
+
 func applyMsg(t *testing.T, m Model, msg tea.Msg) (Model, tea.Cmd) {
 	t.Helper()
 
@@ -244,6 +283,14 @@ func key(typ tea.KeyType, value string) tea.KeyMsg {
 		return tea.KeyMsg{Type: typ, Runes: []rune(value)}
 	}
 	return tea.KeyMsg{Type: typ}
+}
+
+func renderedLineCount(s string) int {
+	trimmed := strings.TrimRight(s, "\n")
+	if trimmed == "" {
+		return 0
+	}
+	return len(strings.Split(trimmed, "\n"))
 }
 
 func fixtureConfig() *config.Config {

@@ -22,9 +22,8 @@ type TopologySnapshot struct {
 }
 
 // topologyTile renders the [Live Service Topology] tile. Slot is
-// [SlotTopology]; the engine routes it into the Ultra+ deep-dive
-// strip but the Ultra layout can opt in too once the operator
-// resizes ≥160 cols.
+// [SlotTopology]; the engine places it in the left column second row
+// of the responsive Ultra / Ultra+ grid.
 type topologyTile struct {
 	snap  TopologySnapshot
 	width int
@@ -43,8 +42,8 @@ func (t *topologyTile) ID() string { return "topology" }
 // Slot satisfies [BentoTile].
 func (t *topologyTile) Slot() Slot { return SlotTopology }
 
-// WithWidth satisfies [WidthAware] so the engine can give the tile
-// the full Ultra+ deep-dive strip width.
+// WithWidth satisfies [WidthAware] so the engine can give the tile the
+// exact column width allocated to the left-hand topology cell.
 func (t *topologyTile) WithWidth(w int) BentoTile {
 	clone := *t
 	clone.width = w

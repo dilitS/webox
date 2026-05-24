@@ -57,9 +57,13 @@ func TestRenderHappyPathOnlineNoDB(t *testing.T) {
 		"shop-ease.io",
 		"GHA Deploy",
 		"Proxy",
-		// Heavy borders signal "infrastructure box" (┏━ rather than ╭─).
-		"┏",
-		"┛",
+		// Light borders signal "infrastructure box inside a tile":
+		// the tile chrome is the heavy frame (┏━), the boxes
+		// inside it stay lighter (┌─) so the hierarchy reads as
+		// "grid > tile > nodes" instead of two competing frame
+		// weights. See renderNode docstring.
+		"┌",
+		"┘",
 		// Online arrow is ✓.
 		"▼ ✓",
 	} {

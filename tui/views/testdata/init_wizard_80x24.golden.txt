@@ -1,4 +1,5 @@
 # Golden needles for stripped init review state at 80x24.
+🪄 [Init Wizard]
 Webox - first run setup
 Step 6/6: Review profile
 Alias: main

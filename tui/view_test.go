@@ -13,6 +13,21 @@ import (
 func TestViewRendersInitWizardDashboardAndProjectDetail(t *testing.T) {
 	t.Parallel()
 
+	projectWizardModel := New(Options{InitialWidth: 120, InitialHeight: 35}).withConfig(fixtureConfig())
+	projectWizardModel.state = StateProjectWizard
+	projectWizardModel.projectForm = newProjectWizardForm(fixtureConfig())
+
+	resumeWizardModel := New(Options{InitialWidth: 120, InitialHeight: 35}).withConfig(fixtureConfig())
+	resumeWizardModel.state = StateResumeWizard
+
+	importPreviewModel := New(Options{InitialWidth: 120, InitialHeight: 35}).withConfig(fixtureConfig())
+	importPreviewModel.state = StateImportPreview
+	importPreviewModel.importForm = importPreviewForm{
+		Rows: []ImportRow{
+			{Domain: "legacy.demo.smallhost.pl", ProfileAlias: "main", Type: "nodejs", NodeVersion: "20", Managed: false},
+		},
+	}
+
 	tests := []struct {
 		name    string
 		model   Model
@@ -20,8 +35,8 @@ func TestViewRendersInitWizardDashboardAndProjectDetail(t *testing.T) {
 	}{
 		{
 			name:    "init wizard",
-			model:   New(Options{InitialWidth: 80, InitialHeight: 24}).withState(StateInitWizard),
-			needles: []string{"Webox - first run setup", "System Pre-requisites", "Default SSH Keypair"},
+			model:   New(Options{InitialWidth: 100, InitialHeight: 30}).withState(StateInitWizard),
+			needles: []string{"WEBOX", "[Init Wizard]", "Webox - first run setup", "System Pre-requisites", "Default SSH Keypair"},
 		},
 		{
 			name: "dashboard",
@@ -31,7 +46,7 @@ func TestViewRendersInitWizardDashboardAndProjectDetail(t *testing.T) {
 					"p1": {ProjectID: "p1", State: ProjectOnline, HTTPHealth: "200 OK", SSLDaysLeft: 27, NodeVersion: "v24.15.0", LastDeploy: "2h ago"},
 					"p2": {ProjectID: "p2", State: ProjectStale, HTTPHealth: "stale", SSLDaysLeft: -1, NodeVersion: "v20.12.2", LastDeploy: "unknown"},
 				}),
-			needles: []string{"Webox Cockpit", "Projects", "sui.demo.smallhost.pl", "STALE", "Overview"},
+			needles: []string{"WEBOX", "[Active Projects]", "sui.demo.smallhost.pl", "[SERVER:", "Connections:"},
 		},
 		{
 			name: "dashboard bento ultra",
@@ -70,10 +85,25 @@ func TestViewRendersInitWizardDashboardAndProjectDetail(t *testing.T) {
 		},
 		{
 			name: "project detail overview",
-			model: New(Options{InitialWidth: 100, InitialHeight: 30}).
+			model: New(Options{InitialWidth: 120, InitialHeight: 35}).
 				withConfig(fixtureConfig()).
 				withState(StateProjectDetail),
-			needles: []string{"Overview", "Env Diff", "unlocked in v0.2", "Restart", "SSL Renew", "Tail Logs"},
+			needles: []string{"WEBOX", "Project Detail", "[Project Detail:", "Overview", "Env Diff", "unlocked in v0.2", "Restart", "SSL Renew", "Tail Logs"},
+		},
+		{
+			name:    "project wizard chrome",
+			model:   projectWizardModel,
+			needles: []string{"WEBOX", "Project Wizard", "[New Project Wizard]", "[q] quit"},
+		},
+		{
+			name:    "resume wizard chrome",
+			model:   resumeWizardModel,
+			needles: []string{"WEBOX", "Resume Wizard", "[Resume Wizard]", "[q] quit"},
+		},
+		{
+			name:    "import preview chrome",
+			model:   importPreviewModel,
+			needles: []string{"WEBOX", "Import Preview", "[Import Existing Projects]", "legacy.demo.smallhost.pl", "[q] quit"},
 		},
 	}
 
@@ -103,7 +133,7 @@ func TestTeatestSmokeDashboardSnapshot(t *testing.T) {
 
 	var snapshot []byte
 	teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
-		if bytes.Contains(out, []byte("Webox Cockpit")) {
+		if bytes.Contains(out, []byte("[Active Projects]")) {
 			snapshot = append(snapshot[:0], out...)
 			return true
 		}
@@ -111,7 +141,7 @@ func TestTeatestSmokeDashboardSnapshot(t *testing.T) {
 	}, teatest.WithDuration(time.Second), teatest.WithCheckInterval(10*time.Millisecond))
 	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
 	tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
-	for _, needle := range [][]byte{[]byte("Webox Cockpit"), []byte("Projects")} {
+	for _, needle := range [][]byte{[]byte("WEBOX"), []byte("[Active Projects]")} {
 		if !bytes.Contains(snapshot, needle) {
 			t.Fatalf("teatest output missing %q\n--- output ---\n%s", string(needle), string(snapshot))
 		}

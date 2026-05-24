@@ -8,15 +8,15 @@ type Slot int
 const (
 	// SlotProjects is the top-left projects list.
 	SlotProjects Slot = iota
-	// SlotOverview is the top-center project overview pane.
+	// SlotOverview is the top-right project overview pane.
 	SlotOverview
 	// SlotMetrics is the top-right header metrics tile (CPU/RAM/Disk).
 	SlotMetrics
-	// SlotCICD is the bottom-left CI/CD pipeline tile.
+	// SlotCICD is the second-row right CI/CD pipeline tile.
 	SlotCICD
-	// SlotLogs is the bottom-center live micro-logs tile.
+	// SlotLogs is the full-width logs row below the 2x2 grid.
 	SlotLogs
-	// SlotTopology is the bottom-right service topology tile.
+	// SlotTopology is the second-row left service topology tile.
 	SlotTopology
 )
 

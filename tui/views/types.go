@@ -153,4 +153,5 @@ type Screen struct {
 	ActionForm    ProjectActionSnapshot
 	ImportForm    ImportPreviewSnapshot
 	LiveLogs      LiveLogsSnapshot
+	Connections   []string
 }

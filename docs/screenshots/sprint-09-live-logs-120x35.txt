@@ -1,6 +1,7 @@
-WEBOX v0.0.0-dev  PENDING                                                                    Live Logs │ 21:15:25 │ main  
+WEBOX v0.0.0-dev  PENDING                                                                    Live Logs │ 00:03:36 │ main  
 ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
-║ sui.demo.smallhost.pl                                                                                                  ║
+║ 📜 [Live Logs: sui.demo.smallhost.pl]                                                                                  ║
+║                                                                                                                        ║
 ║ [1] Overview  [2] Env Diff - unlocked in v0.2  [3] Database - unlocked in v0.2  [4] Logs                               ║
 ║                                                                                                                        ║
 ║ Active File: logs/node.log · Stream: Tail -f: On · Connected · Buffer: 5/1024 lines                                    ║

@@ -1,6 +1,7 @@
 package bento_test
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -115,6 +116,39 @@ func TestEngineRendersUltraPlusGetsExtraSection(t *testing.T) {
 	if !strings.Contains(out, "[Live Service Topology]") {
 		t.Fatalf("UltraPlus should show topology tile\n--- output ---\n%s", out)
 	}
+}
+
+func TestEngineRendersUltraPlacesTopologyLeftOfPipeline(t *testing.T) {
+	t.Parallel()
+
+	engine := bento.NewEngine("Webox Cockpit v0.1", []bento.BentoTile{
+		bento.NewProjectsTile([]bento.ProjectRowSnapshot{{Name: "alpha.example.com", State: "ONLINE", Selected: true}}),
+		bento.NewOverviewTile(bento.ServerOverviewSnapshot{ProjectAlias: "alpha.example.com"}),
+		bento.NewCICDPlaceholderTile(),
+		bento.NewLogsPlaceholderTile(),
+		bento.NewTopologyPlaceholderTile(),
+	})
+
+	out := engine.Render(140, 40)
+	lines := strings.Split(stripANSI(out), "\n")
+	for _, line := range lines {
+		topologyAt := strings.Index(line, "[Live Service Topology]")
+		pipelineAt := strings.Index(line, "[CI/CD PIPELINE: Main Branch]")
+		if topologyAt >= 0 && pipelineAt >= 0 {
+			if topologyAt >= pipelineAt {
+				t.Fatalf("topology should render left of pipeline on the same row\n%s", line)
+			}
+			return
+		}
+	}
+
+	t.Fatalf("expected a row containing both topology and pipeline headers side by side\n--- output ---\n%s", out)
+}
+
+var ansiRE = regexp.MustCompile(`\x1b\[[0-9;]*[A-Za-z]`)
+
+func stripANSI(s string) string {
+	return ansiRE.ReplaceAllString(s, "")
 }
 
 func TestEngineWithStatusBarReplacesGradientHeader(t *testing.T) {

@@ -1,5 +1,5 @@
 # Golden needles for stripped review state at 80x24.
-New project wizard
+🧱 [New Project Wizard]
 Step 5/6: Review
 Profile: main
 Stack:   vite-react

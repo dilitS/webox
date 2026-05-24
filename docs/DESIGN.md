@@ -115,6 +115,18 @@ Reguły, których trzymamy się **bezwyjątkowo** — wymuszają testowalność 
 6. **Cancellation** propagowane przez `context.Context` do każdej operacji I/O. `Model` trzyma `context.CancelFunc` dla aktywnej długoterminowej operacji (np. wizard step), `q`/`Esc` wywołuje `cancel()`.
 7. **Testy:** `Update` testowany jako pure function (input `Msg` → output `Model`), `View` snapshot testowany (`teatest`). I/O testowane osobno (provider × mock SSH).
 
+### 2.4 Chrome contract: status bar / body / footer
+
+Wszystkie powierzchnie składa się od Sprint 13 w trzech wyrównanych pionowo *slotach*. Kontrakt jest egzekwowany przez `tui.View` i zwalnia każdy renderer powierzchni z odpowiedzialności za ramę:
+
+1. **Top chrome (1 linia)** — zunifikowany cockpit status bar `WEBOX vX.Y.Z [LIVE]  HH:MM:SS │ profile │ uptime │ load │ RAM │ ping`. Dashboard reusuje bento engine'owy status bar (przekazany przez `WithStatusBar`), żeby nie stackować dwóch pillów; każda inna powierzchnia (`StateInitWizard`, `StateProjectWizard`, `StateProjectDetail`, …) dostaje *pinned* status bar z `renderChromeTop`.
+2. **Body (scrollowalne)** — output `renderRootBody`, dzielony przez `renderViewport` przy `len(body) > available`. Tylko ten slot reaguje na klawisze nawigacji (`PgUp`, `PgDn`, `Home`, `End`) oraz mysz (`MouseActionPress` na `MouseButtonWheelUp / WheelDown`, krok 3 linie).
+3. **Bottom chrome (1 linia)** — pasek hintów z keybindingami widoku + dynamiczny komunikat `↕ scroll: PgUp/PgDn · Home/End · Mouse · (offset/max)` gdy korpus overflowuje. Globalny alert (toast) i baner `?` pomocy są częścią chrome — **nigdy** body — żeby pozostawały widoczne podczas scrolla.
+
+**Tiny mode** (`< 70×22`) wyłącza chrome i zwraca surowy body z komunikatem „Terminal too small”. Statemachine renderingu (pure `View`) testuje się przez `teatest` snapshot, scrollowanie przez tabelaryczne testy `Update` (`Msg = tea.KeyPgUp` etc.).
+
+**Bento height budget** (`tui/bento/engine.go::planRowBudgets`) dzieli dostępny pionowy obszar między `Top row` (Projects + Server), `Second row` (Topology + CI/CD) i `Logs row`. Gdy kafelek przekracza budżet, `clipTileBlock` zachowuje top border + header + ostatni widoczny rząd i zastępuje przepełnienie obramowanym wierszem `┃ … +N more lines · scroll inside tab/modal ┃` (`framedIndicatorLine` reuse'uje width top bordera i kolor `Primary` żeby ramka kafelka nie rozjeżdżała się geometrycznie). Sąsiedzi w rzędzie są wyrównywani do tej samej wysokości przez `equalizeBlockHeights`, co eliminuje pustą dolną przestrzeń w krótszym kafelku.
+
 ---
 
 ## 3. Provider Pattern (Kontrakty v2)

@@ -36,10 +36,14 @@ func TestCockpitSnapshots(t *testing.T) {
 		needles []string
 	}{
 		{
-			name:    "standard-100x30",
-			width:   100,
-			height:  30,
-			needles: []string{"Webox Cockpit", "Projects", "Overview"},
+			name:   "standard-100x30",
+			width:  100,
+			height: 30,
+			// As of Sprint 13 the Standard Cockpit shares the
+			// bracketed emoji headers with Bento Ultra ("[Active
+			// Projects]" + "[SERVER: …]") and the cockpit-wide
+			// status bar ("WEBOX vX.Y.Z").
+			needles: []string{"WEBOX", "[Active Projects]", "[SERVER:", "Connections:"},
 		},
 		{
 			name:    "bento-ultra-120x35",
@@ -183,6 +187,7 @@ func TestMockCockpitSnapshot(t *testing.T) {
 		"[Active Projects]",
 		"ShopEase-Web",
 		"[SERVER: ShopEase-Web]",
+		"[Live Service Topology]",
 		"[CI/CD PIPELINE: Main Branch]",
 		"Build #412",
 		"[Live Server Logs]",
