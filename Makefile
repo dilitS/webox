@@ -142,6 +142,10 @@ vulncheck: ## Run govulncheck against current dependencies.
 doctor: build ## Run `webox doctor` against current environment.
 	$(BIN_DIR)/webox doctor
 
+.PHONY: mock
+mock: build ## Launch the cockpit with deterministic mock data (no SSH/HTTP/GitHub).
+	$(BIN_DIR)/webox --mock
+
 .PHONY: doctor-security
 doctor-security: build ## Run `webox doctor security` (post-MVP).
 	$(BIN_DIR)/webox doctor security
