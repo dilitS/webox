@@ -16,6 +16,16 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- **Sprint 13 — E2E test layer (`internal/e2e/`) (2026-05-24).**
+  - `internal/e2e/doc.go` documents the package boundary: per-surface unit tests stay in `tui/views/`, per-message Update tests in `tui/`, single-frame snapshots in `tui/cockpit_snapshot_test.go`, **multi-tick keyboard flows** here.
+  - `internal/e2e/cockpit_test.go` — 5 deterministic scenarios driven by `teatest`:
+    - `TestCockpit_MockBootShowsAllSurfaces` — mock-mode boot pins every Bento Ultra slot (Active Projects / Server / Topology / CI/CD / Live Logs) so a regression in `View()` composition surfaces immediately.
+    - `TestCockpit_TabIntoProjectDetailAndBack` — `Tab` from dashboard → Project Detail body, `Esc` returns; the most travelled keyboard path in production.
+    - `TestCockpit_OpenLiveLogsTab` — `4` opens the Sprint 09 live-log surface; guards the ring buffer + redactor wiring.
+    - `TestCockpit_TinyFallbackShowsResizeWarning` — `60×18` viewport must surface "Terminal too small" instead of silently truncating.
+    - `TestCockpit_ScrollHintAppearsOnOverflow` — `120×22` forces a Bento Ultra overflow and asserts the bottom chrome renders `↕ scroll: PgUp/PgDn`.
+  - Whole package budget: < 1 s wall clock today (5 scenarios in ~0.5 s); CI gate cap is 10 s per `internal/e2e` package per `doc.go`.
+
 - **Sprint 13 — Surface contract foundation (2026-05-24).**
   - `tui/surface/` — new leaf package with the [`Surface`](./tui/surface/surface.go) interface (`Body` / `Crumb` / `Footer` / `AcceptsScroll`), a read-only [`Context`](./tui/surface/surface.go) snapshot, a structured [`FooterHint`](./tui/surface/surface.go), and a thread-safe [`Registry`](./tui/surface/registry.go) for tests / future per-Model lookups. Six unit tests pin the contract (`registry register/lookup/reset`, `FooterHint.Empty()`, compile-time contract guard).
   - `tui/surface_adapters.go` — `Model.surfaceFor()` returns a fresh [`dashboardSurface`](./tui/surface_adapters.go) per render so the value-typed Model semantics stay intact (no stale pointer captured between ticks). The dashboard adapter is the first migrated state; remaining surfaces (init wizard, project detail, wizards, import preview) keep flowing through `renderRootBody` until Sprint 14.
