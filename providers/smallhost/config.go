@@ -3,6 +3,7 @@ package smallhost
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/dilitS/webox/providers"
 )
@@ -60,10 +61,41 @@ type Properties struct {
 // real one over `ssh.Pool` via [NewSSHExecutor]. Until SetExecutor
 // runs, every method that needs SSH returns ErrUnknownOutputFormat
 // wrapped with a "not configured" diagnostic — fail-closed.
+//
+// The now field is the per-instance clock seam used by
+// [Provider.CheckStatus]. Defaults to [time.Now]; tests install a
+// deterministic stub via [Provider.SetClock]. Keeping the seam on
+// the receiver — rather than a package-level var — removes a
+// non-thread-safe mutable global and lets t.Parallel() tests run
+// without coordination.
 type Provider struct {
 	cfg      providers.ProviderConfig
 	props    Properties
 	executor Executor
+	now      func() time.Time
+}
+
+// SetClock installs the clock function the adapter uses for latency
+// measurement in [Provider.CheckStatus]. Passing nil restores the
+// default (time.Now); useful for tests that want to reset the seam
+// between subtests.
+func (p *Provider) SetClock(now func() time.Time) {
+	if now == nil {
+		p.now = time.Now
+		return
+	}
+	p.now = now
+}
+
+// clock returns the currently installed clock function. New providers
+// initialised through the registry might not have hit SetClock yet,
+// so we fall back to [time.Now] to keep CheckStatus thread-safe even
+// before the test setup runs.
+func (p *Provider) clock() func() time.Time {
+	if p.now == nil {
+		return time.Now
+	}
+	return p.now
 }
 
 // Name satisfies [providers.HostingProvider]. It returns the
@@ -93,7 +125,7 @@ func New(cfg providers.ProviderConfig) (providers.HostingProvider, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Provider{cfg: cfg, props: props}, nil
+	return &Provider{cfg: cfg, props: props, now: time.Now}, nil
 }
 
 // parseProperties is the single seam where stringly-typed map entries
@@ -138,5 +170,12 @@ func parseProperties(raw map[string]string) (Properties, error) {
 func init() {
 	if err := providers.Register(providerName, New); err != nil {
 		panic(fmt.Sprintf("smallhost: register: %v", err))
+	}
+	if err := providers.RegisterPlanValidators(providerName, providers.PlanValidators{
+		ValidateDomain:      ValidateDomain,
+		ValidateNodeVersion: ValidateNodeVersion,
+		ValidateDBName:      ValidateDBName,
+	}); err != nil {
+		panic(fmt.Sprintf("smallhost: register plan validators: %v", err))
 	}
 }

@@ -1,0 +1,9 @@
+# Golden needles for stripped review state at 80x24.
+New project wizard
+Step 5/6: Review
+Profile: main
+Stack:   vite-react
+Domain:  app.demo.smallhost.pl
+Node:    22
+DB:      skip
+pending_cleanups.json

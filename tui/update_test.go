@@ -76,19 +76,62 @@ func TestUpdateDashboardNavigationAndDetailReturn(t *testing.T) {
 	}
 }
 
-func TestUpdateDisabledProjectDetailActionsSetAlert(t *testing.T) {
+func TestUpdateProjectDetailDisabledTabsSetAlert(t *testing.T) {
 	t.Parallel()
 
 	m := New(Options{})
 	m, _ = applyMsg(t, m, ConfigLoadedMsg{Config: fixtureConfig()})
 	m, _ = applyMsg(t, m, key(tea.KeyRight, ""))
 
-	for _, pressed := range []string{"r", "s", "v", "2", "3", "4"} {
+	for _, pressed := range []string{"2", "3"} {
 		pressed := pressed
 		t.Run(pressed, func(t *testing.T) {
 			got, _ := applyMsg(t, m, key(tea.KeyRunes, pressed))
 			if got.Alert() == "" {
-				t.Fatalf("key %q should set disabled-action alert", pressed)
+				t.Fatalf("key %q should set disabled-tab alert", pressed)
+			}
+			if got.State() != StateProjectDetail {
+				t.Fatalf("key %q changed state to %s", pressed, got.State())
+			}
+		})
+	}
+}
+
+// TestUpdateProjectDetailLogsTabActivates verifies Sprint 09's
+// TASK-09.3 acceptance: pressing `4` on project detail enters the
+// live-log tab instead of raising the "v0.2" disabled-tab alert.
+func TestUpdateProjectDetailLogsTabActivates(t *testing.T) {
+	t.Parallel()
+
+	m := New(Options{})
+	m, _ = applyMsg(t, m, ConfigLoadedMsg{Config: fixtureConfig()})
+	m, _ = applyMsg(t, m, key(tea.KeyRight, ""))
+
+	got, _ := applyMsg(t, m, key(tea.KeyRunes, "4"))
+	if got.ActiveTab() != TabLogs {
+		t.Fatalf("ActiveTab = %s, want %s after pressing '4'", got.ActiveTab(), TabLogs)
+	}
+	if got.State() != StateProjectDetail {
+		t.Fatalf("state = %s, want StateProjectDetail (tab nav must not exit detail)", got.State())
+	}
+	if got.Alert() != "" {
+		t.Fatalf("Alert = %q, want empty (Logs tab is enabled in MVP)", got.Alert())
+	}
+}
+
+func TestUpdateProjectDetailActionKeysDispatchCommand(t *testing.T) {
+	t.Parallel()
+
+	m := New(Options{})
+	m, _ = applyMsg(t, m, ConfigLoadedMsg{Config: fixtureConfig()})
+	m, _ = applyMsg(t, m, key(tea.KeyRight, ""))
+
+	for _, pressed := range []string{"r", "s", "v"} {
+		pressed := pressed
+		t.Run(pressed, func(t *testing.T) {
+			got, cmd := applyMsg(t, m, key(tea.KeyRunes, pressed))
+			if cmd == nil {
+				t.Fatalf("key %q should return a tea.Cmd", pressed)
 			}
 			if got.State() != StateProjectDetail {
 				t.Fatalf("key %q changed state to %s", pressed, got.State())

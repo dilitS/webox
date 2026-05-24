@@ -1,14 +1,14 @@
 # Webox — UX / Design System (Generacja 2026/2027)
 
-> Status: Approved · Ostatnia aktualizacja: 2026-05-22 · Właściciel: @maintainer
+> Status: Approved · Ostatnia aktualizacja: 2026-05-23 · Właściciel: @maintainer
 >
-> Pokrewne dokumenty: [PRD.md](./PRD.md) (cele biznesowe), [DESIGN.md](./DESIGN.md) (architektura TUI i silnika), [adr/0006](./adr/0006-jezyk-interfejsu-en-domyslny.md) (język interfejsu), [AUDIT.md](./AUDIT.md) (scope decisions).
+> Pokrewne dokumenty: [PRD.md](./PRD.md) (cele biznesowe), [DESIGN.md](./DESIGN.md) (architektura TUI i silnika), [adr/0006](./adr/0006-jezyk-interfejsu-en-domyslny.md) (język interfejsu), [adr/0007](./adr/0007-bento-ultra-eskalacja-mvp.md) (eskalacja Bento Ultra do MVP), [AUDIT.md](./AUDIT.md) (scope decisions).
 
 ---
 
 ## TL;DR
 
-UX/UI Webox wkracza w generację **2026/2027** jako zintegrowany **Terminal Cockpit klasy premium**. **MVP (v0.1)** celuje w **Standard Cockpit Mode (`100×30`)** jako default — to **zalecany** rozmiar z [PRD §10.3](./PRD.md#103-terminal). Pełna siatka **Bento-Box Grid (`≥ 120×35`)** jest 🔶 **STRETCH (v0.2+)**, podobnie jak: **Sound Engine** (§12), **Live Service Topology Map** (§3.4), **`/env` Merger** (§9.3) i **Live Log Stream** (§4.3 Tab [4]). Tradycyjny, liniowy kreator zastępujemy **Self-Healing Wizardem** prezentującym wizualny graf zależności z opcją chirurgicznego wznawiania i korekcji błędów na żywo — to **w MVP**, ale jako liniowy step-by-step z prostym LIFO rollback (graf jako wizualizacja, **nie** DAG-based engine — patrz [DESIGN §10](./DESIGN.md#10-dag-based-transactional-engine-wznawialny-rollback)).
+UX/UI Webox wkracza w generację **2026/2027** jako zintegrowany **Terminal Cockpit klasy premium**. **MVP (v0.1)** po [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md) dostarcza **pełną siatkę Bento-Box Grid (`120×35`)** z adaptive layout (fallback do `100×30` Standard Cockpit dla mniejszych terminali), **Live Log Stream** (§4.3 Tab [4]), **Live Service Topology Map** (§3.4), GitHub Actions live panel i server metrics header bar. 🔶 **STRETCH (v0.2+)** zostają: **Bento Ultra+ (`≥ 160×45`)** z dodatkowymi kafelkami (multi-server agregator, TTL panels), **Sound Engine** (§12), **`/env` Merger** (§9.3) i **fast-chord bindings**. Tradycyjny, liniowy kreator zastępujemy **Self-Healing Wizardem** prezentującym wizualny graf zależności z opcją chirurgicznego wznawiania i korekcji błędów na żywo — to **w MVP**, ale jako liniowy step-by-step z prostym LIFO rollback (graf jako wizualizacja, **nie** DAG-based engine — patrz [DESIGN §10](./DESIGN.md#10-dag-based-transactional-engine-wznawialny-rollback)).
 
 > **Konwencja scope w tym dokumencie:** `🔵 MVP (v0.1)` = w zakresie pierwszego release'u. `🔶 STRETCH (v0.2+)` = zaprojektowane, ale **niezimplementowane** w MVP. Patrz [ROADMAP §3.3](./ROADMAP.md#33-czego-nie-ma-w-mvp).
 
@@ -164,7 +164,7 @@ Spinner Webox to nie tylko statyczny zestaw klatek. Jego prędkość (Tick Durat
 
 ### 3.4 Wizualny Graf Topologii Usług (Live Service Topology Map)
 
-> 🔶 **STRETCH (v0.2+)** — wymaga Bento Ultra (`≥120×35`), który sam jest stretch. W MVP zastępujemy tabelaryczną listą połączeń w `Overview` zakładki projektu. Specyfikacja zachowana jako materiał do planowania v0.2+. Patrz [AUDIT A6](./AUDIT.md#a6-scope-creep-w-designmd-i-uxmd-poza-zakresem-mvp-z-roadmapmd-33).
+> 🔵 **MVP (v0.1)** — eskalowane z STRETCH przez [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md). Dostarczane w Sprincie 11 jako kafelek Bento Ultra (`120×35` i większy). Dla terminali `<120×35` (Standard Cockpit fallback) topology pozostaje tabelaryczną listą połączeń w `Overview` zakładki projektu.
 
 W kafelku Bento dedykowanym dla topologii (dostępnym w trybie Bento Grid przy szerokości `≥ 120` znaków) Webox renderuje w czasie rzeczywistym schemat przepływu danych i relacji między elementami systemu. Pozwala to na natychmiastową diagnozę wąskich gardeł lub uszkodzonych węzłów.
 
@@ -215,9 +215,9 @@ W kafelku Bento dedykowanym dla topologii (dostępnym w trybie Bento Grid przy s
 
 ---
 
-### 4.2 Dashboard 2.0 — Bento-Box Grid System (`≥ 120×35`) — STRETCH
+### 4.2 Dashboard 2.0 — Bento-Box Grid System (`120×35` MVP / `≥160×45` STRETCH)
 
-> 🔶 **STRETCH (v0.2+)** — Bento Ultra przy `≥120×35` przewyższa "zalecane" `100×30` z [PRD §10.3](./PRD.md#103-terminal). MVP target = **Standard Cockpit Mode** (§5, próg `100–119`). Sekcja zachowana jako specyfikacja architektoniczna; implementacja po dostarczeniu MVP. Patrz [AUDIT B5](./AUDIT.md#b5-uxmd-42--bento-przy-12035-ale-prdmd-103-deklaruje-zalecane-10030).
+> 🔵 **MVP (v0.1)** — Bento Ultra przy `120×35` eskalowane do MVP przez [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md). Dostarczane w Sprincie 08 (layout engine + theme), Sprint 09 (live logs + header bar metrics), Sprint 10 (CI/CD panel), Sprint 11 (topology map). Dla `100×30 ≤ width < 120×35` (Standard Cockpit) renderujemy zubożony layout split-pane. Dla `width ≥ 160×45` (Bento Ultra+) dorzucamy dodatkowe kafelki — to **🔶 STRETCH (v0.2+)** (multi-server agregator, TTL panels).
 
 Gdy rozmiar okna terminala przekracza próg komfortu (`120×35`), Webox automatycznie transformuje interfejs w pełnoprawny, pięciomodułowy pulpit nawigacyjny. Aktywny panel (w tym przypadku *Projects*) jest podświetlony ramką o grubości 2 znaków (tutaj symbolicznie podwójną) i fioletowym kolorem.
 
@@ -264,9 +264,9 @@ Gdy użytkownik wciśnie `→` lub `Tab` na projekcie, przechodzi do panelu szcz
 | [1] Overview | `1` | 🔵 MVP (v0.1) | implementowane |
 | [2] Env Diff | `2` | 🔶 STRETCH (v0.2+) | wymaga `/env` post-MVP |
 | [3] Database | `3` | 🔶 STRETCH (v0.2+) | wymaga `/db` post-MVP |
-| [4] Logs | `4` | 🔶 STRETCH (v0.2+) | wymaga `Live log stream` post-MVP — patrz [ROADMAP §3.3](./ROADMAP.md#33-czego-nie-ma-w-mvp) |
+| [4] Logs | `4` | 🔵 MVP (v0.1) | Live log stream eskalowany do MVP przez [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md), dostarczany w Sprincie 09 |
 
-> W MVP karta `[1] Overview` jest **jedyną** zakładką — wciśnięcie `→`/`Tab` przenosi do widoku Overview z `[r] Restart`, `[s] SSL Renew`, `[v] Logs (last 200 lines)`. Pozostałe (`H`/`L`, cyfry 2–4) są disabled z dimmed indicator `unlocked in v0.2`.
+> W MVP karty `[1] Overview` i `[4] Logs` są aktywne — `[1]` to widok statyczny z `[r] Restart`, `[s] SSL Renew`, `[v] Logs (last 200 lines)`; `[4]` to live log stream (Sprint 09). Karty `[2] Env Diff` i `[3] Database` (`H`/`L`, cyfry 2–3) są disabled z dimmed indicator `unlocked in v0.2`.
 
 #### Karta [2] — Env Diff (Dwukierunkowy Podgląd Różnic Zmiennych) — STRETCH v0.2+
 
@@ -313,7 +313,9 @@ Ta karta pozwala na graficzne porównanie lokalnego pliku `.env` z rzeczywistym 
  └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Karta [4] — Live Log Stream — STRETCH v0.2+
+#### Karta [4] — Live Log Stream — MVP v0.1 (Sprint 09)
+
+> 🔵 **MVP (v0.1)** — eskalowane z STRETCH przez [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md). Dostarczane w Sprincie 09: SSH `tail -f` przez `ssh.Pool`, ring buffer 1000 linii, ANSI level coloring, **redactor pre-render** (każda linia przez `internal/log.Redact` przed dodaniem do bufora), 60fps throttle cap, context-cancellable na `q`/`Esc`.
 
 ```text
  ┌─ sui.biuromody.smallhost.pl ── [1] Overview  [2] Env Diff  [3] Database  ▶ [4] Logs ──────────────────────────────────────┐

@@ -158,24 +158,48 @@ TASK-06.2 / TASK-06.3 mogą wymagać dodania:
 
 ## Outcome (wypełnij po sprincie)
 
-- ✅ Done: TASK-06.X, ...
-- ⏭️ Carry-over: ...
-- 📌 Decyzje: ...
-- 🧠 Surprises: ...
+- ✅ Done: TASK-06.1 core resume-on-launch (`pending_cleanups.json` detection,
+  Resume Wizard modal, rollback from loaded stack, keep-and-exit,
+  phrase-confirmed discard, corrupted/schema error surface); TASK-06.2 core
+  GitHub client (`gh` primary, REST+PAT fallback, repo/deploy key/secrets/
+  dispatch/latest-run); TASK-06.3 workflow templates (embed, render,
+  SHA-pinned `uses:`, injection checks); TASK-06.4 GitHub-side sequencing and
+  cleanup kinds; TASK-06.5 polling helper and cache TTL contract; TASK-06.7
+  keymap matrix + wizard view golden fixtures.
+- ⏭️ Carry-over: full end-to-end TUI Repo/Secrets/Workflow/Deploy screens are
+  not wired into the interactive project wizard yet; `last_deploy` dashboard
+  still needs a production `services/github` fetcher injected into the default
+  status pipeline; post-deploy SSH probe and `webox doctor github` per-project
+  report remain as Sprint 07 entry tasks; YAML AST validation via
+  `gopkg.in/yaml.v3` is deferred until maintainer sign-off because the module
+  is not present in `go.mod`.
+- 📌 Decyzje: no new external dependency was added; GitHub Actions secret REST
+  fallback uses existing `golang.org/x/crypto/nacl/box` + `blake2b` to produce
+  GitHub-compatible sealed boxes; workflow templates use `[[ ... ]]` delimiters
+  so GitHub `${{ secrets.* }}` expressions stay literal during Go rendering.
+- 🧠 Surprises: Sprint doc assumed `gopkg.in/yaml.v3` was already available,
+  but it is absent from `go.mod`; the original `{{ ... }}` template delimiter
+  conflicted with GitHub expression syntax; a real workflow-file delete needs
+  the GitHub Contents API SHA first, so rollback cannot be a blind DELETE.
 - 📊 Metryki:
-  - Coverage `services/github/`: %
-  - Coverage wizard-related new code: %
-  - Workflow template render scenarios: %
-  - End-to-end happy path duration (s):
+  - Coverage `services/github/`: covered by unit tests for CLI/REST redaction,
+    fallback, sealed-box encryption, cleanup commands, and poll loop.
+  - Coverage wizard-related new code: covered by `go test ./wizard ./tui`.
+  - Workflow template render scenarios: 3/3 stacks render and validate.
+  - End-to-end happy path duration (s): not measured; live GitHub+small.pl path
+    is not wired or executed locally.
 - 🔒 Security validation:
-  - [ ] No PAT in logs, error messages, status cache, or pending snapshot.
-  - [ ] Workflow `uses:` pinned to full 40-char SHA, no tag-only references.
-  - [ ] `.env` post-deploy: `0600` perms, outside web root, secrets not echoed in any operator log.
-  - [ ] `go test -race ./services/github ./wizard ./tui/... ./cmd/webox` green.
+  - [x] No PAT in tested logs/error messages or pending snapshot params.
+  - [x] Workflow `uses:` pinned to full 40-char SHA, no tag-only references in
+    embedded templates.
+  - [ ] `.env` post-deploy live probe not executed; template contains the
+    permission check, but Sprint 07 must wire provider-side verification.
+  - [x] `go test -race ./services/github ./wizard ./tui/... ./cmd/webox`
+    green; `go test ./...` and `make lint` green after final formatting.
 - ➡️ Następny sprint: `sprint-07-import-doctor-polish.md`
 
 ---
 
 ## Retro Link
 
-`docs/retros/YYYY-MM-DD-sprint-06.md`
+`docs/retros/2026-05-23-sprint-06.md`

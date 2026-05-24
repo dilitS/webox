@@ -5,7 +5,21 @@ import (
 	"sync"
 
 	"github.com/dilitS/webox/providers"
+	"github.com/dilitS/webox/providers/smallhost"
 )
+
+// init registers the same validator set under the "fake" provider
+// type so the wizard's ValidatePlan can run against the in-memory
+// fakeProvider returned by newFakeProvider(). Tests that import
+// smallhost transitively register the real "smallhost" set; this
+// init() does the equivalent for the test seam.
+func init() {
+	_ = providers.RegisterPlanValidators("fake", providers.PlanValidators{
+		ValidateDomain:      smallhost.ValidateDomain,
+		ValidateNodeVersion: smallhost.ValidateNodeVersion,
+		ValidateDBName:      smallhost.ValidateDBName,
+	})
+}
 
 // fakeProvider is the deterministic in-memory HostingProvider used by
 // every wizard execution + rollback test. Each method has a scripted
@@ -100,6 +114,9 @@ func (f *fakeProvider) CreateDatabase(_ context.Context, dbKind, dbName string) 
 func (f *fakeProvider) RestartNodeApp(context.Context, string) error { return nil }
 func (f *fakeProvider) GetDeployPath(string) string                  { return "/tmp/deploy" }
 func (f *fakeProvider) GetLogPath(string) string                     { return "/tmp/logs" }
+func (f *fakeProvider) TailLog(context.Context, string, int) ([]byte, error) {
+	return []byte("fake log line\n"), nil
+}
 
 func (f *fakeProvider) CheckStatus(context.Context) (*providers.ProviderStatus, error) {
 	f.record("status")

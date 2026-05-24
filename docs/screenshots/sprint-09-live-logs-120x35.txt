@@ -1,0 +1,15 @@
+╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ sui.demo.smallhost.pl                                                                                                  │
+│ [1] Overview  [2] Env Diff - unlocked in v0.2  [3] Database - unlocked in v0.2  [4] Logs                               │
+│                                                                                                                        │
+│ Active File: logs/node.log · Stream: Tail -f: On · Connected · Buffer: 5/1024 lines                                    │
+│                                                                                                                        │
+│ · starting worker pool=4                                                                                               │
+│ · GET /healthz 200 12ms                                                                                                │
+│ ! queue depth 87%                                                                                                      │
+│ ✗ db connect failed  (redacted)                                                                                        │
+│ · retrying db connection                                                                                               │
+│                                                                                                                        │
+│ [f] toggle auto-scroll  [c] clear buffer  [Esc] back                                                                   │
+│ up/down: scroll · q: quit                                                                                              │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

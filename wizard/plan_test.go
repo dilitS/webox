@@ -6,8 +6,22 @@ import (
 	"testing"
 
 	"github.com/dilitS/webox/providers"
+	_ "github.com/dilitS/webox/providers/smallhost" // register smallhost validators for ValidatePlan tests
 	"github.com/dilitS/webox/wizard"
 )
+
+// smallhostValidators is the registered validator set used by every
+// test in this file. Resolved once via the registry so the test
+// stays decoupled from the smallhost package while still exercising
+// the real production validators.
+func smallhostValidators(t *testing.T) providers.PlanValidators {
+	t.Helper()
+	set, err := providers.PlanValidatorsFor("smallhost")
+	if err != nil {
+		t.Fatalf("smallhost validators not registered: %v", err)
+	}
+	return set
+}
 
 func TestIsValidStack(t *testing.T) {
 	t.Parallel()
@@ -174,13 +188,14 @@ func TestValidatePlan(t *testing.T) {
 		},
 	}
 
+	validators := smallhostValidators(t)
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			plan := base
 			tc.mutate(&plan)
-			err := wizard.ValidatePlan(plan)
+			err := wizard.ValidatePlan(plan, validators)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("ValidatePlan(%+v) = nil, want error", plan)
@@ -197,6 +212,24 @@ func TestValidatePlan(t *testing.T) {
 				t.Fatalf("ValidatePlan(%+v) = %v, want nil", plan, err)
 			}
 		})
+	}
+}
+
+func TestValidatePlan_RequiresCompleteValidatorSet(t *testing.T) {
+	t.Parallel()
+
+	plan := wizard.ProvisionPlan{
+		ProfileAlias: "main",
+		Stack:        wizard.StackNodeExpress,
+		Domain:       "app.demo.smallhost.pl",
+		NodeVersion:  "22",
+	}
+	err := wizard.ValidatePlan(plan, providers.PlanValidators{})
+	if !errors.Is(err, wizard.ErrInvalidPlan) {
+		t.Fatalf("err = %v, want wrapped ErrInvalidPlan", err)
+	}
+	if !strings.Contains(err.Error(), "validator set is incomplete") {
+		t.Fatalf("err = %v, want incomplete-validator-set message", err)
 	}
 }
 

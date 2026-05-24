@@ -1,25 +1,30 @@
 package tui
 
-// State is the top-level TUI route. The list mirrors docs/DESIGN.md §12;
-// Sprint 04 enabled InitWizard / Dashboard / ProjectDetail; Sprint 05
-// adds the StateProjectWizard route for new-project provisioning.
+// State is the top-level TUI route. The list mirrors docs/DESIGN.md §12.
 type State int
 
 const (
-	// StateInitWizard is shown when no local config exists yet. In
-	// Sprint 05 this state hosts the first-run profile capture flow
-	// (see [InitWizardStep]).
+	// StateInitWizard is shown when no local config exists yet and
+	// hosts the first-run profile capture flow (see [InitWizardStep]).
 	StateInitWizard State = iota
-	// StateDashboard is the read-only project list and overview screen.
+	// StateDashboard is the project list and overview screen.
 	StateDashboard
 	// StateProjectDetail is the focused Overview tab for one project.
 	StateProjectDetail
-	// StateProjectWizard is the multi-step new-project flow added in
-	// Sprint 05 (see [ProjectWizardStep]).
+	// StateProjectWizard is the multi-step new-project flow
+	// (see [ProjectWizardStep]).
 	StateProjectWizard
-	// StateCommandPalette is reserved for the Sprint 07 palette.
+	// StateResumeWizard is shown on launch when pending_cleanups.json
+	// exists and the operator must choose rollback, keep, or discard.
+	StateResumeWizard
+	// StateImportPreview shows a read-only diff between projects in
+	// the local config and the subdomains the provider reports
+	// (PRD F9). The operator can accept the unmanaged rows to seed
+	// stub `config.Project` entries without mutating the server.
+	StateImportPreview
+	// StateCommandPalette hosts the `/` fuzzy command launcher.
 	StateCommandPalette
-	// StateConfirmDialog is reserved for future destructive confirmations.
+	// StateConfirmDialog renders modal destructive confirmations.
 	StateConfirmDialog
 )
 
@@ -33,6 +38,10 @@ func (s State) String() string {
 		return "ProjectDetail"
 	case StateProjectWizard:
 		return "ProjectWizard"
+	case StateResumeWizard:
+		return "ResumeWizard"
+	case StateImportPreview:
+		return "ImportPreview"
 	case StateCommandPalette:
 		return "CommandPalette"
 	case StateConfirmDialog:
@@ -105,18 +114,20 @@ const (
 	ProjectStepDone
 )
 
-// DetailTab names the project-detail tabs. In v0.1 only TabOverview is
-// enabled; the others are visible as roadmap markers.
+// DetailTab names the project-detail tabs. v0.1 enables TabOverview and
+// TabLogs (Sprint 09 live SSH tail). TabEnvDiff/TabDatabase remain
+// roadmap markers until v0.2.
 type DetailTab int
 
 const (
-	// TabOverview is the only enabled project detail tab in MVP.
+	// TabOverview shows the project health summary and action bar.
 	TabOverview DetailTab = iota
 	// TabEnvDiff is visible but disabled until v0.2.
 	TabEnvDiff
 	// TabDatabase is visible but disabled until v0.2.
 	TabDatabase
-	// TabLogs is visible but disabled until v0.2 live/tail work.
+	// TabLogs hosts the Sprint 09 live SSH tail (`tail -f` with
+	// redaction, ring buffer, ANSI parser).
 	TabLogs
 )
 
@@ -137,5 +148,10 @@ func (t DetailTab) String() string {
 
 // Enabled reports whether the tab can be opened in the current MVP surface.
 func (t DetailTab) Enabled() bool {
-	return t == TabOverview
+	return t == TabOverview || t == TabLogs
 }
+
+// liveLogsCapacity is the default ring buffer capacity for the Sprint 09
+// live-log tab. 1024 mirrors `components.DefaultRingCapacity` rounded
+// to the next power of two for easier debug-time inspection.
+const liveLogsCapacity = 1024

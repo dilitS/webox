@@ -16,6 +16,187 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- **Sprint 10 — Live CI/CD Pipeline Panel + F8 Workflow Logs Modal.**
+  - `services/github.Transport` extended with `GetWorkflowSteps(ctx, repo, runID) ([]Step, error)` and `GetWorkflowLogs(ctx, repo, runID, maxLines) ([]WorkflowLogLine, error)` plus the matching `Client` facades. CLI primary path proxies through `gh api /repos/.../actions/runs/<id>/jobs` and shells out to `gh run view <runID> --log`; REST fallback hits the same jobs endpoint and returns a typed `ErrPATScopeInsufficient` for the log endpoint (zip stream we deliberately do not unpack in-process).
+  - New sentinel errors `ErrRunNotFound` (treated as recoverable "no run yet") and `ErrStepsParseError` (gh schema skew worth investigating).
+  - `services/github.Step` and `WorkflowLogLine` projections + `WorkflowRunSummary.IsTerminal` so the tile can switch between static badge and live elapsed-time rendering without touching the transport.
+  - `services/github/logs.go::parseGHLogLines` redacts every log line through `internal/log.Redact` **before** it leaves the transport boundary, then optionally caps to the last `maxLines` (Sprint 10 plan TASK-10.3 hard cap = 50).
+  - `services/github.WorkflowRun` gained the missing `RunNumber` field (`run_number`) so the tile can render `Build #N`.
+  - `tui/bento.NewCICDPipelineTile` ships with a `CICDPipelineSnapshot` (alias / workflow / run number / status / duration / steps / `RateLimited` / `RateLimitHint` / `ErrorMessage`). Steps render as numbered list with UX-§3.1 badges (`✓ ✗ ⏳ … ⊘ ⊗ ?`). Header indicator switches between `[LIVE]` / `[STALE]` / `[LIMITED]` and the footer hints `[F8] View logs · [Enter] Open run`.
+  - `tui/cicd.go` adds the polling pipeline: 10-second `tea.Tick` (`status.GitHubStepsTTL`), `status.GetOrFetchMeta` SWR cache (`gh:steps:<owner>/<repo>:<workflow>`), per-project snapshot map, and graceful rate-limit handling (cached steps preserved, hint extracted from `reset=<RFC3339>` markers when present).
+  - F8 logs modal: `cicdLogsModalForm` + double-border `components.RenderModal`, red border for `FAILED ✗` runs, `↑/↓` scroll, `Esc/F8` to dismiss. Lines arrive already redacted from the transport so the modal cannot leak PATs.
+  - `tui/update.go::onDashboardSelectionChanged` invalidates the active project's CI/CD cache entry and triggers an immediate refetch when the operator moves the selection cursor, satisfying TASK-10.4.
+  - `cmd/webox/run.go` wires `pipelineFetcherFor` and `logsFetcherFor` against the shared `ghsvc.Client` so all three GitHub call paths (last-deploy / pipeline / logs) reuse the same auth state.
+  - `status` package: new `PrefixGitHubSteps = "gh:steps:"` and `GitHubStepsTTL = 10s`; `EventDeploy` invalidation list now includes `gh:steps:` so the post-deploy refresh shows fresh pipeline data immediately.
+- **Sprint 09 — Live Log Stream foundations + Header Bar Server Metrics.**
+  - `services/sshtail/` — context-cancellable `tail -f` streamer with a
+    1-method `Executor` seam (production wires it to `ssh.Pool`; tests
+    inject canned byte streams without booting a mock SSH server).
+    Pre-buffer redaction via `internal/log.Redact` is the
+    non-negotiable security contract: every emitted `Line.Raw` is
+    already sanitised, `Redacted` flags whether a regex matched.
+    Sentinels: `ErrLogPathInvalid`, `ErrSessionClosed`,
+    `ErrReconnectFailed`, `ErrStreamerClosed`. Exponential backoff
+    (2s/4s/8s) and `shellEscape` + `validateLogPath` for log-path
+    sanitisation (rejects `..`, NULs, newlines).
+  - `services/sshmetrics/` — `Poller.Poll` with parsers for `uptime`
+    (Linux days+H:M, Linux days+min, Linux H:M, FreeBSD, macOS
+    `up D+H:M`) and `free -m`. `Metrics` projection (Uptime / Memory /
+    RTT) cached via `status.Cache` SWR (TTL 5s, key
+    `ssh:metrics:<alias>`). Graceful degradation when `free` is
+    missing (FreeBSD): zeroed RAM rather than failing the whole poll.
+    `FormatUptime`/`FormatRAM`/`FormatLoadAvg`/`FormatRTT` helpers.
+  - `tui/components/` — generic thread-safe `RingBuffer[T]` (Push /
+    Snapshot / Tail / Len / Cap, circular overwrite, default capacity
+    1000, snapshot returns independent copy). `ANSIStrip` (SGR + OSC +
+    residual) and `ParseLogLevel` with ordered fall-through
+    (ANSI colour → bracketed prefix → `level:` / `level=` → JSON
+    `"level":"…"` → word-boundary scan → `LevelInfo`). Benchmarks:
+    `RingBuffer.Push` ≈ 6 ns/op, Redact 200-char PAT line ≈ 18 µs/op
+    (both well under Sprint 09's perf budget).
+  - `tui/bento/` — two new live tiles backed by snapshots so the
+    layout engine stays free of `services/` imports:
+    `NewHeaderMetricsTile` (`HeaderMetricsSnapshot` →
+    `[LIVE]`/`[STALE]` badge + Uptime/Load/RAM/Ping row) and
+    `NewMicroLogsTile` (`MicroLogLine` → marker-per-level micro tail
+    with `(redacted)` annotation). Placeholders kept as the
+    "no data yet" fallback for both slots.
+  - `tui/` — `TabLogs` promoted to MVP (`Enabled()` returns true);
+    `enterLiveLogsTab` lazily allocates the ring buffer per project,
+    `updateLiveLogsKey` honours `f` (toggle auto-scroll), `c` (clear
+    buffer), `↑/↓` (pause auto-scroll + scroll), `Esc/1/←` (back to
+    Overview). New view `tui/views/live_logs.go` renders the tab with
+    `Active File · Stream · Connected · Buffer N/N` strip,
+    level-coloured rows, and the Sprint 09 keybinding hints.
+  - `internal/log/redact.go` — three new patterns: JWT (anchored on
+    `eyJ…` header), generic `key=value`/`key: value` for `password`,
+    `passwd`, `token`, `secret`, `api[_-]?key`, `access[_-]?key` in
+    CLI args / env / JSON, and `mysql/mysqldump/psql -p<password>`
+    (anchored on the binary name to avoid touching unrelated tools).
+    Corpus expanded to 13 secret families with a 200-sample property
+    test (0% leakage, well under the 5% acceptance margin).
+  - `tui/cockpit_snapshot_test.go` — new `TestSprint09Snapshots`
+    produces `docs/screenshots/sprint-09-live-logs-120x35.txt`
+    (opt-in via `WEBOX_SNAPSHOT=1`) so reviewers can diff the
+    live-log tab visually without an SSH session.
+
+### Security
+- **CI/CD pipeline log redaction at the transport boundary.** Every
+  line returned by `services/github.GetWorkflowLogs` passes through
+  `internal/log.Redact` *before* it is buffered, scrolled, or rendered
+  by the F8 modal. Tests prove the modal cannot leak `ghp_…` PATs even
+  when the workflow output prints them verbatim
+  (`TestCLITransport_GetWorkflowLogs_TailAndRedact`,
+  `TestParseGHLogLines_RedactsSecrets`).
+- **CI/CD cache key never carries credentials.** The status-cache key
+  `gh:steps:<owner>/<repo>:<workflow>` deliberately omits PAT/auth
+  state — gh CLI's cached auth handles the request, not the cache
+  layer (SECURITY §10.4).
+- **Rate-limit graceful degradation.** The CI/CD tile preserves the
+  last successful pipeline snapshot and renders a `[LIMITED]` badge +
+  reset hint instead of clearing the data, so a primary/secondary
+  GitHub rate-limit response cannot hide an in-flight failed deploy
+  from the operator (TASK-10.5).
+- **Goroutine leak coverage for the SSH tail pipeline.**
+  `services/sshtail/leak_test.go` runs `goleak.VerifyNone` on the
+  cancel-to-shutdown happy path *and* the exhausted-reconnect failure
+  path. Both must clean up within 500 ms (CI jitter buffer over the
+  100 ms perf-budget cap).
+- **Redactor corpus uplift.** Sprint 09 added test coverage for
+  GitHub PATs (`ghp_`/`github_pat_`/`ghs_`), OpenAI keys (`sk-`),
+  AWS access keys, JWTs, OpenSSH/RSA private key blocks, MySQL/Postgres
+  URIs with embedded credentials, generic `key=value` secrets, and
+  MySQL/PSQL `-p<password>` CLI flags. Recall validated against a 200-
+  sample randomised property test.
+
+### Added
+- **Sprint 08 — Bento Ultra Layout Engine + premium components.**
+  - `tui/bento/` adaptive layout engine with `BentoTile` interface,
+    `Slot` enum, `Registry`, and a stateless `Engine` that renders four
+    tiers (`Tiny` ≤70×22 fallback, `Standard` 100×30, `Ultra` 120×35,
+    `UltraPlus` 160×45). Mode detection is pure (`bento.DetectMode`);
+    `bento.Resolve` layers in the `WEBOX_LAYOUT` env override
+    (`tiny`/`standard`/`ultra`/`ultraplus`/`auto`).
+  - Six tile implementations: `ProjectsTile`, `OverviewTile`, plus four
+    placeholder tiles for `Header Metrics`, `CI/CD Pipeline`,
+    `Live Micro-Logs`, and `Topology` — each advertises the sprint
+    (09/10/11) that will wire its live data, so the Ultra silhouette is
+    visible end-to-end even before the next sprints land.
+  - `tui/theme/` palette extended with a `Light()` variant (eleven
+    OKLCH-anchored roles), premium `StatusBadge` (filled background +
+    bold for `ONLINE`/`BUILDING`/`OFFLINE`/`STALE`/`DEGRADED`), and a
+    `Gradient()` utility (sRGB interpolation, multi-byte rune safe).
+  - `tui/components/` package — `RenderHeaderBar` (gradient title +
+    pill badge), `LogoArt`, `FormatModeBadge`, `RenderModal`
+    (double-border with `Info`/`Warning`/`Error` tones and a
+    drop-shadow strip), `SpinnerStyle`/`NewAdaptiveSpinner` (`Dot`
+    for Standard, `Pulse` for Ultra/UltraPlus).
+  - `Model.BentoMode()` plus `Options.LayoutOverride` for tests; the
+    spinner frame set is recomputed on `tea.WindowSizeMsg` when the
+    resolved mode changes.
+  - Opt-in cockpit snapshot generator (`WEBOX_SNAPSHOT=1 go test ./tui
+    -run TestCockpitSnapshots`) that writes ANSI-stripped renders to
+    `docs/screenshots/sprint-08-*.txt` for visual review.
+
+### Changed
+- **MVP scope (v0.1) significantly expanded by [ADR-0007](./docs/adr/0007-bento-ultra-eskalacja-mvp.md):** Bento Ultra adaptive layout (`100×30` / `120×35` / `160×45`), Live Log Stream (`tail -f` via SSH with ring buffer + ANSI level coloring + pre-render redaction), Live CI/CD Pipeline Panel (live GitHub Actions workflow steps + click-through logs), and Live Service Topology Map are now in v0.1 — previously they were 🔶 STRETCH (v0.2+). Roadmap re-baselined from P50 22 → 27 weeks, P70 32 → 35 weeks. Four new sprints added: 08 (Bento Ultra Layout Engine + OKLCH theme + sprint-leak cleanup), 09 (Live Log Stream + Header Bar Metrics), 10 (CI/CD Panel), 11 (Topology Map). Rationale: brand promise of "Terminal Cockpit klasy premium" from PRD §3 and UX TL;DR requires premium visual layer in MVP, not v0.2+ — early-adopter perception of v0.1 matters more than +5-week delay. v0.2 reshuffled to focus on second provider, Env Merger, Sound Engine, fast-chord bindings, and multi-provider dashboard aggregator (instead of catching up on visual layer).
+
+### Added
+- ADR-0007 — explicit override of the [AGENTS.md §2.4](./AGENTS.md#24-scope-discipline) scope-discipline guardrail to escalate Bento Ultra, Live Log Stream, GHA live panel, and Topology Map from STRETCH (v0.2+) to MVP (v0.1). Cross-linked from PRD §6 (F14/F15 P1→P0), ROADMAP §3.0/§3.1/§3.3/§3.5/§4.2, AGENTS §3.1/§3.2, UX TL;DR/§3.4/§4.2/§4.3 Tab [4]. Sprint plans `sprint-08-bento-ultra.md`, `sprint-09-live-log-stream.md`, `sprint-10-cicd-panel.md`, `sprint-11-topology-map.md` created with full task breakdown, AC, risk watch, and outcome templates.
+- TUI project actions (Sprint 07 push toward production): `[r] Restart`,
+  `[s] SSL Renew`, and `[v] Tail Logs` on the project-detail screen,
+  wired through a new `WizardRunner.{RestartApp,RenewSSL,TailLog,
+  ListProviderSubdomains}` seam. Restart and renew invalidate the
+  matching `status.Cache` prefix on success; tail logs renders the
+  last 200 lines inside a scoped panel. `providers.HostingProvider`
+  gained `TailLog(ctx, domain, lines)` with line-count clamping
+  (`defaultTailLines=200`, `maxTailLines=10000`), and the small.pl
+  adapter ships an implementation that tails `node.log` + `error.log`
+  while treating "missing file" exit codes as soft errors.
+- `webox doctor github [--json]` — read-only GitHub integration
+  diagnostics in `services/doctor/github.go`. Checks the `gh` CLI
+  presence on PATH, parses `gh auth status` (with PAT redaction via
+  `internal/log.Redact`), probes `GET /rate_limit` through the gh
+  transport, and reports keyring slot presence for the default PAT
+  account. CLI argument parser now treats `github` as a subcommand
+  for `webox doctor`, and `--json` is forwarded regardless of
+  position.
+- Dashboard `last_deploy` integration: `tui.FetchProjectStatusesWithGitHub`
+  resolves the most recent workflow run per project through a SWR
+  cache (`gh:lastDeploy:<owner>/<repo>:<workflow>`, 60s TTL) and
+  formats it as `2m ago · success`. The production wiring lives in
+  `cmd/webox`; nil fetchers degrade gracefully to a `—` placeholder
+  so the dashboard never blocks on GitHub.
+- Read-only import preview (PRD F9): pressing `i` on the dashboard
+  scans every configured profile for subdomains via
+  `WizardRunner.ListProviderSubdomains`, joins them with
+  `config.Projects`, and shows a managed/new diff. Accepting with
+  `a` writes stub `config.Project` entries for the unmanaged rows
+  with `ImportedAt` set; no server resource is mutated. The new
+  `StateImportPreview` route lives alongside the existing wizard
+  states.
+- `services/github/` — minimal GitHub integration for Sprint 06 with
+  `gh` CLI as the primary transport, REST+PAT fallback, repository
+  creation, deploy keys, Actions secrets via sealed-box encryption,
+  workflow dispatch, latest-run polling, workflow-file commits, and
+  metadata-only cleanup methods for LIFO rollback.
+- `assets/workflows/` and `wizard/workflow_validate.go` — embedded
+  deploy workflow templates for `vite-react`, `node-express`, and
+  `static`; all GitHub Actions `uses:` references are pinned to full
+  40-character SHAs and rendered workflow fields reject GitHub
+  expression / shell injection.
+- Resume-on-launch for `pending_cleanups.json`: the TUI now opens a
+  Resume Wizard when an interrupted LIFO snapshot exists, supports
+  rollback from the loaded stack, keep-and-exit, and phrase-confirmed
+  discard.
+- `wizard.ExecuteGitHubProvision` — GitHub-side wizard sequencing for
+  repo creation, deploy key, Actions secrets, workflow file commit, and
+  workflow dispatch, with cleanup steps persisted after every successful
+  external mutation.
+- TUI regression coverage for Sprint 06: keymap matrix tests for wizard
+  text-vs-picker behavior, Resume Wizard tests, and committed golden
+  view fixtures for init/project wizard review states at 80×24 and
+  100×30.
 - `docs/sprints/sprint-06-github-deploy-workflow.md` —
   rolling-wave plan for Sprint 06 closing the MVP path: resume on
   launch for `pending_cleanups.json`, `services/github` minimal
@@ -92,8 +273,37 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   not only when the file is absent. This lets the TUI route any
   zero-profile install (including hand-edited configs) through the
   init wizard instead of dropping the user on an empty dashboard.
+- `wizard/plan.go` no longer imports `providers/smallhost` directly.
+  `ValidatePlan` now accepts a `providers.PlanValidators` set
+  resolved from the new validator registry, so the wizard layer can
+  drive any registered provider without a compile-time dependency on
+  a concrete adapter. `providers/validators.go` exposes
+  `RegisterPlanValidators` / `PlanValidatorsFor` with sentinel
+  `ErrUnknownValidator` / `ErrInvalidValidatorSet` errors, and
+  `wizard.Execute` resolves validators from the provider's name.
+- `smallhost.Provider` carries an injectable `now func() time.Time`
+  clock instead of the package-level `nowFn`. The shared mutable
+  global is gone, which removes a `t.Parallel()` race vector and
+  lets tests assert latency calculations deterministically via
+  `SetClock`.
+- `cmd/webox/run.go` factors the TUI bootstrap into
+  `runTUIWith(configPathResolver, teaProgramFactory, teaRunner)`
+  seams so the CLI's failure paths (config lookup, program build,
+  program run) are unit-testable without a real terminal.
+
+### Fixed
+- `services/doctor/github.go` `parseGHAccount` now strips the leading
+  `✓` (or `x`) status glyph that `gh` 2.40+ prepends to the
+  "Logged in to ..." line. Without this, `webox doctor github`
+  reported WARN ("no active account was parsed") for properly
+  authenticated users on modern `gh` releases.
 
 ### Security
+- GitHub PAT and Actions secret handling now has explicit redaction and
+  non-leak tests: CLI/REST errors are filtered through the project
+  redactor, Actions secret plaintext is passed only through stdin or
+  sealed-box ciphertext, and GitHub rollback snapshots carry only
+  metadata, never token or key material.
 - Every `wizard.Stack.Push` rejects `CleanupStep.Params` values that
   match the project-wide secret regex corpus (same source as
   `internal/log/redact.go`). Tests in `wizard/rollback_test.go` and

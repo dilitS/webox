@@ -1,0 +1,9 @@
+# Golden needles for stripped init review state at 80x24.
+Webox - first run setup
+Step 6/6: Review profile
+Alias: main
+Type:  smallhost
+Host:  s1.small.pl
+Port:  22
+User:  demo
+No secrets stored in config.json

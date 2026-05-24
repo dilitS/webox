@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"sync"
 
 	"github.com/dilitS/webox/providers"
@@ -42,6 +43,16 @@ type PersistFunc func(ctx context.Context, steps []CleanupStep) error
 // operator sees the full picture instead of halting on the first
 // failure.
 type StepRunner func(ctx context.Context, step CleanupStep) error
+
+// GitHubCleanupRunner handles rollback of resources created through the
+// GitHub API. It deliberately uses primitive metadata-only arguments so
+// pending_cleanups.json never needs to carry tokens.
+type GitHubCleanupRunner interface {
+	RemoveGitHubRepo(ctx context.Context, owner, repo string) error
+	RemoveGitHubDeployKey(ctx context.Context, owner, repo string, keyID int64) error
+	RemoveGitHubActionsSecret(ctx context.Context, owner, repo, name string) error
+	RemoveGitHubWorkflowFile(ctx context.Context, owner, repo, path, branch string) error
+}
 
 // Stack is the LIFO rollback stack from DESIGN §10.0. Push/Pop are
 // goroutine-safe, snapshotting happens inside the lock so concurrent
@@ -220,17 +231,54 @@ func (s *Stack) Rollback(ctx context.Context, run StepRunner) ([]CleanupResult, 
 // Params, because [Stack.Push] already rejected malformed steps and
 // the on-disk snapshot is owner-only (`0600`).
 func MakeStepRunner(provider providers.HostingProvider) StepRunner {
+	return MakeStepRunnerWithGitHub(provider, nil)
+}
+
+// MakeStepRunnerWithGitHub returns a StepRunner for both provider-side and
+// GitHub-side cleanup kinds. Passing nil gh keeps the old provider-only
+// behavior and fails closed on GitHub cleanup kinds.
+func MakeStepRunnerWithGitHub(provider providers.HostingProvider, gh GitHubCleanupRunner) StepRunner {
 	return func(ctx context.Context, step CleanupStep) error {
-		if provider == nil {
-			return fmt.Errorf("%w: provider is nil", ErrInvalidStep)
-		}
 		switch step.Kind {
 		case ResourceSubdomain:
+			if provider == nil {
+				return fmt.Errorf("%w: provider is nil", ErrInvalidStep)
+			}
 			return provider.RemoveSubdomain(ctx, step.Params["domain"])
 		case ResourceSSL:
+			if provider == nil {
+				return fmt.Errorf("%w: provider is nil", ErrInvalidStep)
+			}
 			return provider.RemoveSSL(ctx, step.Params["domain"])
 		case ResourceDatabase:
+			if provider == nil {
+				return fmt.Errorf("%w: provider is nil", ErrInvalidStep)
+			}
 			return provider.RemoveDatabase(ctx, step.Params["dbKind"], step.Params["dbName"])
+		case ResourceGitHubRepo:
+			if gh == nil {
+				return fmt.Errorf("%w: github cleanup runner is nil", ErrUnsupportedKind)
+			}
+			return gh.RemoveGitHubRepo(ctx, step.Params["owner"], step.Params["repo"])
+		case ResourceGitHubDeployKey:
+			if gh == nil {
+				return fmt.Errorf("%w: github cleanup runner is nil", ErrUnsupportedKind)
+			}
+			keyID, err := strconv.ParseInt(step.Params["keyID"], 10, 64)
+			if err != nil {
+				return fmt.Errorf("%w: invalid github deploy key id: %w", ErrInvalidStep, err)
+			}
+			return gh.RemoveGitHubDeployKey(ctx, step.Params["owner"], step.Params["repo"], keyID)
+		case ResourceGitHubActionsSecret:
+			if gh == nil {
+				return fmt.Errorf("%w: github cleanup runner is nil", ErrUnsupportedKind)
+			}
+			return gh.RemoveGitHubActionsSecret(ctx, step.Params["owner"], step.Params["repo"], step.Params["name"])
+		case ResourceGitHubWorkflowFile:
+			if gh == nil {
+				return fmt.Errorf("%w: github cleanup runner is nil", ErrUnsupportedKind)
+			}
+			return gh.RemoveGitHubWorkflowFile(ctx, step.Params["owner"], step.Params["repo"], step.Params["path"], step.Params["branch"])
 		default:
 			return fmt.Errorf("%w: %q", ErrUnsupportedKind, step.Kind)
 		}
@@ -240,12 +288,13 @@ func MakeStepRunner(provider providers.HostingProvider) StepRunner {
 // validateStep enforces the structural invariants and the
 // no-secret-in-params rule. Pure function — every input is plain Go
 // strings, no I/O.
-func validateStep(step CleanupStep) error {
+func validateStep(step CleanupStep) error { //nolint:gocyclo // Explicit per-resource validation keeps the on-disk cleanup schema auditable.
 	if step.Name == "" {
 		return fmt.Errorf("%w: name is required", ErrInvalidStep)
 	}
 	switch step.Kind {
-	case ResourceSubdomain, ResourceSSL, ResourceDatabase:
+	case ResourceSubdomain, ResourceSSL, ResourceDatabase,
+		ResourceGitHubRepo, ResourceGitHubDeployKey, ResourceGitHubActionsSecret, ResourceGitHubWorkflowFile:
 	default:
 		return fmt.Errorf("%w: kind %q is not supported", ErrInvalidStep, step.Kind)
 	}
@@ -262,6 +311,25 @@ func validateStep(step CleanupStep) error {
 	case ResourceDatabase:
 		if step.Params["dbName"] == "" || step.Params["dbKind"] == "" {
 			return fmt.Errorf("%w: database requires params[dbKind] and params[dbName]", ErrInvalidStep)
+		}
+	case ResourceGitHubRepo:
+		if step.Params["owner"] == "" || step.Params["repo"] == "" {
+			return fmt.Errorf("%w: github_repo requires params[owner] and params[repo]", ErrInvalidStep)
+		}
+	case ResourceGitHubDeployKey:
+		if step.Params["owner"] == "" || step.Params["repo"] == "" || step.Params["keyID"] == "" {
+			return fmt.Errorf("%w: github_deploy_key requires params[owner], params[repo], and params[keyID]", ErrInvalidStep)
+		}
+		if _, err := strconv.ParseInt(step.Params["keyID"], 10, 64); err != nil {
+			return fmt.Errorf("%w: github_deploy_key params[keyID] must be decimal", ErrInvalidStep)
+		}
+	case ResourceGitHubActionsSecret:
+		if step.Params["owner"] == "" || step.Params["repo"] == "" || step.Params["name"] == "" {
+			return fmt.Errorf("%w: github_actions_secret requires params[owner], params[repo], and params[name]", ErrInvalidStep)
+		}
+	case ResourceGitHubWorkflowFile:
+		if step.Params["owner"] == "" || step.Params["repo"] == "" || step.Params["path"] == "" || step.Params["branch"] == "" {
+			return fmt.Errorf("%w: github_workflow_file requires params[owner], params[repo], params[path], and params[branch]", ErrInvalidStep)
 		}
 	}
 	return nil

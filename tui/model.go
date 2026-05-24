@@ -2,14 +2,24 @@ package tui
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 
 	"github.com/dilitS/webox/config"
+	ghsvc "github.com/dilitS/webox/services/github"
 	"github.com/dilitS/webox/status"
+	"github.com/dilitS/webox/tui/bento"
+	"github.com/dilitS/webox/tui/components"
 	"github.com/dilitS/webox/tui/theme"
 )
+
+// layoutOverrideEnv is the environment variable a power user can set to
+// pin the cockpit to a specific Bento mode (see [bento.ParseLayoutOverride]).
+// We resolve it once in [New] so the rest of the model sees a stable
+// value across the lifetime of the process.
+const layoutOverrideEnv = "WEBOX_LAYOUT"
 
 const (
 	defaultRefreshInterval = 30 * time.Second
@@ -20,17 +30,29 @@ const (
 // StatusFetcher is the side-effect seam used by refresh commands.
 type StatusFetcher func(context.Context, []config.Project, *status.Cache) ([]ProjectStatus, error)
 
+// GitHubLogsFetcher is the seam used by the F8 modal: returns the
+// (already redacted) tail of a workflow run's combined log stream.
+// Splitting it out from [GitHubPipelineFetcher] keeps the polling and
+// modal-open code paths independently testable.
+type GitHubLogsFetcher func(ctx context.Context, ref ghsvc.RepoRef, runID int64, maxLines int) ([]ghsvc.WorkflowLogLine, error)
+
 // Options configures a TUI model without using package globals.
 type Options struct {
-	ConfigPath      string
-	PendingPath     string
-	Cache           *status.Cache
-	FetchStatuses   StatusFetcher
-	RefreshInterval time.Duration
-	InitialWidth    int
-	InitialHeight   int
-	NewContext      func() (context.Context, context.CancelFunc)
-	WizardRunner    WizardRunner
+	ConfigPath       string
+	PendingPath      string
+	Cache            *status.Cache
+	FetchStatuses    StatusFetcher
+	GitHubLastDeploy GitHubLastDeployFetcher
+	GitHubPipeline   GitHubPipelineFetcher
+	GitHubLogs       GitHubLogsFetcher
+	RefreshInterval  time.Duration
+	InitialWidth     int
+	InitialHeight    int
+	NewContext       func() (context.Context, context.CancelFunc)
+	WizardRunner     WizardRunner
+	// LayoutOverride mirrors `WEBOX_LAYOUT` for tests: when non-empty
+	// it bypasses the env-var lookup performed by [New].
+	LayoutOverride string
 }
 
 // Model contains all mutable TUI state. It is copied by value by Update,
@@ -56,11 +78,69 @@ type Model struct {
 	spinner         spinner.Model
 	styles          theme.Styles
 
-	initForm     initWizardForm
-	projectForm  projectWizardForm
-	wizardRunner WizardRunner
-	wizardStack  *wizardStackSlot
-	pendingPath  string
+	initForm        initWizardForm
+	projectForm     projectWizardForm
+	resumeForm      resumeWizardForm
+	actionForm      projectActionForm
+	importForm      importPreviewForm
+	liveLogs        liveLogsForm
+	cicdSnapshots   map[string]cicdSnapshotEntry
+	cicdModal       cicdLogsModalForm
+	cicdFetcher     GitHubPipelineFetcher
+	cicdLogsFetcher GitHubLogsFetcher
+	wizardRunner    WizardRunner
+	wizardStack     *wizardStackSlot
+	pendingPath     string
+	layoutOverride  string
+}
+
+// liveLogsForm captures the per-session state of the Sprint 09 live-log
+// tab. The buffer is owned by [components.RingBuffer] so producers
+// (services/sshtail) can push concurrently while the renderer reads via
+// `Snapshot()`. AutoScroll mirrors the operator's "follow" preference;
+// when false, the renderer keeps the buffer pinned to ScrollOffset.
+type liveLogsForm struct {
+	ProjectID    string
+	Domain       string
+	LogPath      string
+	AutoScroll   bool
+	Buffer       *components.RingBuffer[LiveLogLine]
+	ScrollOffset int
+	StreamErr    string
+	Connected    bool
+}
+
+// LiveLogLine is the in-memory record stored in the live-log ring
+// buffer. It mirrors `services/sshtail.Line` minus the Timestamp field
+// (the view layer renders relative offsets, not absolute timestamps).
+type LiveLogLine struct {
+	Level    string
+	Text     string
+	Redacted bool
+}
+
+// importPreviewForm holds in-memory state for the read-only import
+// preview (PRD F9). Loading is true while the scan command is in
+// flight; Rows is the joined view of provider subdomains × local
+// projects; Err captures any scan failure so the renderer can flag it
+// without crashing.
+type importPreviewForm struct {
+	Loading bool
+	Rows    []ImportRow
+	Err     string
+	Saving  bool
+}
+
+// projectActionForm holds the in-memory state of a dashboard action
+// (restart / ssl renew / log tail). Empty Kind == no action in
+// flight; the renderer keeps the last completed action visible so the
+// operator can read the output before triggering the next one.
+type projectActionForm struct {
+	Kind      ProjectActionKind
+	ProjectID string
+	Running   bool
+	Output    []byte
+	Err       error
 }
 
 // New creates a pure initial model. I/O starts only when Init returns a Cmd.
@@ -69,7 +149,10 @@ func New(opts Options) Model {
 		opts.Cache = status.NewCache(status.Options{})
 	}
 	if opts.FetchStatuses == nil {
-		opts.FetchStatuses = FetchProjectStatuses
+		fetcher := opts.GitHubLastDeploy
+		opts.FetchStatuses = func(ctx context.Context, projects []config.Project, cache *status.Cache) ([]ProjectStatus, error) {
+			return FetchProjectStatusesWithGitHub(ctx, projects, cache, fetcher)
+		}
 	}
 	if opts.RefreshInterval <= 0 {
 		opts.RefreshInterval = defaultRefreshInterval
@@ -83,14 +166,21 @@ func New(opts Options) Model {
 		opts.WizardRunner = DefaultWizardRunner()
 	}
 	ctx, cancel := opts.NewContext()
-	spin := spinner.New()
-	spin.Spinner = spinner.Dot
+
+	override := opts.LayoutOverride
+	if override == "" {
+		override = os.Getenv(layoutOverrideEnv)
+	}
+	width := fallbackInt(opts.InitialWidth, defaultTerminalWidth)
+	height := fallbackInt(opts.InitialHeight, defaultTerminalHeight)
+	mode := bento.Resolve(width, height, override)
+	spin := components.NewAdaptiveSpinner(mode.String())
 
 	return Model{
 		state:           StateDashboard,
 		activeTab:       TabOverview,
-		width:           fallbackInt(opts.InitialWidth, defaultTerminalWidth),
-		height:          fallbackInt(opts.InitialHeight, defaultTerminalHeight),
+		width:           width,
+		height:          height,
 		statuses:        make(map[string]ProjectStatus),
 		configPath:      opts.ConfigPath,
 		pendingPath:     opts.PendingPath,
@@ -103,7 +193,19 @@ func New(opts Options) Model {
 		styles:          theme.NewStyles(theme.Default()),
 		wizardRunner:    opts.WizardRunner,
 		initForm:        newInitWizardForm(),
+		layoutOverride:  override,
+		cicdSnapshots:   make(map[string]cicdSnapshotEntry),
+		cicdFetcher:     opts.GitHubPipeline,
+		cicdLogsFetcher: opts.GitHubLogs,
 	}
+}
+
+// BentoMode returns the resolved Bento mode for the current viewport
+// and any [layoutOverrideEnv] override captured at construction time.
+// Exposing it on the model keeps the cockpit's routing logic centralised
+// (view.go, components, tests).
+func (m Model) BentoMode() bento.Mode {
+	return bento.Resolve(m.width, m.height, m.layoutOverride)
 }
 
 // State returns the current top-level route.
@@ -122,6 +224,28 @@ func (m Model) Alert() string { return m.alert }
 func (m Model) ProjectStatus(projectID string) (ProjectStatus, bool) {
 	got, ok := m.statuses[projectID]
 	return got, ok
+}
+
+// ImportSnapshot exposes the read-only import preview state for
+// renderers and tests. Returns (zero, false) when no scan has run.
+func (m Model) ImportSnapshot() (ImportSnapshot, bool) {
+	if !m.importForm.Loading && len(m.importForm.Rows) == 0 && m.importForm.Err == "" {
+		return ImportSnapshot{}, false
+	}
+	snap := ImportSnapshot{
+		Loading: m.importForm.Loading,
+		Rows:    m.importForm.Rows,
+		Err:     m.importForm.Err,
+		Total:   len(m.importForm.Rows),
+	}
+	for _, row := range m.importForm.Rows {
+		if row.Managed {
+			snap.Managed++
+		} else {
+			snap.Unmanaged++
+		}
+	}
+	return snap, true
 }
 
 func (m Model) withState(state State) Model {

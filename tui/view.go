@@ -2,7 +2,13 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+
+	"github.com/dilitS/webox/tui/bento"
+	"github.com/dilitS/webox/tui/components"
+	"github.com/dilitS/webox/tui/theme"
 	"github.com/dilitS/webox/tui/views"
 )
 
@@ -13,14 +19,215 @@ func (m Model) View() string {
 	case StateInitWizard:
 		return views.RenderInitWizard(screen)
 	case StateDashboard:
-		return views.RenderDashboard(screen)
+		return m.renderDashboard(screen)
 	case StateProjectDetail:
+		if m.activeTab == TabLogs {
+			return views.RenderLiveLogs(screen)
+		}
 		return views.RenderProjectDetail(screen)
 	case StateProjectWizard:
 		return views.RenderProjectWizard(screen)
+	case StateResumeWizard:
+		return views.RenderResumeWizard(screen)
+	case StateImportPreview:
+		return views.RenderImportPreview(screen)
 	default:
-		return m.styles.Panel.Render(fmt.Sprintf("%s is not enabled in Sprint 05", m.state))
+		return m.styles.Panel.Render(fmt.Sprintf("%s is not enabled", m.state))
 	}
+}
+
+func (m Model) renderDashboard(screen views.Screen) string {
+	mode := m.BentoMode()
+	var base string
+	switch mode {
+	case bento.ModeStandard:
+		base = views.RenderDashboard(screen)
+	case bento.ModeTiny:
+		base = bento.NewEngine("Webox Cockpit v0.1", nil).
+			RenderMode(screen.Width, screen.Height, mode)
+	default:
+		base = bento.NewEngine("Webox Cockpit v0.1", m.dashboardBentoTiles()).
+			RenderMode(screen.Width, screen.Height, mode)
+	}
+	if !m.cicdModal.Open {
+		return base
+	}
+	overlay := renderCICDLogsModal(m.cicdModal, screen.Width)
+	return base + "\n" + overlay
+}
+
+// renderCICDLogsModal builds the F8 logs viewer. The modal uses the
+// double-border component from Sprint 08 and inherits the FAILED ✗
+// red border when the run conclusion was a failure (Sprint 10 plan
+// §TASK-10.3 acceptance criteria).
+func renderCICDLogsModal(modal cicdLogsModalForm, screenWidth int) string {
+	if !modal.Open {
+		return ""
+	}
+	tokens := theme.Default()
+	tone := components.ToneInfo
+	if modal.RunStatus == bento.CICDStatusFailure {
+		tone = components.ToneError
+	}
+
+	header := fmt.Sprintf("Workflow Run #%d · %s", modal.RunNumber, cicdModalStatusVerb(modal.RunStatus))
+	if modal.ProjectAlias != "" {
+		header += " · " + modal.ProjectAlias
+	}
+
+	var body strings.Builder
+	switch {
+	case modal.Loading:
+		body.WriteString("Fetching workflow logs (gh run view --log)…")
+	case modal.Err != "":
+		body.WriteString("Error: ")
+		body.WriteString(modal.Err)
+	case len(modal.Lines) == 0:
+		body.WriteString("No log output yet.")
+	default:
+		const maxRows = 20
+		start := modal.ScrollOffset
+		if start < 0 {
+			start = 0
+		}
+		end := start + maxRows
+		if end > len(modal.Lines) {
+			end = len(modal.Lines)
+		}
+		for i := start; i < end; i++ {
+			line := modal.Lines[i]
+			prefix := ""
+			if line.StepName != "" {
+				prefix = "[" + line.StepName + "] "
+			}
+			body.WriteString(lipgloss.NewStyle().
+				Foreground(lipgloss.Color(tokens.TextBright)).
+				Render(prefix + line.Text))
+			body.WriteString("\n")
+		}
+		if len(modal.Lines) > maxRows {
+			body.WriteString("\n")
+			fmt.Fprintf(&body, "(showing %d–%d of %d lines · ↑/↓ scroll)", start+1, end, len(modal.Lines))
+		}
+	}
+
+	const (
+		modalSidePadding = 4
+		modalMinWidth    = 60
+	)
+	minWidth := screenWidth - modalSidePadding
+	if minWidth < modalMinWidth {
+		minWidth = modalMinWidth
+	}
+
+	return components.RenderModal(components.ModalOptions{
+		Title:    header,
+		Body:     body.String(),
+		Footer:   "↑/↓ scroll · Esc/F8 close",
+		MinWidth: minWidth,
+		Tone:     tone,
+		Theme:    tokens,
+	})
+}
+
+func cicdModalStatusVerb(s bento.CICDStatus) string {
+	switch s {
+	case bento.CICDStatusSuccess:
+		return "SUCCESS ✓"
+	case bento.CICDStatusFailure:
+		return "FAILED ✗"
+	case bento.CICDStatusInProgress:
+		return "IN_PROGRESS ⏳"
+	case bento.CICDStatusQueued:
+		return "QUEUED …"
+	case bento.CICDStatusCancelled:
+		return "CANCELLED ⊗"
+	case bento.CICDStatusSkipped:
+		return "SKIPPED ⊘"
+	case bento.CICDStatusUnknown:
+		return "UNKNOWN ?"
+	default:
+		return "UNKNOWN ?"
+	}
+}
+
+func (m Model) dashboardBentoTiles() []bento.BentoTile {
+	registry := bento.NewRegistry()
+	registry.Register(bento.NewProjectsTile(m.dashboardProjectRows()))
+
+	domain, overview := m.dashboardOverviewSnapshot()
+	registry.Register(bento.NewOverviewTile(domain, overview))
+
+	registry.Register(bento.NewMetricsPlaceholderTile())
+	if snap, ok := buildCICDPipelineSnapshot(m); ok {
+		registry.Register(bento.NewCICDPipelineTile(snap))
+	} else {
+		registry.Register(bento.NewCICDPlaceholderTile())
+	}
+	registry.Register(bento.NewLogsPlaceholderTile())
+	registry.Register(bento.NewTopologyPlaceholderTile())
+
+	return registry.Tiles()
+}
+
+func (m Model) dashboardProjectRows() []string {
+	projects := cfgProjects(m.cfg)
+	if len(projects) == 0 {
+		return nil
+	}
+	rows := make([]string, 0, len(projects))
+	for idx, project := range projects {
+		marker := " "
+		if idx == m.selectedIndex {
+			marker = ">"
+		}
+		state := ProjectUnknown
+		if status, ok := m.statuses[project.ID]; ok {
+			state = status.State
+		}
+		rows = append(rows, fmt.Sprintf("%s %s [%s]", marker, project.Domain, state))
+	}
+	return rows
+}
+
+func (m Model) dashboardOverviewSnapshot() (domain string, lines []string) {
+	projects := cfgProjects(m.cfg)
+	if len(projects) == 0 || m.selectedIndex < 0 || m.selectedIndex >= len(projects) {
+		return "", []string{"Select a project to inspect status."}
+	}
+
+	project := projects[m.selectedIndex]
+	status, ok := m.statuses[project.ID]
+	if !ok {
+		return project.Domain, []string{
+			"HTTP: pending",
+			"SSL: unknown",
+			"Node: " + fallbackString(project.NodeVersion, "unknown"),
+			"Repo: " + fallbackString(project.Repo, "not linked"),
+			"Last deploy: pending",
+		}
+	}
+
+	ssl := "unknown"
+	if status.SSLDaysLeft >= 0 {
+		ssl = fmt.Sprintf("%d days remaining", status.SSLDaysLeft)
+	}
+
+	return project.Domain, []string{
+		"Status: " + string(status.State),
+		"HTTP: " + fallbackString(status.HTTPHealth, "pending"),
+		"SSL: " + ssl,
+		"Node: " + fallbackString(status.NodeVersion, fallbackString(project.NodeVersion, "unknown")),
+		"Repo: " + fallbackString(project.Repo, "not linked"),
+		"Last deploy: " + fallbackString(status.LastDeploy, "—"),
+	}
+}
+
+func fallbackString(value, def string) string {
+	if value == "" {
+		return def
+	}
+	return value
 }
 
 func (m Model) screen() views.Screen {
@@ -57,7 +264,98 @@ func (m Model) screen() views.Screen {
 		Styles:        m.styles,
 		InitForm:      initFormSnapshot(m.initForm),
 		ProjectForm:   projectFormSnapshot(m.projectForm),
+		ResumeForm:    resumeFormSnapshot(m.resumeForm),
+		ActionForm:    actionFormSnapshot(m.actionForm),
+		ImportForm:    importFormSnapshot(m),
+		LiveLogs:      liveLogsSnapshot(m),
 	}
+}
+
+// liveLogsSnapshot is the pure view-layer projection of [liveLogsForm].
+// The buffer is read via Snapshot() so consumers cannot mutate the
+// streamer's underlying ring while rendering.
+func liveLogsSnapshot(m Model) views.LiveLogsSnapshot {
+	snap := views.LiveLogsSnapshot{
+		Domain:     m.liveLogs.Domain,
+		LogPath:    m.liveLogs.LogPath,
+		AutoScroll: m.liveLogs.AutoScroll,
+		Connected:  m.liveLogs.Connected,
+		Err:        m.liveLogs.StreamErr,
+	}
+	if m.liveLogs.Buffer != nil {
+		snap.BufferCap = m.liveLogs.Buffer.Cap()
+		snap.BufferUsed = m.liveLogs.Buffer.Len()
+		raw := m.liveLogs.Buffer.Tail(liveLogsTailCap(m.BentoMode()))
+		for _, line := range raw {
+			snap.Lines = append(snap.Lines, views.LiveLogLineSnapshot{
+				Level:    line.Level,
+				Text:     line.Text,
+				Redacted: line.Redacted,
+			})
+		}
+	}
+	return snap
+}
+
+// Live-log tail-cap thresholds. Numbers come from `docs/UX.md §4.3`
+// (Live Log Stream) — Ultra+ shows more history, Standard fits 12 rows
+// without scrolling on an 80x24 terminal.
+const (
+	liveLogsTailCapUltraPlus = 24
+	liveLogsTailCapUltra     = 18
+	liveLogsTailCapStandard  = 12
+)
+
+// liveLogsTailCap caps the number of rendered rows so the live-log
+// panel never overflows the cockpit.
+func liveLogsTailCap(mode bento.Mode) int {
+	switch mode {
+	case bento.ModeUltraPlus:
+		return liveLogsTailCapUltraPlus
+	case bento.ModeUltra:
+		return liveLogsTailCapUltra
+	default:
+		return liveLogsTailCapStandard
+	}
+}
+
+func importFormSnapshot(m Model) views.ImportPreviewSnapshot {
+	snap := views.ImportPreviewSnapshot{
+		Loading: m.importForm.Loading,
+		Saving:  m.importForm.Saving,
+		Err:     m.importForm.Err,
+	}
+	for _, row := range m.importForm.Rows {
+		snap.Rows = append(snap.Rows, views.ImportRowSnapshot{
+			ProfileAlias: row.ProfileAlias,
+			Domain:       row.Domain,
+			Type:         row.Type,
+			NodeVersion:  row.NodeVersion,
+			Managed:      row.Managed,
+		})
+		if row.Managed {
+			snap.Managed++
+		} else {
+			snap.Unmanaged++
+		}
+	}
+	snap.Total = len(snap.Rows)
+	return snap
+}
+
+func actionFormSnapshot(f projectActionForm) views.ProjectActionSnapshot {
+	snap := views.ProjectActionSnapshot{
+		Kind:      string(f.Kind),
+		ProjectID: f.ProjectID,
+		Running:   f.Running,
+	}
+	if f.Output != nil {
+		snap.Output = string(f.Output)
+	}
+	if f.Err != nil {
+		snap.Err = f.Err.Error()
+	}
+	return snap
 }
 
 func initFormSnapshot(f initWizardForm) views.InitWizardSnapshot {
@@ -115,4 +413,31 @@ func errString(err error) string {
 		return ""
 	}
 	return err.Error()
+}
+
+func resumeFormSnapshot(f resumeWizardForm) views.ResumeWizardSnapshot {
+	snap := views.ResumeWizardSnapshot{
+		Err:           f.err,
+		Discarding:    f.discarding,
+		DiscardPhrase: f.discardPhrase(),
+		ConfirmInput:  f.confirmInput,
+		RollingBack:   f.rollingBack,
+	}
+	if f.snapshot != nil {
+		snap.WizardID = f.snapshot.WizardID
+		snap.ProfileAlias = f.snapshot.ProfileAlias
+		if !f.snapshot.UpdatedAt.IsZero() {
+			snap.UpdatedAt = f.snapshot.UpdatedAt.Format("2006-01-02 15:04:05 UTC")
+		}
+		for _, step := range f.snapshot.Steps {
+			snap.StepNames = append(snap.StepNames, step.Name)
+		}
+	}
+	for _, result := range f.results {
+		snap.Results = append(snap.Results, views.RollbackResultSnapshot{
+			Name: result.Step.Name,
+			Err:  errString(result.Err),
+		})
+	}
+	return snap
 }

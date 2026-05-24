@@ -50,6 +50,8 @@ func (s *stubProvider) RemoveDatabase(context.Context, string, string) error { r
 
 func (s *stubProvider) RemoveSSL(context.Context, string) error { return nil }
 
+func (s *stubProvider) TailLog(context.Context, string, int) ([]byte, error) { return nil, nil }
+
 // registerOnce is a tiny test helper that registers a factory and
 // schedules its removal at the end of the test. Because Register lives
 // on a package-level singleton, every test that calls it MUST clean up
@@ -243,6 +245,7 @@ func TestHostingProviderShape(t *testing.T) {
 		"RestartNodeApp",
 		"GetDeployPath",
 		"GetLogPath",
+		"TailLog",
 		"CheckStatus",
 		"ListSubdomains",
 		"RemoveSubdomain",

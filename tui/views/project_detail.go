@@ -23,7 +23,7 @@ func RenderProjectDetail(s Screen) string {
 		"[1] Overview",
 		s.Styles.Muted.Render("[2] Env Diff - unlocked in v0.2"),
 		s.Styles.Muted.Render("[3] Database - unlocked in v0.2"),
-		s.Styles.Muted.Render("[4] Logs - unlocked in v0.2"),
+		"[4] Logs",
 	}, "  ")
 
 	ssl := "unknown"
@@ -42,14 +42,51 @@ func RenderProjectDetail(s Screen) string {
 		renderKV("SSL", ssl),
 		renderKV("Deploy path", fmt.Sprintf("~/domains/%s/public_html", project.Domain)),
 		renderKV("Repo", fallback(project.Repo, "not linked")),
-		renderKV("Last Deploy", fallback(status.LastDeploy, "pending Sprint 06")),
+		renderKV("Last Deploy", fallback(status.LastDeploy, "no run yet")),
 		"",
-		s.Styles.Muted.Render("[r] Restart disabled  [s] SSL Renew disabled  [v] Logs disabled"),
+		actionLine(s),
+		"",
+		s.Styles.Muted.Render("[r] Restart  [s] SSL Renew  [v] Tail Logs"),
 		s.Styles.HelpHints.Render("left/esc:back  q:quit"),
+	}
+	if action := renderProjectActionPanel(s, width); action != "" {
+		body = append(body, "", action)
 	}
 	if s.Alert != "" {
 		body = append(body, "", s.Styles.Alert.Render(s.Alert))
 	}
 
 	return s.Styles.ActivePanel.Width(width).Render(strings.Join(body, "\n"))
+}
+
+func actionLine(s Screen) string {
+	switch {
+	case s.ActionForm.Running && s.ActionForm.Kind != "":
+		return s.Styles.Muted.Render(s.Spinner + " running " + s.ActionForm.Kind)
+	case s.ActionForm.Err != "":
+		return s.Styles.Alert.Render(s.ActionForm.Kind + " failed: " + s.ActionForm.Err)
+	case s.ActionForm.Kind != "":
+		return s.Styles.Muted.Render(s.ActionForm.Kind + " ok")
+	default:
+		return s.Styles.Muted.Render("no action yet")
+	}
+}
+
+// actionPanelInsetWidth is subtracted from the parent panel width so
+// the nested log panel does not overflow the rounded border of the
+// outer ActivePanel container.
+const actionPanelInsetWidth = 4
+
+func renderProjectActionPanel(s Screen, panelWidth int) string {
+	if s.ActionForm.Kind != "logs" || s.ActionForm.Output == "" {
+		return ""
+	}
+	lines := strings.Split(strings.TrimRight(s.ActionForm.Output, "\n"), "\n")
+	const maxRendered = 12
+	if len(lines) > maxRendered {
+		lines = append([]string{fmt.Sprintf("... (%d older lines omitted)", len(lines)-maxRendered)}, lines[len(lines)-maxRendered:]...)
+	}
+	rendered := strings.Join(lines, "\n")
+	heading := fmt.Sprintf("logs (last %d lines)\n", len(lines))
+	return s.Styles.Panel.Width(panelWidth - actionPanelInsetWidth).Render(heading + rendered)
 }

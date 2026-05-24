@@ -112,7 +112,11 @@ func Execute(ctx context.Context, provider providers.HostingProvider, plan Provi
 	if stack == nil {
 		return nil, fmt.Errorf("%w: stack is nil", ErrInvalidPlan)
 	}
-	if err := ValidatePlan(plan); err != nil {
+	validators, err := providers.PlanValidatorsFor(provider.Name())
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidPlan, err)
+	}
+	if err := ValidatePlan(plan, validators); err != nil {
 		return nil, err
 	}
 
