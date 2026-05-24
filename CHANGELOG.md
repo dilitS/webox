@@ -16,6 +16,12 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- **Sprint 14 — E2E expansion: host-key modal, --debug-trace event, viewport scroll (TASK-14.5, 2026-05-25).** Three new multi-tick scenarios in `internal/e2e/cockpit_test.go` raise the operator-visible coverage from the Sprint 13 baseline of 5 to **9 scenarios** (sub-second total wall clock):
+  - `TestCockpit_HostKeyModalRendersAtRuntime` — boots the mock cockpit, injects `StatusRefreshFailedMsg{Err: ssh.ErrHostKeyMismatch}`, asserts the strict-block modal painted "Host key mismatch", "ssh-keygen -R", "OUT OF BAND", "SECURITY" inside the composed frame (chrome + tile + overlay). Scope is intentionally render-side; the dismiss-on-Esc keyboard contract stays at the cheaper unit tier.
+  - `TestCockpit_DebugTraceEmitsHostKeyEvent` — wires a recording `telemetry.Sink` into `tui.MockOptions`, replays the same failure, then verifies the trace contains both `status.refresh_failed` with `err_class=host_key_mismatch` AND `modal.hostkey_open` with `kind=mismatch`. This guards the emit-call-sites at the e2e tier so a future Update refactor that swallows the message cannot silently break the trace contract.
+  - `TestCockpit_PgDownScrollsViewportInOverflow` — opens the cockpit at 120×22 (forces Bento Ultra overflow), sends `PgDown`/`Home`, asserts the chrome footer's `↕ scroll: PgUp/PgDn` indicator persists across the keyboard flow. Catches regressions in the viewport scroll routing introduced when the chrome contract was extracted in Sprint 13.
+  - Duplicated `recordingSink` lives in the `internal/e2e` package by design — `tui/trace_emit_test.go` keeps its own copy so the e2e package depends on `tui` only through the public surface (matches the package-boundary convention from `internal/e2e/doc.go`).
+
 - **Sprint 14 — `--debug-trace=PATH` local JSONL trace (TASK-14.6, 2026-05-25).** New CLI flag (and `telemetry.FileSink`) record structured cockpit events to a local file for offline debugging. Strict guarantees:
   - **Local-only.** No network, no auto-upload, no fallback transport. The package `internal/telemetry/file_sink.go` is grep-clean — there is literally no `net/http` import.
   - **Mode 0600** on the file + `O_APPEND|O_CREATE` so multiple runs accumulate without widening access. Parent dir created with `0700` if missing.
