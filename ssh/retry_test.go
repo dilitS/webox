@@ -217,8 +217,10 @@ func TestExecWithRetry_BudgetExhaustedReturnsWrappedError(t *testing.T) {
 
 	_, err := ExecWithRetry(
 		context.Background(), nil, Target{}, "tail -f",
-		RetryableExecPolicy{Attempts: 2, BaseBackoff: time.Microsecond, MaxBackoff: time.Microsecond,
-			Sleep: func(_ context.Context, _ time.Duration) error { return nil }},
+		RetryableExecPolicy{
+			Attempts: 2, BaseBackoff: time.Microsecond, MaxBackoff: time.Microsecond,
+			Sleep: func(_ context.Context, _ time.Duration) error { return nil },
+		},
 		nil,
 	)
 	if !errors.Is(err, ErrPoolBusy) {

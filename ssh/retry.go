@@ -104,15 +104,26 @@ type ExecMetricsSnapshot struct {
 	TerminalErrors uint64 `json:"terminal_errors"`
 }
 
+const (
+	// defaultRetryAttempts mirrors the cockpit's tolerance for the
+	// pool-busy backpressure case: enough retries to absorb a
+	// burst of N parallel goroutines saturating MaxPerHost=3, few
+	// enough that a genuinely stuck remote surfaces inside the
+	// 5 s SWR freshness budget.
+	defaultRetryAttempts    = 4
+	defaultRetryBaseBackoff = 100 * time.Millisecond
+	defaultRetryMaxBackoff  = 1 * time.Second
+)
+
 // DefaultRetryableExecPolicy returns the production-recommended
 // policy: 4 attempts, 100 ms base / 1 s cap. With ±20 % jitter the
 // total worst-case wall clock is ~2.3 s, comfortably inside the
 // cockpit's 5 s status-refresh tick (DESIGN §8).
 func DefaultRetryableExecPolicy() RetryableExecPolicy {
 	return RetryableExecPolicy{
-		Attempts:    4,
-		BaseBackoff: 100 * time.Millisecond,
-		MaxBackoff:  1 * time.Second,
+		Attempts:    defaultRetryAttempts,
+		BaseBackoff: defaultRetryBaseBackoff,
+		MaxBackoff:  defaultRetryMaxBackoff,
 	}
 }
 

@@ -160,7 +160,7 @@ func renderHostKeyModal(form hostKeyModalForm, screenWidth int, knownHostsPath s
 	body.WriteString("Steps to recover safely:\n\n")
 	body.WriteString("  1. Verify the new fingerprint OUT OF BAND (provider panel / phone / chat\n")
 	body.WriteString("     with the server admin). Do NOT trust the value shown by your SSH client.\n")
-	body.WriteString(fmt.Sprintf("  2. If verified legit, remove the stale entry:\n     ssh-keygen -R %s -f %s\n", target, knownHostsPath))
+	fmt.Fprintf(&body, "  2. If verified legit, remove the stale entry:\n     ssh-keygen -R %s -f %s\n", target, knownHostsPath)
 	body.WriteString("  3. Re-run the action that triggered this modal — Webox will TOFU the\n     new key on first dial and store it in known_hosts.\n\n")
 	body.WriteString(lipgloss.NewStyle().
 		Foreground(lipgloss.Color(tokens.TextDim)).
@@ -231,12 +231,6 @@ func (m *Model) tryRaiseHostKeyModal(err error) bool {
 		Kind:     kind,
 	}
 	return true
-}
-
-// dismissHostKeyModal closes the modal without modifying any other
-// model state. Triggered by `Esc` while the modal is open.
-func (m *Model) dismissHostKeyModal() {
-	m.hostKeyModal = hostKeyModalForm{}
 }
 
 // activeSSHTarget returns the host / port / username that should be

@@ -16,6 +16,19 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- **Sprint 14 — Mock cockpit acknowledges Sprint-14 subsystems (2026-05-25).** `tui/mockdata.go` `MockLiveLogLines()` now seeds two additional log lines that surface the new telemetry sink and SSH pool metrics in the offline demo, so `webox --mock` is self-documenting for operators discovering the Sprint-14 features for the first time. The lines are synthetic ("cockpit: telemetry.Sink = Disabled", "ssh.pool: MaxPerHost=3, ExecMetrics{…}") and contain zero secret-shaped content.
+
+### Changed
+- **Sprint 14 — golangci-lint v2 hygiene pass (2026-05-25).** The new Sprint-14 code (host-key modal, retry layer, telemetry file sink, `--debug-trace` CLI wiring) ships with a clean `make lint` run:
+  - Replaced `errors.New("telemetry: empty trace path")` with the typed sentinel `telemetry.ErrEmptyTracePath` so callers can branch with `errors.Is` and the `err113` rule stays green.
+  - Extracted `defaultRetryAttempts` / `defaultRetryBaseBackoff` / `defaultRetryMaxBackoff` constants in `ssh/retry.go` (was triggering `mnd` magic-number flags).
+  - Named return values on `openTraceSink` (gocritic `unnamedResult`) and renamed the inner variable to avoid shadow.
+  - `WriteString(fmt.Sprintf(…))` → `fmt.Fprintf` in `tui/host_key_modal.go` (`staticcheck` QF1012).
+  - Documented `nolint:gosec` on the `os.OpenFile(resolved, …, 0600)` call — path is operator-supplied via the audited `--debug-trace=PATH` flag, file mode is locked at 0600.
+  - Removed two dead-code units (`runMockTUI`, `Model.dismissHostKeyModal`) that were superseded by the trace-aware `runMockTUIWithTrace` and the inline Esc handler in `Update`.
+  - `gofumpt -w` applied to every touched file. `make ci` exits clean with 81 % coverage; `make bench-check` reports 117 / 186 / 202 µs/op (Apple M4), 25× under the 5 ms budget.
+
+### Added
 - **Sprint 14 — E2E expansion: host-key modal, --debug-trace event, viewport scroll (TASK-14.5, 2026-05-25).** Three new multi-tick scenarios in `internal/e2e/cockpit_test.go` raise the operator-visible coverage from the Sprint 13 baseline of 5 to **9 scenarios** (sub-second total wall clock):
   - `TestCockpit_HostKeyModalRendersAtRuntime` — boots the mock cockpit, injects `StatusRefreshFailedMsg{Err: ssh.ErrHostKeyMismatch}`, asserts the strict-block modal painted "Host key mismatch", "ssh-keygen -R", "OUT OF BAND", "SECURITY" inside the composed frame (chrome + tile + overlay). Scope is intentionally render-side; the dismiss-on-Esc keyboard contract stays at the cheaper unit tier.
   - `TestCockpit_DebugTraceEmitsHostKeyEvent` — wires a recording `telemetry.Sink` into `tui.MockOptions`, replays the same failure, then verifies the trace contains both `status.refresh_failed` with `err_class=host_key_mismatch` AND `modal.hostkey_open` with `kind=mismatch`. This guards the emit-call-sites at the e2e tier so a future Update refactor that swallows the message cannot silently break the trace contract.

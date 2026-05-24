@@ -189,6 +189,12 @@ func mockCICDSnapshots(cfg *config.Config) map[string]cicdSnapshotEntry {
 // Server Logs tile when `--mock` is active. The lines mirror the
 // reference image's INFO/WARN/DEBUG mix so the operator can verify
 // the colour mapping at a glance.
+//
+// Sprint-14 addition: two extra lines reference the new
+// `--debug-trace` and host-key modal subsystems so the mock demo
+// surfaces them even before the operator interacts with the
+// cockpit. The lines are NOT marked Redacted because they contain
+// no secret-shaped content.
 func MockLiveLogLines() []LiveLogLine {
 	return []LiveLogLine{
 		{Level: "INFO", Text: "[14:32:10] INFO - API-Gateway: Incoming GET /users (status: 200)"},
@@ -196,6 +202,8 @@ func MockLiveLogLines() []LiveLogLine {
 		{Level: "INFO", Text: "[14:32:12] INFO - ShopEase-Web: Served /products in 88ms"},
 		{Level: "DEBUG", Text: "[14:32:14] DEBUG - Worker #2: Cache hit for key 'prod:list'"},
 		{Level: "INFO", Text: "[14:32:15] INFO - API-Gateway: Healthcheck OK (12ms)"},
+		{Level: "INFO", Text: "[14:32:16] INFO - cockpit: telemetry.Sink = Disabled (no --debug-trace flag)"},
+		{Level: "DEBUG", Text: "[14:32:17] DEBUG - ssh.pool: MaxPerHost=3, ExecMetrics{acquires=0, busy=0, retries=0}"},
 		{Level: "ERROR", Text: "[14:32:18] ERROR - Payment-UI: 502 backend timeout", Redacted: true},
 	}
 }
