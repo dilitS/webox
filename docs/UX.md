@@ -164,26 +164,45 @@ Spinner Webox to nie tylko statyczny zestaw klatek. Jego prędkość (Tick Durat
 
 ### 3.4 Wizualny Graf Topologii Usług (Live Service Topology Map)
 
-> 🔵 **MVP (v0.1)** — eskalowane z STRETCH przez [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md). Dostarczane w Sprincie 11 jako kafelek Bento Ultra (`120×35` i większy). Dla terminali `<120×35` (Standard Cockpit fallback) topology pozostaje tabelaryczną listą połączeń w `Overview` zakładki projektu.
+> 🔵 **MVP (v0.1) — dostarczone w Sprincie 11.** Kafelek `🌐 [Live Service Topology]` renderuje się w Ultra (`120×35`) **i** Ultra+ (`160×45`) — eskalowane z Ultra+-only po code review reference cockpit image. Dla terminali `<120×35` (Standard Cockpit fallback) topology degraduje się do tabelarycznej listy `Connections:` wewnątrz kafelka `Overview` (zaplanowane na Sprint 12 TASK-12.1).
 
-W kafelku Bento dedykowanym dla topologii (dostępnym w trybie Bento Grid przy szerokości `≥ 120` znaków) Webox renderuje w czasie rzeczywistym schemat przepływu danych i relacji między elementami systemu. Pozwala to na natychmiastową diagnozę wąskich gardeł lub uszkodzonych węzłów.
+Renderer to czysta funkcja w `tui/components/asciigraph/asciigraph.go`. Producer (`tui/topology.go::buildTopologySnapshot`) folduje `config.Project` + `ProjectStatus` + `cicdSnapshotEntry` w jeden `asciigraph.Graph`. Pulse jest sterowany przez `m.nowFn().Second()%2`, więc edge'y BUILDING/OFFLINE migoczą na tick refresh dashboardu bez dodatkowego timera (i bez ryzyka leak goroutine).
 
 ```text
-┌── Live Infrastructure Topology ────────────────────────────────────────────────────────────────────────┐
-│                                                                                                          │
-│  [ GitHub Repo ] ───(GHA Deploy)───▶ [ Production Server ]                                               │
-│                                              │                                                           │
-│                                              ├─▶ [ sui.biuromody... ] ───(Proxy)───▶ [ Local Port: 3000 ]  │
-│                                              │                                                           │
-│                                              └─▶ [ MySQL Tunnel ] ─────────────────▶ [ biuromody_sui ]     │
-│                                                                                                          │
-└──────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 🌐 [Live Service Topology]                                                            ┃
+┃ ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓                                        ┃
+┃ ┃ 📦 dilitS-demo/shopease-web  ●             ┃                                        ┃
+┃ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛                                        ┃
+┃         │ GHA Deploy                                                                  ┃
+┃         ▼ ✓                                                                           ┃
+┃ ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓                                        ┃
+┃ ┃ 🖥 us-east-1  ●                             ┃                                       ┃
+┃ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛                                        ┃
+┃         │ Proxy → node-express                                                        ┃
+┃         ▼ ✓                                                                           ┃
+┃ ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓                                        ┃
+┃ ┃ 🌐 ShopEase-Web  ●                         ┃                                        ┃
+┃ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛                                        ┃
+┃ ↻ live · All systems nominal                                                          ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 ```
 
 #### Zasady Dynamiki Wizualnej Grafu:
-* **Status ONLINE (Węzły sprawne):** Połączenia oraz ramki węzłów są rysowane cienką linią w kolorze `Primary`, a statusy posiadają mały, zielony glif `󰄬` lub `✓`.
-* **Status BUILDING / DEPLOYING (W trakcie pracy):** Strzałka `───(GHA Deploy)───▶` zmienia się w animowaną linię przerywaną `═ ═ ═ ▶` z fioletowym pulsowaniem ramki.
-* **Status ERROR / OFFLINE (Błąd krytyczny):** Ścieżka łącząca uszkodzony węzeł (np. brak połączenia z bazą) zmienia styl na grubą linię pulsującą na czerwono `⚡ ⚡ ⚡` z migającym badge `✗ DISCONNECTED`.
+
+| Stan edge'a | Konektor | Strzałka | Glyph wertykalny | Kolor | Sygnał źródłowy |
+|---|---|---|---|---|---|
+| **ONLINE** | `──────────` | `✓` | `│` | Success (#04B575) | HTTP 2xx + SSL ≥ 14 dni + last CI success |
+| **BUILDING** | `╌╌ ╌╌ ╌╌ ╌` ↔ ` ╌╌ ╌╌ ╌╌ ` (pulse) | `▶` | `╎` | Warning (#FFB800) | CI run `in_progress` / `queued` / `pending` |
+| **DEGRADED** | `━━━━━━━━━━` | `⚠` | `│` | Degraded (#D846EF) | SSL < 14 dni, HTTP 4xx, lub CI `cancelled`/`skipped` |
+| **OFFLINE** | `⚡   ⚡   ⚡` ↔ `⚡ ⚡ ⚡ ⚡ ⚡` (pulse) | `✗` | `║` | Error (#FF4444) | HTTP 5xx, timeout, lub `ProjectOffline` |
+| **UNKNOWN** | `··········` | `?` | `│` | Muted (#4E5A85) | brak danych (pierwsza klatka, przed pierwszym probe) |
+
+Node states używają tych samych kolorów + okrągłych markerów: `●` (online), `◐` (building), `◑` (degraded), `○` (offline), `·` (unknown).
+
+#### Hard-coded layout (v0.1)
+
+Renderer **nie jest** generic DAG layout engine — to świadoma decyzja. Hard-coded 3-level tree (`Repo → Server → {Subdomain, [DB]}`) wystarcza dla typowego solo projektu small.pl/Devil. Generic DAG layout zostaje odroczony do v0.3+ przez ADR-0010 (do utworzenia w Sprincie 13). Project z 4+ services (np. cache layer) fallbackuje do tabelarycznej `Connections:` listy.
 
 ---
 

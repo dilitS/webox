@@ -1,26 +1,26 @@
  Webox Cockpit v0.1 ⣾                                                                               
-╭────────────────────────────────────╮  ╭──────────────────────────────────────────────────────────╮
-│ Projects                           │  │ Overview                                                 │
-│                                    │  │                                                          │
-│ > sui.demo.smallhost.pl    ONLINE  │  │ sui.demo.smallhost.pl                                    │
-│ v24.15.0                           │  │                                                          │
-│   legacy.demo.smallhost.pl  STALE  │  │  ONLINE                                                  │
-│ v20.12.2                           │  │                                                          │
-│                                    │  │ HTTP Health:   200 OK                                    │
-│                                    │  │ SSL:           27 days remaining                         │
-│                                    │  │ Node:          v24.15.0                                  │
-│                                    │  │ Repo:          dilitS/sui                                │
-│                                    │  │ Last Deploy:   2h ago                                    │
-│                                    │  │                                                          │
-│                                    │  │ [r] Restart  [s] SSL Renew  [v] Tail Logs                │
-│                                    │  ╰──────────────────────────────────────────────────────────╯
-│                                    │                                                              
-│                                    │                                                              
-│                                    │                                                              
-│                                    │                                                              
-│                                    │                                                              
-│                                    │                                                              
-│                                    │                                                              
-│                                    │                                                              
-╰────────────────────────────────────╯                                                              
+╔════════════════════════════════════╗  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+║ Projects                           ║  ┃ Overview                                                 ┃
+║                                    ║  ┃                                                          ┃
+║ > sui.demo.smallhost.pl    ONLINE  ║  ┃ sui.demo.smallhost.pl                                    ┃
+║ v24.15.0                           ║  ┃                                                          ┃
+║   legacy.demo.smallhost.pl  STALE  ║  ┃  ONLINE                                                  ┃
+║ v20.12.2                           ║  ┃                                                          ┃
+║                                    ║  ┃ HTTP Health:   200 OK                                    ┃
+║                                    ║  ┃ SSL:           27 days remaining                         ┃
+║                                    ║  ┃ Node:          v24.15.0                                  ┃
+║                                    ║  ┃ Repo:          dilitS/sui                                ┃
+║                                    ║  ┃ Last Deploy:   2h ago                                    ┃
+║                                    ║  ┃                                                          ┃
+║                                    ║  ┃ [r] Restart  [s] SSL Renew  [v] Tail Logs                ┃
+║                                    ║  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+║                                    ║                                                              
+║                                    ║                                                              
+║                                    ║                                                              
+║                                    ║                                                              
+║                                    ║                                                              
+║                                    ║                                                              
+║                                    ║                                                              
+║                                    ║                                                              
+╚════════════════════════════════════╝                                                              
 q:quit  up/down:navigate  right/tab:detail  n:new  i:import  ?:help                                 

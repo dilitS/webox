@@ -171,11 +171,25 @@ type teaRunner interface {
 }
 
 // realTeaProgram wraps the standard `*tea.Program` so tests can hand
-// runTUI a stub instead. The wrapper is one line on purpose: every
-// other function-shape adapter in main has the same shape and the
-// repetition keeps the seam grep-able.
+// runTUI a stub instead.
+//
+// As of the 2026-05-24 UX refresh we run inside Bubble Tea's alternate
+// screen buffer ([tea.WithAltScreen]). The cockpit is a full-screen
+// app (like vim, htop, lazygit): screen swaps replace the active frame
+// instead of scrolling the host terminal's history. The buffer is
+// released on quit so the operator returns to a clean prompt.
+//
+// [tea.WithMouseCellMotion] enables fine-grained mouse routing so
+// future surfaces (CI/CD step click-through, log scroll) can opt in
+// without bumping the program options. Mouse handlers stay opt-in per
+// surface; no global behaviour change today.
 func realTeaProgram(model tea.Model, stdout io.Writer) teaRunner {
-	return tea.NewProgram(model, tea.WithOutput(stdout))
+	return tea.NewProgram(
+		model,
+		tea.WithOutput(stdout),
+		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(),
+	)
 }
 
 func runTUI(stdout, stderr io.Writer) int {

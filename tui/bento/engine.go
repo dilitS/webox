@@ -187,9 +187,15 @@ func (e *Engine) renderUltraGrid(width, _ int, mode Mode) string {
 	}
 	sections = append(sections, mainRow, logsRow)
 
-	if topology := bySlot[SlotTopology]; topology != nil && mode == ModeUltraPlus {
-		sections = append(sections, topology.Render(mode, false))
-	} else if mode == ModeUltraPlus {
+	// 2026-05-24 UX refresh: topology tile renders in both Ultra
+	// (`120×35`) and Ultra+ (`160×45`). The MVP scope (Sprint 11)
+	// makes the topology a first-class cockpit panel rather than an
+	// Ultra+-only deep-dive strip. Ultra+ keeps a thin extras strip
+	// below the topology for future "service timeline" widgets.
+	if topology := bySlot[SlotTopology]; topology != nil {
+		sections = append(sections, renderTileWithWidth(topology, mode, width-tileBorderOverhead))
+	}
+	if mode == ModeUltraPlus {
 		sections = append(sections, renderDeepDiveStrip(width))
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)

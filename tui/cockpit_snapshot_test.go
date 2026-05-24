@@ -51,7 +51,7 @@ func TestCockpitSnapshots(t *testing.T) {
 			name:    "bento-ultraplus-160x45",
 			width:   160,
 			height:  45,
-			needles: []string{"WEBOX", "[Topology]"},
+			needles: []string{"WEBOX", "Live Service Topology"},
 		},
 		{
 			name:    "tiny-fallback-60x18",
