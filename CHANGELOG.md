@@ -16,6 +16,11 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- **Sprint 13 — Per-frame benchmark + CI perf gate (2026-05-24).**
+  - `tui/bento/engine_bench_test.go` — `BenchmarkRenderMode/{standard-100x30,ultra-120x35,ultraplus-160x45}` measures the cockpit's per-frame composition cost (`ns/op` + `B/op`) using a representative 5-tile stub (Projects + Server + Topology + CI/CD + Logs). Current baseline on Apple M4: 138 / 183 / 192 µs/op respectively — comfortably inside the 60 fps budget (~16 ms).
+  - `Makefile` — new `make bench` target runs the suite verbatim; new `make bench-check` parses the output and fails when any single `ns/op` exceeds `BENCH_MAX_NS` (default 5 000 000 ns / 5 ms — 26× headroom over current baseline). A new `make ci-full` target chains `make ci` + `make bench-check` for release-candidate hardening.
+  - Rationale: lipgloss is a string builder where subtle changes (extra `Padding` call, alternate border style) can grow allocations 5–10×; without a CI gate we would only learn about regressions when an operator notices terminal lag.
+
 - **Sprint 13 — E2E test layer (`internal/e2e/`) (2026-05-24).**
   - `internal/e2e/doc.go` documents the package boundary: per-surface unit tests stay in `tui/views/`, per-message Update tests in `tui/`, single-frame snapshots in `tui/cockpit_snapshot_test.go`, **multi-tick keyboard flows** here.
   - `internal/e2e/cockpit_test.go` — 5 deterministic scenarios driven by `teatest`:

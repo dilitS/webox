@@ -261,11 +261,49 @@ changelog: ## Append entry to CHANGELOG.md Unreleased. Required: KIND=added|fixe
 	@test -n "$(KIND)" -a -n "$(MSG)" || { echo "usage: make changelog KIND=added MSG=\"...\""; exit 1; }
 	@scripts/changelog-add.sh "$(KIND)" "$(MSG)"
 
+# ── Performance budget ─────────────────────────────────────────────────
+
+# BENCH_PKG — package to benchmark. Default covers the cockpit's hot
+# path (`tui/bento`); override (e.g. `BENCH_PKG=./status`) for
+# focused regression hunts.
+BENCH_PKG ?= ./tui/bento
+# BENCH_MAX_NS — hard ceiling for any single `ns/op` in the bench
+# output. The cockpit's 60 fps comfort zone is ~16 ms (16 000 000 ns);
+# we keep the gate at 5 000 000 ns (5 ms) so we catch creep long
+# before the operator feels it.
+BENCH_MAX_NS ?= 5000000
+
+.PHONY: bench
+bench: ## Run TUI benchmarks (BENCH_PKG, default ./tui/bento).
+	$(GO) test -bench=. -benchmem -run=^$$ -benchtime=1s $(BENCH_PKG)
+
+.PHONY: bench-check
+bench-check: ## Fail if any bench's ns/op exceeds BENCH_MAX_NS (default 5ms).
+	@out=$$($(GO) test -bench=. -benchmem -run=^$$ -benchtime=1s $(BENCH_PKG)); \
+	printf "%s\n" "$$out"; \
+	max=0; \
+	while IFS= read -r line; do \
+		if [[ "$$line" == Benchmark* ]]; then \
+			ns=$$(printf "%s" "$$line" | awk '{print $$3}'); \
+			[[ "$$ns" =~ ^[0-9]+$$ ]] || continue; \
+			if (( ns > max )); then max=$$ns; fi; \
+		fi; \
+	done <<< "$$out"; \
+	if (( max > $(BENCH_MAX_NS) )); then \
+		printf "$(COLOR_RED)✗ perf regression: %d ns/op > budget %d ns/op$(COLOR_RESET)\n" "$$max" "$(BENCH_MAX_NS)"; \
+		exit 1; \
+	fi; \
+	printf "$(COLOR_GREEN)✓ perf budget OK (worst %d ns/op ≤ %d)$(COLOR_RESET)\n" "$$max" "$(BENCH_MAX_NS)"
+
 # ── CI bundle ──────────────────────────────────────────────────────────
 
 .PHONY: ci
 ci: tidy lint vet vulncheck test cover-check build ## Run the exact CI bundle locally.
 	@printf "$(COLOR_GREEN)✓ CI bundle passed.$(COLOR_RESET)\n"
+
+.PHONY: ci-full
+ci-full: ci bench-check ## CI bundle + performance budget gate (slower).
+	@printf "$(COLOR_GREEN)✓ ci-full passed.$(COLOR_RESET)\n"
 
 .PHONY: ci-fast
 ci-fast: lint vet test-short ## Lightweight CI subset for local pre-push.
