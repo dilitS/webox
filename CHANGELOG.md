@@ -15,6 +15,15 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ## [Unreleased]
 
+### Added
+- **Sprint 14 — `ssh.ExecWithRetry` + `ExecMetrics` (TASK-14.3, 2026-05-25).** `ssh/retry.go` adds a thin retry layer on top of `ssh.Exec` that distinguishes "pool exhausted, back off and try again" from "terminal error, surface it now". Behaviour highlights:
+  - Retries **only** on `ssh.ErrPoolBusy`; terminal sentinels (`ErrHostKeyMismatch`, `ErrHostKeyUnknown`, command exit codes, auth failures) bypass the loop so the host-key modal / wizard parser see the original error in one tick.
+  - Backoff is exponential (`BaseBackoff << attempt`) clamped at `MaxBackoff`, with ±20 % jitter to prevent the thundering-herd pattern when the cockpit's periodic status refresh wakes every project goroutine simultaneously.
+  - Defaults (`DefaultRetryableExecPolicy`): 4 attempts, 100 ms base, 1 s cap → ~2.3 s worst-case wall clock, comfortably inside the 5 s SWR freshness budget (DESIGN §8).
+  - `ExecMetrics` exposes atomic counters (`Acquires`, `PoolBusyHits`, `Retries`, `TerminalErrors`) and a JSON-stable `ExecMetricsSnapshot` — the data feed for the upcoming `--debug-trace` JSONL stream (TASK-14.6).
+  - Idempotency contract documented in the godoc + sprint plan: only read-only / safely-replayable commands MAY use `ExecWithRetry`. State-mutating ops keep using bare `Exec` so the provider parser can inspect the remote side before deciding whether to replay (DESIGN §9).
+  - Tests: jitter bounds (`-20%/0/+20%`), exponential clamp at `MaxBackoff`, busy → retry → success path, terminal-error bypass, budget exhaustion, context cancellation, nil-safe `Snapshot()`. Per AGENTS.md §7.1 the tests that swap the `execFunc` package seam run sequentially (no `t.Parallel()`).
+
 ### Security
 - **Sprint 14 — Host-key mismatch / unknown-key modal (TASK-14.4, 2026-05-25).** When any SSH operation surfaces `ssh.ErrHostKeyMismatch` or `ssh.ErrHostKeyUnknown`, the cockpit now opens a strict-block modal (`tui/host_key_modal.go`) instead of swallowing the failure into a dismissible alert toast. The modal:
   - **Never** renders the offered key, its fingerprint, SHA-256, MD5, or any cryptographic material — that policy is locked behind `TestRenderHostKeyModal_NeverLeaksKeyMaterial`, which asserts the absence of `AAAAB3`, `ssh-ed25519`, `ssh-rsa`, `ecdsa-sha2`, `SHA256:`, `MD5:` substrings.
