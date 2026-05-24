@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/dilitS/webox/internal/telemetry"
 	"github.com/dilitS/webox/internal/version"
 	ghsvc "github.com/dilitS/webox/services/github"
 	"github.com/dilitS/webox/tui"
@@ -33,11 +35,17 @@ Usage:
   webox --help                print this help and exit
 
 Flags:
-  --debug          enable verbose diagnostic logging
-  --mock           boot the cockpit with deterministic mock data;
-                   no SSH, no HTTP probes, no GitHub calls. Useful
-                   for demos, screenshots, and offline UI iteration.
-                   Equivalent to WEBOX_MOCK=1.
+  --debug              enable verbose diagnostic logging
+  --mock               boot the cockpit with deterministic mock data;
+                       no SSH, no HTTP probes, no GitHub calls. Useful
+                       for demos, screenshots, and offline UI iteration.
+                       Equivalent to WEBOX_MOCK=1.
+  --debug-trace=PATH   record local-only JSONL trace events (state
+                       transitions, SSH metrics, error categories) to
+                       PATH. Strictly local; no network. The file is
+                       created with mode 0600 and every line is passed
+                       through the redactor before write — see
+                       docs/SECURITY.md §6 for the policy.
 
 Documentation:
   https://github.com/dilitS/webox/tree/main/docs
@@ -55,6 +63,12 @@ type opts struct {
 	doctor       bool
 	doctorJSON   bool
 	doctorTarget string // "" | "github"
+	// debugTracePath, when non-empty, instructs the launcher to open
+	// a [telemetry.FileSink] at the given path and route cockpit /
+	// SSH / doctor events into it. Empty value keeps the default
+	// [telemetry.Disabled] no-op sink so production runs never touch
+	// disk (TASK-14.6).
+	debugTracePath string
 }
 
 // doctorDispatcher is the seam that lets tests run the CLI router
@@ -119,10 +133,78 @@ func runWithFullDeps(
 	// with the diagnostics wiring.
 	_ = parsed.debug
 
+	sink, sinkCleanup := openTraceSink(parsed.debugTracePath, stderr)
+	defer sinkCleanup()
+
 	if parsed.mock || mockEnvActive() {
-		return runMockTUI(stdout, stderr)
+		return runMockTUIWithTrace(stdout, stderr, sink)
 	}
-	return startTUI(stdout, stderr)
+	return runTUIWithTrace(stdout, stderr, sink, startTUI)
+}
+
+// runTUIWithTrace is a thin shim that keeps the legacy
+// `tuiDispatcher` signature alive (used by tests) while still
+// threading the trace sink into the production launcher. For the
+// default `tuiDispatcher == runTUI`, the shim calls `runTUIWith`
+// directly so the sink reaches `tui.Options.Trace`. For test
+// dispatchers (which already inject everything they need via
+// closure capture), the shim invokes the dispatcher unchanged.
+func runTUIWithTrace(stdout, stderr io.Writer, sink telemetry.Sink, dispatch tuiDispatcher) int {
+	if !sink.Enabled() {
+		return dispatch(stdout, stderr)
+	}
+	// Production fast path: when the trace sink is live we bypass
+	// the legacy dispatcher seam and go straight to runTUIWith so
+	// the sink reaches the cockpit. Tests stub `dispatch` to a
+	// no-op so this branch is never exercised by them.
+	client := ghsvc.NewClient(ghsvc.Options{})
+	return runTUIWithDeps(
+		stdout, stderr, sink,
+		tui.DefaultConfigPath,
+		realTeaProgram,
+		lastDeployFetcherFor(client),
+		pipelineFetcherFor(client),
+		logsFetcherFor(client),
+	)
+}
+
+// runMockTUIWithTrace mirrors runMockTUI but injects a trace sink
+// into the mock cockpit. Used when an operator runs
+// `webox --mock --debug-trace=PATH` to debug renderer transitions
+// without touching real servers.
+func runMockTUIWithTrace(stdout, stderr io.Writer, sink telemetry.Sink) int {
+	fmt.Fprintln(stderr, "webox: starting in MOCK mode — no servers are contacted")
+	opts := tui.MockOptions("")
+	opts.Trace = sink
+	program := realTeaProgram(tui.New(opts), stdout)
+	if _, err := program.Run(); err != nil {
+		fmt.Fprintf(stderr, "webox: TUI failed: %v\n", err)
+		return exitMisuse
+	}
+	return exitOK
+}
+
+// openTraceSink resolves the `--debug-trace=PATH` flag into either a
+// [telemetry.FileSink] or the canonical [telemetry.Disabled] no-op
+// sink. The function NEVER returns an error to the caller — trace
+// is a debugging convenience, not a critical path, so a failed open
+// only emits a one-line warning on stderr and degrades to the no-op
+// sink. The returned cleanup closes the file (if any) and is safe
+// to defer regardless of which sink was selected.
+func openTraceSink(path string, stderr io.Writer) (telemetry.Sink, func()) {
+	if path == "" {
+		return telemetry.Disabled, func() {}
+	}
+	sink, err := telemetry.OpenFileSink(path, telemetry.FileSinkPolicy{})
+	if err != nil {
+		fmt.Fprintf(stderr, "webox: --debug-trace disabled: %v\n", err)
+		return telemetry.Disabled, func() {}
+	}
+	fmt.Fprintf(stderr, "webox: --debug-trace writing to %s (local only, 0600)\n", path)
+	if closer, ok := sink.(io.Closer); ok {
+		return sink, func() { _ = closer.Close() }
+	}
+	return sink, func() {}
 }
 
 // mockEnv is the environment variable the launcher honours as an
@@ -214,6 +296,28 @@ func runTUIWith(
 	pipeline tui.GitHubPipelineFetcher,
 	logs tui.GitHubLogsFetcher,
 ) int {
+	return runTUIWithDeps(
+		stdout, stderr, telemetry.Disabled,
+		resolveConfig, makeProgram, fetcher, pipeline, logs,
+	)
+}
+
+// runTUIWithDeps is the trace-aware TUI launcher used by both the
+// production fast path (when `--debug-trace=PATH` is set) and the
+// legacy `runTUIWith` shim (which passes [telemetry.Disabled]). The
+// extra parameter avoids changing the signature of `runTUIWith`
+// (still used by existing test helpers) while keeping the new wire
+// in a single place.
+func runTUIWithDeps(
+	stdout,
+	stderr io.Writer,
+	sink telemetry.Sink,
+	resolveConfig configPathResolver,
+	makeProgram teaProgramFactory,
+	fetcher tui.GitHubLastDeployFetcher,
+	pipeline tui.GitHubPipelineFetcher,
+	logs tui.GitHubLogsFetcher,
+) int {
 	cfgPath, err := resolveConfig()
 	if err != nil {
 		fmt.Fprintf(stderr, "webox: resolve config path: %v\n", err)
@@ -225,6 +329,7 @@ func runTUIWith(
 			GitHubLastDeploy: fetcher,
 			GitHubPipeline:   pipeline,
 			GitHubLogs:       logs,
+			Trace:            sink,
 		}),
 		stdout,
 	)
@@ -298,6 +403,13 @@ func parseArgs(args []string) (parsed opts, errMsg string) {
 		case "--json":
 			parsed.doctorJSON = true
 		default:
+			if path, ok := strings.CutPrefix(arg, "--debug-trace="); ok {
+				if path == "" {
+					return opts{}, "webox: --debug-trace requires a non-empty PATH (e.g. --debug-trace=/tmp/webox.jsonl)"
+				}
+				parsed.debugTracePath = path
+				continue
+			}
 			return opts{}, fmt.Sprintf(
 				"webox: unknown argument %q. Run `webox --help` for usage.",
 				arg,
