@@ -170,7 +170,13 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cancel()
 			return m, tea.Quit
 		case "esc", "enter":
-			m.dismissHostKeyModal()
+			// Inline mutation rather than calling a pointer-
+			// receiver helper: Bubble Tea's MVU contract returns
+			// a value copy; we want the dismissal visible in
+			// the returned Model regardless of how Go handles
+			// the implicit address-of in the method call. Keeps
+			// the data-flow obvious to readers.
+			m.hostKeyModal = hostKeyModalForm{}
 			return m, nil
 		default:
 			return m, nil
