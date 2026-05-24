@@ -83,3 +83,4 @@ go.work.sum
 *.cosign.bundle
 *.cosign.pem
 *.sig
+/landing

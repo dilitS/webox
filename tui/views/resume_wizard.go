@@ -15,7 +15,7 @@ func RenderResumeWizard(s Screen) string {
 	width := clamp(s.Width, resumeWizardMinWidth, resumeWizardMaxWidth)
 	form := s.ResumeForm
 	rows := []string{
-		"Resume Wizard",
+		"♻ [Resume Wizard]",
 		"",
 		"Webox found pending cleanup work from an interrupted wizard run.",
 		"",

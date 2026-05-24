@@ -21,6 +21,8 @@ const (
 	// the longest demo project name (`Dashboard-Admin`) always fits
 	// inside the rounded border with room for the selection pill.
 	ultraProjectsMinWidth = 28
+	ultraLeftMinWidth     = 40
+	ultraRightMinWidth    = 46
 )
 
 // Engine renders a slice of [BentoTile] into a single multi-line string.
@@ -125,80 +127,266 @@ func (e *Engine) renderStandardFallback(width int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, append([]string{header}, rendered...)...)
 }
 
-// renderUltraGrid composes the cockpit using the 2026-05-24 design
-// refresh layout:
+// renderUltraGrid composes the cockpit using the Sprint 13 responsive
+// layout:
 //
 //	┌────────── status bar (full width) ───────────┐
 //	│                                              │
 //	│ ┌──────────┐ ┌──────────────────────────┐    │
 //	│ │ Projects │ │      Server tile         │    │
-//	│ │  (full   │ ├──────────────────────────┤    │
-//	│ │ height)  │ │      CI/CD tile          │    │
+//	│ ├──────────┤ ├──────────────────────────┤    │
+//	│ │ Topology │ │      CI/CD tile          │    │
 //	│ └──────────┘ └──────────────────────────┘    │
 //	│ ┌──────────────────────────────────────┐     │
 //	│ │           Live Server Logs           │     │
 //	│ └──────────────────────────────────────┘     │
 //	└──────────────────────────────────────────────┘
 //
+// The grid is height-aware as of Sprint 13: when the engine knows the
+// viewport's height it carves out budgets for each row (status bar →
+// top row → second row → logs row → optional UltraPlus strip) and
+// asks tiles that exceed their budget to surface a scroll indicator
+// instead of pushing every other tile down or padding short siblings
+// with empty whitespace. This is what makes the right-hand column
+// responsive: the previous "equalize-to-max" strategy left dead space
+// under short CI/CD pipelines whenever the topology graph was taller.
+//
 // UltraPlus appends a deep-dive strip below the logs for the optional
 // `≥160×45` tier.
-func (e *Engine) renderUltraGrid(width, _ int, mode Mode) string {
+func (e *Engine) renderUltraGrid(width, height int, mode Mode) string {
 	if width <= 0 {
 		width = ultraMinWidth
 	}
 
 	bySlot := indexTilesBySlot(e.tiles)
 
-	// Column proportions follow the reference cockpit at 1024 px:
-	// Projects column ≈ 36%, Server/CICD stack ≈ 64%. Each tile then
-	// inherits the column width (minus the 2-char rounded border) via
-	// the optional `WithWidth` capability so the right column visibly
-	// dominates the cockpit, matching the design brief.
 	const (
-		projectsRatioNumerator   = 36
-		projectsRatioDenominator = 100
 		tileBorderOverhead       = 2
+		ratioDenominator         = 100
+		compactLeftRatio         = 46
+		mediumLeftRatio          = 42
+		wideLeftRatio            = 38
+		mediumViewportBreakpoint = 136
+		wideViewportBreakpoint   = 160
 	)
-	projectsCol := (width * projectsRatioNumerator) / projectsRatioDenominator
-	if projectsCol < ultraProjectsMinWidth {
-		projectsCol = ultraProjectsMinWidth
+	leftRatio := compactLeftRatio
+	switch {
+	case width >= wideViewportBreakpoint:
+		leftRatio = wideLeftRatio
+	case width >= mediumViewportBreakpoint:
+		leftRatio = mediumLeftRatio
 	}
-	rightCol := width - projectsCol
-	if rightCol < ultraProjectsMinWidth {
-		rightCol = ultraProjectsMinWidth
+	leftCol := (width * leftRatio) / ratioDenominator
+	if leftCol < ultraLeftMinWidth {
+		leftCol = ultraLeftMinWidth
 	}
+	maxLeft := width - ultraRightMinWidth
+	if leftCol > maxLeft {
+		leftCol = maxLeft
+	}
+	rightCol := width - leftCol
 
-	projects := renderTileWithWidth(bySlot[SlotProjects], mode, projectsCol-tileBorderOverhead)
+	budget := planRowBudgets(height, mode)
+
+	projects := renderTileWithWidth(bySlot[SlotProjects], mode, leftCol-tileBorderOverhead)
 	overview := renderTileWithWidth(bySlot[SlotOverview], mode, rightCol-tileBorderOverhead)
+	projects = clipTileBlock(projects, budget.TopRow)
+	overview = clipTileBlock(overview, budget.TopRow)
+	projects, overview = equalizeBlockHeights(projects, overview)
+	topRow := lipgloss.JoinHorizontal(lipgloss.Top, projects, overview)
+
+	topology := renderTileWithWidth(bySlot[SlotTopology], mode, leftCol-tileBorderOverhead)
 	cicd := renderTileWithWidth(bySlot[SlotCICD], mode, rightCol-tileBorderOverhead)
+	topology = clipTileBlock(topology, budget.SecondRow)
+	cicd = clipTileBlock(cicd, budget.SecondRow)
+	topology, cicd = equalizeBlockHeights(topology, cicd)
+	secondRow := lipgloss.JoinHorizontal(lipgloss.Top, topology, cicd)
 
-	rightStack := lipgloss.JoinVertical(lipgloss.Left, overview, cicd)
-	mainRow := lipgloss.JoinHorizontal(lipgloss.Top, projects, rightStack)
 	logsRow := renderTileWithWidth(bySlot[SlotLogs], mode, width-tileBorderOverhead)
+	logsRow = clipTileBlock(logsRow, budget.Logs)
 
-	// Capacity: status bar + main row + logs row + optional topology
-	// row (Ultra+ only).
-	const maxSections = 4
+	// Capacity: status bar + top row + second row + logs row + optional
+	// deep-dive strip.
+	const maxSections = 5
 	sections := make([]string, 0, maxSections)
 	if e.statusBar != "" {
 		sections = append(sections, e.statusBar)
 	} else {
 		sections = append(sections, renderHeader(e.title, mode, width))
 	}
-	sections = append(sections, mainRow, logsRow)
-
-	// 2026-05-24 UX refresh: topology tile renders in both Ultra
-	// (`120×35`) and Ultra+ (`160×45`). The MVP scope (Sprint 11)
-	// makes the topology a first-class cockpit panel rather than an
-	// Ultra+-only deep-dive strip. Ultra+ keeps a thin extras strip
-	// below the topology for future "service timeline" widgets.
-	if topology := bySlot[SlotTopology]; topology != nil {
-		sections = append(sections, renderTileWithWidth(topology, mode, width-tileBorderOverhead))
-	}
+	sections = append(sections, topRow, secondRow, logsRow)
 	if mode == ModeUltraPlus {
 		sections = append(sections, renderDeepDiveStrip(width))
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
+}
+
+// rowBudget captures the per-row max-line allowance the engine hands
+// to clipTileBlock. A zero value means "no clip" so callers without a
+// known viewport height (older tests, fallback paths) preserve the
+// pre-Sprint-13 unbounded behaviour.
+type rowBudget struct {
+	TopRow    int
+	SecondRow int
+	Logs      int
+}
+
+// Height accounting constants kept named so the planner reads top-down.
+const (
+	bentoStatusBarLines = 1
+	// bentoLogsTargetUltra is the preferred number of lines we want
+	// the live-log row to occupy in Ultra (status bar already
+	// subtracted). It must be large enough to show a meaningful
+	// burst of log lines (≥ 6 visible rows + chrome) but small
+	// enough that the 2x2 grid above can still breathe.
+	bentoLogsTargetUltra     = 10
+	bentoLogsTargetUltraPlus = 14
+	bentoLogsMinLines        = 7
+	// bentoMinRowLines is the smallest sensible per-row budget. Tile
+	// chrome itself eats 3 lines (top border + header + bottom
+	// border); going below 6 would leave nothing scrollable.
+	bentoMinRowLines = 6
+	// bentoDeepDiveLines reserves the UltraPlus footer strip so it
+	// is not stolen from the two main grid rows.
+	bentoDeepDiveLines = 2
+	// bentoGridRows reflects the two stacked tile rows in the Ultra
+	// grid (top: Projects+Server, second: Topology+CI/CD). We never
+	// allocate fewer than this many rows, so it doubles as a divisor
+	// when sharing height between them and as a floor on `available`.
+	bentoGridRows = 2
+)
+
+// planRowBudgets divides the available vertical space between the
+// three cockpit rows. When height is unknown (≤ 0) every budget is
+// zero, which clipTileBlock interprets as "no clip" — that matches
+// every pre-Sprint-13 caller path (tests, narrow legacy fallbacks).
+func planRowBudgets(height int, mode Mode) rowBudget {
+	if height <= 0 {
+		return rowBudget{}
+	}
+
+	logs := bentoLogsTargetUltra
+	if mode == ModeUltraPlus {
+		logs = bentoLogsTargetUltraPlus
+	}
+
+	available := height - bentoStatusBarLines - logs
+	if mode == ModeUltraPlus {
+		available -= bentoDeepDiveLines
+	}
+	if available < bentoGridRows*bentoMinRowLines {
+		// Shrink the logs row first — the operator can still tail
+		// via the Live Logs tab if the bottom row collapses.
+		logs = height - bentoStatusBarLines - bentoGridRows*bentoMinRowLines
+		if mode == ModeUltraPlus {
+			logs -= bentoDeepDiveLines
+		}
+		if logs < bentoLogsMinLines {
+			logs = bentoLogsMinLines
+		}
+		available = bentoGridRows * bentoMinRowLines
+	}
+
+	perRow := available / bentoGridRows
+	if perRow < bentoMinRowLines {
+		perRow = bentoMinRowLines
+	}
+
+	return rowBudget{
+		TopRow:    perRow,
+		SecondRow: perRow,
+		Logs:      logs,
+	}
+}
+
+// clipTileBlock trims a rendered tile to maxLines while preserving its
+// top/bottom borders and the header row. When the tile already fits,
+// the function is a no-op. When clipping happens, the penultimate body
+// line is replaced with a discreet `… +N more lines` indicator so the
+// operator knows the content is truncated — and where to use the
+// per-tile scroll affordance (currently the Live Logs tab for tail
+// data; topology scroll keys land in Sprint 14).
+//
+// The function is intentionally string-level (rather than ANSI-aware):
+// every renderer above ships its own ANSI sequences inside the body
+// lines we keep, and the indicator we inject uses dim TextDim only —
+// no border-side cells, so we do not need to know the tile's accent
+// colour.
+func clipTileBlock(rendered string, maxLines int) string {
+	if maxLines <= 0 {
+		return rendered
+	}
+	lines := strings.Split(rendered, "\n")
+	if len(lines) <= maxLines {
+		return rendered
+	}
+	const (
+		minBorderedFrame = 4 // top border + header + indicator + bottom border
+		bordersAndHeader = 3 // top border + header + bottom border
+	)
+	if maxLines < minBorderedFrame {
+		// Degenerate viewport — clip naïvely; we cannot keep the
+		// frame intact while showing any meaningful body.
+		return strings.Join(lines[:maxLines], "\n")
+	}
+	visibleBody := maxLines - bordersAndHeader
+	tokens := theme.Default()
+	// `borderRows` excludes the top + bottom border from the source
+	// frame so the hidden-line count reflects only body rows.
+	const borderRows = 2
+	hiddenBody := len(lines) - borderRows - visibleBody
+	// Use the bottom border line as the geometric template so the
+	// indicator line keeps the tile's exact pixel width — `┃` on
+	// both sides plus inner padding. Without this fallback, the
+	// indicator rendered as a bare string with no side borders and
+	// the cockpit frame visibly broke (the next column's left
+	// border would appear adjacent to the indicator text).
+	tileWidth := lipgloss.Width(lines[0])
+	indicator := framedIndicatorLine(
+		tileWidth,
+		"… +"+intString(hiddenBody)+" more lines · scroll inside tab/modal",
+		tokens,
+	)
+
+	out := make([]string, 0, maxLines)
+	out = append(out, lines[0])
+	out = append(out, lines[1:1+visibleBody]...)
+	out = append(out, indicator, lines[len(lines)-1])
+	return strings.Join(out, "\n")
+}
+
+// framedIndicatorLine returns a single line that mimics the tile's
+// `┃ … ┃` body row: thick border glyphs on both sides, accent-coloured,
+// with a dim/faint payload in the middle. The function returns the
+// fully-styled string ready to be joined into the output slice.
+func framedIndicatorLine(tileWidth int, payload string, tokens theme.Theme) string {
+	const (
+		sideGlyphs = 2 // left + right `┃`
+		minInner   = 2 // a single padded character on each side
+	)
+	inner := tileWidth - sideGlyphs
+	if inner < minInner {
+		inner = minInner
+	}
+	bodyStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(tokens.TextDim)).
+		Faint(true).
+		Width(inner).
+		Padding(0, 1)
+	borderStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(tokens.Primary))
+	return borderStyle.Render("┃") + bodyStyle.Render(payload) + borderStyle.Render("┃")
+}
+
+func equalizeBlockHeights(left, right string) (leftPadded, rightPadded string) {
+	maxHeight := lipgloss.Height(left)
+	if rightHeight := lipgloss.Height(right); rightHeight > maxHeight {
+		maxHeight = rightHeight
+	}
+	pad := func(block string) string {
+		return lipgloss.NewStyle().Height(maxHeight).Render(block)
+	}
+	return pad(left), pad(right)
 }
 
 // WidthAware is the optional capability tiles can implement to learn

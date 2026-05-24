@@ -94,13 +94,14 @@ type HeaderMetricsSnapshot struct {
 // Model contains all mutable TUI state. It is copied by value by Update,
 // matching Bubble Tea's MVU pattern.
 type Model struct {
-	state         State
-	activeTab     DetailTab
-	width         int
-	height        int
-	selectedIndex int
-	helpVisible   bool
-	alert         string
+	state           State
+	activeTab       DetailTab
+	width           int
+	height          int
+	selectedIndex   int
+	viewportOffsetY int
+	helpVisible     bool
+	alert           string
 
 	cfg      *config.Config
 	statuses map[string]ProjectStatus

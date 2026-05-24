@@ -27,7 +27,7 @@ func RenderImportPreview(s Screen) string {
 	form := s.ImportForm
 
 	rows := []string{
-		"Import Existing Projects",
+		"📥 [Import Existing Projects]",
 		"",
 		"Read-only scan: Webox compares panel-reported subdomains with config.json.",
 		"No server resource is modified by this screen.",

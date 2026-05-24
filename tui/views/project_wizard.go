@@ -36,7 +36,7 @@ func RenderProjectWizard(s Screen) string {
 	hint := s.Styles.Muted.Render("[ Enter ] Next  [ Shift+Tab ] Back  [ Esc ] Cancel")
 	return s.Styles.ActivePanel.
 		Width(width).
-		Render(fmt.Sprintf("New project wizard\n\n%s\n\n%s", body, hint))
+		Render(fmt.Sprintf("🧱 [New Project Wizard]\n\n%s\n\n%s", body, hint))
 }
 
 func renderProjectStep(s Screen, panelWidth int) string {

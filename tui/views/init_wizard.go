@@ -34,7 +34,7 @@ func RenderInitWizard(s Screen) string {
 
 	return s.Styles.ActivePanel.
 		Width(width).
-		Render(fmt.Sprintf("Webox - first run setup\n\n%s", body))
+		Render(fmt.Sprintf("🪄 [Init Wizard]\n\nWebox - first run setup\n\n%s", body))
 }
 
 func renderInitStep(s Screen, panelWidth int) string {

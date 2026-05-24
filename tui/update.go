@@ -24,6 +24,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:gocyclo // To
 		previous := m.BentoMode()
 		m.width = msg.Width
 		m.height = msg.Height
+		const chromeLines = 2
+		body := m.renderRootBody(m.screen())
+		available := m.height - chromeLines
+		if available < 1 {
+			available = 1
+		}
+		m.viewportOffsetY = clampViewportOffset(m.viewportOffsetY, available, len(viewportLines(body)))
 		if next := m.BentoMode(); next != previous {
 			m.spinner.Spinner = components.SpinnerStyle(next.String())
 		}
@@ -108,11 +115,40 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:gocyclo // To
 		return m.applyCICDFetched(msg)
 	case CICDLogsFetchedMsg:
 		return m.applyCICDLogsFetched(msg), nil
+	case tea.MouseMsg:
+		return m.updateMouse(msg)
 	case tea.KeyMsg:
 		return m.updateKey(msg)
 	default:
 		return m, nil
 	}
+}
+
+// mouseWheelStep is how many lines a single wheel tick moves the
+// viewport. We keep it small enough to feel precise on a trackpad
+// and large enough that a flick on a real wheel does not feel slow.
+const mouseWheelStep = 3
+
+// updateMouse handles the scroll-wheel cases that the Sprint-13 chrome
+// contract surfaces inside the body slot. Click / drag events are
+// reserved for future per-tile click-through and currently no-op.
+//
+// Bubble Tea v1.3+ split `MouseMsg.Type` into the orthogonal
+// `MouseAction` (press/release/motion) + `MouseButton`
+// (left/middle/wheel-up/wheel-down/…) pair. We only react to *press*
+// actions on the two scroll-wheel buttons so a long mouse drag does
+// not accidentally fire repeated viewport jumps.
+func (m Model) updateMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if msg.Action != tea.MouseActionPress {
+		return m, nil
+	}
+	switch msg.Button {
+	case tea.MouseButtonWheelUp:
+		m.scrollViewportBy(-mouseWheelStep)
+	case tea.MouseButtonWheelDown:
+		m.scrollViewportBy(mouseWheelStep)
+	}
+	return m, nil
 }
 
 func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -122,8 +158,15 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "?":
 		m.helpVisible = !m.helpVisible
+		m.viewportOffsetY = 0
 		return m, nil
 	}
+
+	if handled := m.handleViewportKey(msg); handled {
+		return m, nil
+	}
+
+	m.viewportOffsetY = 0
 
 	switch m.state {
 	case StateInitWizard:
@@ -141,6 +184,46 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
+}
+
+const viewportPageMargin = 4
+
+func (m *Model) handleViewportKey(msg tea.KeyMsg) bool {
+	switch msg.String() {
+	case "pgup":
+		m.scrollViewportBy(-m.viewportPageStep())
+		return true
+	case "pgdown":
+		m.scrollViewportBy(m.viewportPageStep())
+		return true
+	case "home":
+		m.viewportOffsetY = 0
+		return true
+	case "end":
+		m.viewportOffsetY = m.maxViewportOffset()
+		return true
+	default:
+		return false
+	}
+}
+
+func (m *Model) viewportPageStep() int {
+	step := m.height - viewportPageMargin
+	if step < 1 {
+		return 1
+	}
+	return step
+}
+
+func (m *Model) scrollViewportBy(delta int) {
+	m.viewportOffsetY += delta
+	const chromeLines = 2
+	body := m.renderRootBody(m.screen())
+	available := m.height - chromeLines
+	if available < 1 {
+		available = 1
+	}
+	m.viewportOffsetY = clampViewportOffset(m.viewportOffsetY, available, len(viewportLines(body)))
 }
 
 func (m Model) updateImportPreviewKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

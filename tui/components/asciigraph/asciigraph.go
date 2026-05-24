@@ -298,10 +298,14 @@ func edgeColor(state EdgeState, tokens theme.Theme) string {
 	}
 }
 
-// renderNode paints a single boxed node. The box uses heavy
-// box-drawing characters (┏━┓┗━┛) so the cockpit immediately reads
-// as "infrastructure component" instead of "tile chrome" (which uses
-// the lighter rounded border).
+// renderNode paints a single boxed node. The box uses *normal* light
+// box-drawing characters (┌─┐└─┘). After the 2026-05-24 cockpit
+// polish the visual hierarchy is inverted vs the original Sprint 11
+// design: tile chrome is the heavy frame (┏━┓) and the
+// infrastructure boxes drawn *inside* the tile are the lighter
+// frames. That way the operator's eye lands on the tile boundary
+// first, then on the individual services — and the cockpit reads as
+// a single grid instead of a "boxes inside boxes inside boxes" pile.
 func renderNode(n Node, width int, tokens theme.Theme) string {
 	if width < minBoxWidth {
 		width = minBoxWidth
@@ -328,7 +332,7 @@ func renderNode(n Node, width int, tokens theme.Theme) string {
 		Render(headerLine) + "  " + dot
 
 	box := lipgloss.NewStyle().
-		Border(lipgloss.ThickBorder()).
+		Border(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color(color)).
 		Padding(0, 1).
 		Width(width).
@@ -336,8 +340,15 @@ func renderNode(n Node, width int, tokens theme.Theme) string {
 	return box
 }
 
-// renderEdge paints a vertical connector with a side label. The
-// vertical glyph follows the edge colour so a red `⚡` cascade reads
+// renderEdge paints a compact two-line connector with a side label.
+// The 2026-05-24 polish shrunk the edge from a three-line block
+// (label / vertical filler / arrow) to two lines: the label line
+// shows the vertical glyph + label, the body line shows the arrow.
+// Trimming the filler line saves three rows across both edges and
+// lets the topology tile fit alongside the CI/CD tile without forcing
+// the engine to pad the shorter sibling.
+//
+// The vertical glyph stays coloured so a red `║` cascade still reads
 // unmistakably as "this connection is down" even before the operator
 // reads the label.
 func renderEdge(e Edge, tokens theme.Theme) string {
@@ -364,7 +375,7 @@ func renderEdge(e Edge, tokens theme.Theme) string {
 	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(tokens.TextDim))
 	labelLine := indent + vertical + " " + labelStyle.Render(e.Label)
 	bodyLine := indent + arrowGlyph
-	return labelLine + "\n" + indent + vertical + "\n" + bodyLine
+	return labelLine + "\n" + bodyLine
 }
 
 func truncate(s string, limit int) string {

@@ -56,7 +56,8 @@ func RenderLiveLogs(s Screen) string {
 	)
 
 	body := []string{
-		project.Domain,
+		"📜 [Live Logs: " + project.Domain + "]",
+		"",
 		tabs,
 		"",
 		statusLine,

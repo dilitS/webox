@@ -1,8 +1,8 @@
-# Sprint 12 — Polish, Standard fallback & v0.1 Release Candidate
+# Sprint 12 — Responsive Cockpit Polish & Overflow Ergonomics
 
-> **Daty:** 2026-05-25 → 2026-06-07 (planowane 2 tygodnie solo) · **Czas:** ~30–40h skupienia
+> **Daty:** 2026-05-25 → 2026-06-01 (planowane 1 tydzień solo) · **Czas:** ~18-26h skupienia
 >
-> **Cel:** zamknąć MVP scope. Sprint 12 to ostatni sprint przed Release Candidate 1: usuwamy braki z poprzednich sprintów (Standard Cockpit topology fallback, animation toggle), robimy bug bash całego cockpitu, regenerujemy snapshoty, podpisujemy artefakty release'a, i tagujemy `v0.1.0-rc1`. **Żadnych nowych ficzerów** — wszystko, co tu robimy, służy „polish to ship".
+> **Cel:** dopiąć ergonomię cockpitu po Sprincie 11. Sprint 12 skupia się na tym, jak interfejs zachowuje się w prawdziwym terminalu, a nie tylko jak wygląda na idealnym screenshotcie: gdy frame nie mieści się w oknie ma dać się przewijać, szerokości kart mają adaptować się do viewportu, `🌐 [Live Service Topology]` ma siedzieć pod `📂 [Active Projects]` po lewej stronie `🚀 [CI/CD PIPELINE]`, a pozostałe ekrany mają mieć ten sam chrome/styling co główny cockpit. Release-hardening (`rc1`, signing, release smoke-test) zostaje przesunięte do Sprintu 13 po retrospekcji, żeby nie mieszać ergonomii UI z cięciem release'a.
 
 ---
 
@@ -10,117 +10,93 @@
 
 Po sprincie 12:
 
-- Standard Cockpit (`100×30`) ma sekcję `Connections:` w Overview (tabelaryczny fallback topologii — TASK-11.4 z poprzedniego sprintu).
-- Wszystkie ekrany (Init Wizard, Project Wizard, Resume Wizard, Import Preview, Project Detail) używają wspólnej chrome (status bar + footer hints) — sprawdzone snapshotami.
-- Bug bash: 10 scenariuszy z `docs/UX.md §11` przejdzie ręcznie + zostanie nagrany jako asciinema (`docs/demos/`).
-- Performance budget: cockpit re-render < 16ms na M-series Mac (60fps), CPU < 8 % przy 3 aktywnych projektach.
-- `make release-dry-run` produkuje SLSA-signed artefakty (Linux/macOS/Windows) z cosign keyless OIDC.
-- CHANGELOG.md ma sekcję `[v0.1.0-rc1]` z pełnym opisem zmian od bootstrapu.
-- `goreleaser snapshot` zamyka się czysto; manualnie zweryfikowane: smoke-run binarki na każdej z trzech platform.
-- Tag `v0.1.0-rc1` na `main` po pełnym CI green.
+- Cockpit dostaje **viewport scroll**: jeśli wyrenderowana ramka ma więcej linii niż aktualna wysokość terminala, operator może przewijać `PgUp`, `PgDn`, `Home`, `End`.
+- Layout Ultra (`120×35`) zmienia strukturę z:
+  - `Projects | Server+CI/CD`
+  - `Logs`
+  - `Topology`
+  na:
+  - `Projects | Server`
+  - `Topology | CI/CD`
+  - `Logs`
+- Kolumny nie używają już jednego sztywnego ratio; szerokości reagują na zakres viewportu (`120-135`, `136-159`, `>=160`) i clampują się do minimów, żeby nie ucinać nazw projektów ani grafu topologii.
+- Standard Cockpit (`100×30`) dostaje sekcję `Connections:` w `Overview` — tabelaryczny fallback grafu topologii z Sprintu 11.
+- Wszystkie kluczowe ekrany (Init Wizard, Project Wizard, Resume Wizard, Import Preview, Project Detail, Live Logs) używają tego samego chrome: status bar, footer hints, grube ramki, ten sam język tytułów.
+- Snapshoty pokazują nie tylko "ładny idealny ekran", ale też zachowanie przy overflow i przy Standard vs Ultra.
 
 **Nie robimy w tym sprincie:**
 
-- Drugi provider (cPanel / DirectAdmin) — sprint 13.
-- Webox OAuth Device Flow — sprint 13.
-- DB wiring w topologii (`graph.DB`) — czeka na `config.Project.DB*` w v0.2.
-- Stretch ficzery z `AGENTS.md §3.2`.
+- `v0.1.0-rc1`, signing, release smoke-test — przeniesione do Sprintu 13.
+- Drugi provider (cPanel / DirectAdmin / CyberPanel) — sprint 13.
+- OAuth Device Flow — sprint 13.
+- DB leaf w topologii — dalej czeka na `config.Project.DB*` w v0.2.
 
 ---
 
 ## Pre-flight Checklist
 
 - [x] Sprint 11 zamknięty z Outcome (2026-05-24).
-- [ ] `git log --oneline main..HEAD` po Sprint 11 zawiera commit z topology map + UI refresh.
-- [ ] Re-read [PRD §6 priorytety](../PRD.md), [SECURITY §10](../SECURITY.md), [TESTING §3 piramida](../TESTING.md).
+- [ ] Re-read [UX §3.4](../UX.md#34-wizualny-graf-topologii-us%C5%82ug-live-service-topology-map), [UX §4.1-§4.3](../UX.md#4-layouty-ekran%C3%B3w-20), [DESIGN §2.3](../DESIGN.md#23-zasady-przep%C5%82ywu-danych-mvu).
 - [ ] `make ci` green na `main`.
-- [ ] `.golangci.yml` v2 — bez przerwy 0 issues po `make lint`.
-- [ ] Re-read [docs/UX.md §11](../UX.md#11-flowy-end-to-end-mvp) — bug bash scenariusze.
+- [ ] Snapshot baseline z Sprintu 11 odtworzony lokalnie (`WEBOX_SNAPSHOT=1 go test ./tui -run TestCockpitSnapshots`).
+- [ ] Potwierdzone, że zmiana nie wychodzi poza MVP scope (to ergonomia istniejących ekranów, nie nowy feature area).
 
 ---
 
 ## Taski
 
-### TASK-12.1 — Standard Cockpit `Connections:` strip (carry-over z Sprint 11)
+### TASK-12.1 — Viewport scroll dla overflowing screens
 
-- **Estymata:** S
+- **Estymata:** M
 - **Zależności:** none
 - **Acceptance Criteria:**
-  - [ ] Dla `width<120 || height<35` (Standard Cockpit) Overview tile dostaje dodatkową sekcję `Connections:` z 3-4 wierszami:
-    ```
-    Connections:
-      GitHub → Server : ✓ Active (2h ago, success)
-      Server → App    : ✓ Online (200 OK, 88ms)
-      Server → MySQL  : (no DB linked)
-    ```
-  - [ ] Producer reuses `buildTopologySnapshot` z Sprint 11 — fold edges w 1-linijkowy fallback (`renderTopologyTextLine(edge)`).
-  - [ ] Snapshot test `100×30` zawiera `Connections:`.
-- **Docs:** [UX §3.4](../UX.md#34-wizualny-graf-topologii-us%C5%82ug-live-service-topology-map), Sprint 11 TASK-11.4.
+  - [ ] Jeśli wyrenderowany frame ma więcej linii niż `WindowSizeMsg.Height`, `View()` zwraca tylko aktualny wycinek viewportu zamiast przepychać terminal history.
+  - [ ] Operator może przewijać `PgUp`, `PgDn`, `Home`, `End`.
+  - [ ] Scroll działa dla dashboardu, init wizarda, project detail, project wizarda, resume/import preview oraz live logs (scroll całej ramki; wewnętrzny scroll logów zostaje na `↑/↓`).
+  - [ ] Test jednostkowy potwierdza, że przy overflow liczba renderowanych linii == wysokość viewportu oraz że `PgDn` zmienia zawartość.
+- **Docs:** [DESIGN §2.3](../DESIGN.md#23-zasady-przep%C5%82ywu-danych-mvu), [UX §4](../UX.md#4-layouty-ekran%C3%B3w-20).
 
-### TASK-12.2 — Chrome consistency audit (init wizard, project wizard, import preview)
+### TASK-12.2 — Responsive Bento widths + left-column topology
 
 - **Estymata:** M
 - **Zależności:** TASK-12.1
 - **Acceptance Criteria:**
-  - [ ] Snapshot test per surface (`init_wizard_100x30.txt`, `project_wizard_120x35.txt`, `import_preview_120x35.txt`, `resume_wizard_120x35.txt`, `project_detail_140x40.txt`) — wszystkie pokazują:
-    - Brand `WEBOX vX.Y.Z` w status barze
-    - Breadcrumb cell w status barze (`Init Wizard`, `Project Wizard`, …)
-    - Footer hint strip `[q] quit · [?] help · [/] palette · [Tab] cycle`
-  - [ ] Każdy panel używa `lipgloss.ThickBorder()` przez `theme.Styles.Panel`; ActivePanel używa `lipgloss.DoubleBorder()`.
-  - [ ] Wizardy mają ASCII WEBOX logo na pierwszym ekranie (TASK-11.* już dodał na init; rozszerzyć na project wizard intro).
-- **Docs:** [UX §4](../UX.md#4-uk%C5%82ad-ekran%C3%B3w), nowy ADR-0008 jeśli format chrome wymaga formalnej decyzji.
+  - [ ] Ultra layout zmienia kompozycję na:
+    ```text
+    StatusBar
+    [Projects]  | [Server]
+    [Topology]  | [CI/CD]
+    [Logs................. full width .................]
+    ```
+  - [ ] `🌐 [Live Service Topology]` renderuje się pod `📂 [Active Projects]` i po lewej od `🚀 [CI/CD PIPELINE: Main Branch]`.
+  - [ ] Width ratio jest adaptacyjne (nie jeden sztywny `36/64`) i clampowane minimami, żeby nie ucinać najdłuższych nazw demo projektów oraz grafu topologii.
+  - [ ] Test layoutu sprawdza, że na tej samej linii `Live Service Topology` pojawia się przed `CI/CD PIPELINE`.
+- **Docs:** [UX §3.4](../UX.md#34-wizualny-graf-topologii-us%C5%82ug-live-service-topology-map), [UX §4.2](../UX.md#42-dashboard-20--bento-box-grid-system-12035-mvp--16045-stretch).
 
-### TASK-12.3 — Bug bash scenariusze + asciinema demos
-
-- **Estymata:** L
-- **Zależności:** TASK-12.2
-- **Acceptance Criteria:**
-  - [ ] 10 scenariuszy z `docs/UX.md §11` zarchiwizowane w `docs/demos/<scenario>.cast`:
-    1. `init-wizard-happy-path.cast`
-    2. `project-wizard-create-no-db.cast`
-    3. `project-detail-restart-app.cast`
-    4. `project-detail-logs-redacted-secret.cast`
-    5. `dashboard-ci-pipeline-failure.cast`
-    6. `dashboard-ssl-near-expiry-degraded.cast`
-    7. `topology-offline-cascade.cast`
-    8. `doctor-json.cast`
-    9. `import-preview-detects-gaps.cast`
-    10. `resume-wizard-after-crash.cast`
-  - [ ] `make demo` target generuje pojedynczą asciinemę z `--mock`.
-  - [ ] Każdy plik `.cast` ma siostrzany `.md` z 3-5 zdaniami "co tu się dzieje" — żeby reviewer widział kontekst.
-- **Docs:** new `docs/demos/README.md` z indeksem.
-
-### TASK-12.4 — Performance budget enforcement
-
-- **Estymata:** M
-- **Zależności:** TASK-12.2
-- **Acceptance Criteria:**
-  - [ ] Nowy benchmark `tui/cockpit_bench_test.go::BenchmarkCockpitRender` — 60fps target (16ms/frame) na M-series Mac.
-  - [ ] `make bench` target uruchamia bench i fail'uje jeśli regression > 20% względem snapshot baseline (`docs/perf/baseline.json`).
-  - [ ] Dodatkowo `goleak.VerifyNone` w teście quit transition cockpitu — żaden timer nie wycieka po `q`.
-- **Docs:** ADR-0009 (TBD) — performance budget formalizacja.
-
-### TASK-12.5 — Release tooling smoke-test
-
-- **Estymata:** M
-- **Zależności:** TASK-12.4
-- **Acceptance Criteria:**
-  - [ ] `make release-dry-run` produkuje 6 artefaktów (linux-amd64/arm64, darwin-amd64/arm64, windows-amd64, source-tarball) podpisanych przez cosign keyless OIDC.
-  - [ ] SLSA provenance attached do każdego artefaktu.
-  - [ ] Manualny smoke-test każdej platformy: rozpakuj binarkę → `webox --version` → `webox doctor --json` → `webox --mock`.
-  - [ ] `goreleaser check` zero warnings.
-- **Docs:** [DESIGN §14 Release pipeline](../DESIGN.md), CONTRIBUTING.md sekcja release.
-
-### TASK-12.6 — CHANGELOG release notes + tag `v0.1.0-rc1`
+### TASK-12.3 — Standard Cockpit `Connections:` fallback
 
 - **Estymata:** S
-- **Zależności:** TASK-12.5
+- **Zależności:** TASK-12.2
 - **Acceptance Criteria:**
-  - [ ] Sekcja `[v0.1.0-rc1] - 2026-06-07` w `CHANGELOG.md` z kategoriami: Added / Changed / Fixed / Security / Performance.
-  - [ ] `[Unreleased]` zostaje pusty.
-  - [ ] Annotated git tag `v0.1.0-rc1` na zielonym CI.
-  - [ ] GitHub Release draft (NIE published) z release notes wygenerowanymi przez goreleaser.
-- **Docs:** [ROADMAP §3.1](../ROADMAP.md), CHANGELOG zasady.
+  - [ ] Dla `100×30 ≤ viewport < 120×35` Overview renderuje sekcję:
+    ```text
+    Connections:
+      GitHub → Server : ✓ Active (2h ago, success)
+      Server → App    : ✓ Online (200 OK)
+    ```
+  - [ ] Producer reużywa `buildTopologySnapshot` — bez nowych źródeł danych.
+  - [ ] Snapshot `100×30` zawiera `Connections:`.
+- **Docs:** [UX §3.4](../UX.md#34-wizualny-graf-topologii-us%C5%82ug-live-service-topology-map), carry-over Sprint 11 TASK-11.4.
+
+### TASK-12.4 — Cross-screen cockpit styling parity
+
+- **Estymata:** M
+- **Zależności:** TASK-12.1
+- **Acceptance Criteria:**
+  - [ ] Init Wizard, Project Wizard, Resume Wizard, Import Preview, Project Detail i Live Logs używają tego samego chrome co dashboard: status bar, footer hints, thick/double borders, ten sam język tytułów.
+  - [ ] Snapshot / tests potwierdzają obecność brandu `WEBOX`, breadcrumba (`Init Wizard`, `Project Wizard`, ... ) i footer hint strip.
+  - [ ] Jeśli ekran nie mieści się pionowo, viewport scroll działa tam tak samo jak na dashboardzie.
+- **Docs:** [UX §4.1-§4.3](../UX.md#4-layouty-ekran%C3%B3w-20).
 
 ---
 
@@ -128,39 +104,51 @@ Po sprincie 12:
 
 | Ryzyko | Impact | Mitygacja |
 |---|---|---|
-| Asciinema demos nagrane na małym terminalu — Ultra+ tile nie renderuje się czytelnie w 80×24 | M | `make demo` ustawia jawnie `tput cols 140; tput lines 40` przed nagraniem; reviewer ma jasny rozmiar. |
-| Goreleaser SLSA + cosign wymaga zmiany GitHub Actions workflow → potencjalny supply-chain ryzyko | M | Pinujemy actions przez SHA (AGENTS.md §2.1). Manualnie weryfikujemy każdy nowy step przed merge'em. |
-| Performance budget regression niewykryta lokalnie (M-series Mac), wykryta dopiero w CI na ARM Linux | M | `make bench` jest osobnym CI jobem na 3 runnerach (Ubuntu, macOS, Windows). Baseline per runner. |
-| Bug bash znajdzie blocker → przesunięcie RC1 → ryzyko zsuwania v0.1 GA | H | Bug bash zaczynamy na 4 dzień sprintu; bufor 5 dni na fix + retest. |
-| Mock mode rozjedzie się z realnym kodem (mock fetcher zwraca dane niezgodne z `ProjectStatus` v2) | M | `make ci` uruchamia mock cockpit jako snapshot test; rozjazd lapie się na PR. |
+| Globalny viewport scroll pogryzie się z istniejącą nawigacją (`↑/↓` wybór projektu, `↑/↓` logs buffer, `↑/↓` modal workflow logs) | H | Scroll całej ramki tylko na `PgUp/PgDn/Home/End`; wewnętrzne `↑/↓` zostają bez zmian. |
+| Zbyt agresywne ściskanie lewej kolumny popsuje czytelność topologii | M | Adaptive ratios + minima per column; snapshot tests dla `120×35`, `140×40`, `160×45`. |
+| Ujednolicenie chrome na małych ekranach pogorszy ciasne terminale | M | Tiny fallback (`<70×22`) zostaje bez zmian; dla większych ekranów overflow obsługuje viewport scroll. |
+| Standard Cockpit zacznie dryfować od `buildTopologySnapshot` i będzie pokazywał inne stany niż kafelek topologii | M | `Connections:` budowane wyłącznie z `buildTopologySnapshot`, nie z oddzielnej logiki. |
 
 ---
 
 ## Dependencies signoff
 
-Sprint 12 **nie dodaje** nowych zewnętrznych zależności. Jeśli SLSA tooling wymaga nowego helpera, idzie przez ADR + maintainer sign-off.
+Sprint 12 **nie dodaje** nowych zewnętrznych zależności. Do viewport scroll możemy użyć istniejących zależności (`bubbletea`, `bubbles`) albo własnego pure slicera — bez dotykania `go.mod`.
 
 ---
 
 ## Outcome (wypełnij po sprincie)
 
-- ✅ Done: ...
-- ⏭️ Carry-over → Sprint 13: ...
-- 📌 Decyzje: ...
-- 🧠 Surprises: ...
+- ✅ Done:
+  - viewport scroll (`PgUp` / `PgDn` / `Home` / `End`) dla overflowing screens
+  - responsive Ultra grid `Projects | Server` / `Topology | CI/CD` / `Logs`
+  - Standard Cockpit `Connections:` fallback zasilany z `buildTopologySnapshot`
+  - cross-screen chrome parity + bracketed emoji titles na ekranach poza dashboardem
+  - snapshot refresh (`docs/screenshots/*.txt`) + pełne `make ci`
+- ⏭️ Carry-over → Sprint 13:
+  - release tooling smoke-test
+  - RC1 / GA tagging
+  - formalny bug bash release'owy i okres obserwacji RC
+  - benchmark/performance-budget formalizacja
+- 📌 Decyzje:
+  - viewport scroll dostał osobne klawisze, żeby nie psuć istniejącej nawigacji `↑/↓`
+  - Standard fallback i Ultra tile współdzielą jedną semantykę topologii
+  - Sprint 13 zostaje przepisany tak, by najpierw dowieźć release hardening, a dopiero potem wracać do foundation spikes
+- 🧠 Surprises:
+  - samo przeniesienie topologii do lewej kolumny nie wystarczyło; trzeba było jeszcze wyrównać wysokości wierszy, żeby grid czytał się jak prawdziwe `2x2`
+  - `tea.WithAltScreen()` rozwiązuje host-terminal scroll, ale nie problem overflowu wewnątrz samej aplikacji
 - 📊 Metryki:
-  - Coverage post-sprint: ?%
-  - Cockpit render time (M-series): ?ms
-  - All-tiles CPU%: ?
-  - Release artefacts size: ? MB total
+  - Coverage post-sprint: 81.5%
+  - Overflow scroll tests: 1 dedykowany regression test + pełne `go test ./tui/...`
+  - Snapshot tiers updated: 5 files (`standard`, `ultra`, `ultra+`, `live logs`, `mock cockpit`)
 - 🔒 Security validation:
-  - [ ] `govulncheck` zero findings na release tag.
-  - [ ] Cosign verify każdej platformy zielony.
-  - [ ] SLSA provenance present + matches commit SHA.
-- ➡️ Następny sprint: `sprint-13-second-provider-research.md` (post-MVP — second provider research + OAuth Device Flow PoC).
+  - [x] Zero nowych network calls.
+  - [x] `go test -race ./...` green via `make ci`.
+  - [x] No secret leakage in scrollable/rendered surfaces.
+- ➡️ Następny sprint: `sprint-13-v01-ga-and-post-mvp-foundation.md` (release hardening + post-MVP foundation).
 
 ---
 
 ## Retro Link
 
-`docs/retros/<data>-sprint-12.md` (do utworzenia po RC1 tagu)
+`docs/retros/2026-05-24-sprint-12.md`

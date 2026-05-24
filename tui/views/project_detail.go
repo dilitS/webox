@@ -32,7 +32,8 @@ func RenderProjectDetail(s Screen) string {
 	}
 
 	body := []string{
-		project.Domain,
+		"🖥 [Project Detail: " + project.Domain + "]",
+		"",
 		tabs,
 		"",
 		s.Styles.StatusBadge(status.State).Render(status.State),
