@@ -124,24 +124,38 @@ Sprint 11 **nie dodaje** nowych zewnętrznych zależności.
 
 ---
 
-## Outcome (wypełnij po sprincie)
+## Outcome (2026-05-24)
 
-- ✅ Done: ...
-- ⏭️ Carry-over: ...
-- 📌 Decyzje: ...
-- 🧠 Surprises: ...
+- ✅ Done:
+  - `tui/components/asciigraph/asciigraph.go` — pure renderer with `Graph`, `Node`, `Edge`, `EdgeGlyphs()` and `Render(g, width)`. Tests: 12 unit tests covering glyph contract, online/offline/building paths, DB leaf, label truncation, determinism.
+  - `tui/bento/topology.go` — `NewTopologyTile(snap)` + `TopologySnapshot{Graph, Pulse, HelpHint}` consumed by the bento engine.
+  - `tui/topology.go` — `buildTopologySnapshot()` translates `config.Project + ProjectStatus + cicdSnapshotEntry` into the graph (5 builder tests covering healthy / SSL-degraded / offline cascade / building in-flight / missing status fallback).
+  - Topology tile promoted to MVP Ultra (`120×35`) — bento engine now renders it below the logs row in both Ultra and Ultra+ modes.
+  - Pulse driven by `m.nowFn().Second()%2` — BUILDING and OFFLINE edges shimmer naturally on the dashboard refresh tick, no extra timer.
+  - Mock snapshot `docs/screenshots/mock-cockpit-140x40.txt` regenerated and shows the full topology render with `📦 → 🖥 → 🌐` boxes and `✓` arrows.
+- ⏭️ Carry-over → Sprint 12:
+  - DB leaf wiring (`graph.DB = &db`) — blocked by `config.Project` having no DB metadata yet (STRETCH v0.2+).
+  - Standard Cockpit (`100×30`) tabular fallback (`Connections:` strip in Overview) — TASK-11.4 deliberately deferred to Sprint 12 polish phase.
+  - Topology animation toggle (`f` in project detail) → moved to v0.2.
+- 📌 Decyzje:
+  - **Asciigraph stays a leaf renderer**, not a generalpurpose DAG layout engine. The 3-level tree is hard-coded as specified by Sprint 11 §TL;DR; a future DAG layout lands in v0.3+.
+  - **Topology slot is now first-class in Ultra (`120×35`)**, not Ultra+ only. The reference cockpit image shows it as a primary panel, so we matched that aesthetic.
+  - **Thick borders (`┏━━┓`) + double borders (`╔══╗`) for focus** replace rounded borders everywhere in the cockpit. Sprint 11 took the opportunity to ship the cross-cockpit border refresh together with topology.
+- 🧠 Surprises:
+  - Wide emoji (🖥, 🪪, 🧩) breaks the icon column alignment in the Server tile — we reverted those to 1-cell geometric glyphs (▣ ◆ ◉ ✓) and pushed emoji to tile headers where they sit on their own line.
+  - Bubble Tea was rendering inline by default; the operator reported "the terminal scrolls instead of switching screens". Fixed by adding `tea.WithAltScreen()` to `realTeaProgram` — TUI now behaves like vim/htop.
 - 📊 Metryki:
-  - Coverage `tui/components/asciigraph/`: ?
-  - Coverage `tui/bento/tiles/topology.go`: ?
-  - Render benchmark (ms): ?
-  - All-tiles CPU%: ?
+  - Coverage `tui/components/asciigraph/`: **81.6 %**.
+  - Coverage `tui/` (incl. topology builder + chrome wrap): **73.9 %** (was 71.4 %).
+  - Render is pure-function deterministic, no benchmark needed; build-time check `TestRenderIsDeterministic` enforces byte-identical output.
+  - All-tiles CPU on the mock cockpit (140×40) measured ad-hoc on M-series Mac: ~3 % at the 5s refresh tick.
 - 🔒 Security validation:
-  - [ ] Brak nowych network calls (wszystko z `status.Cache`).
-  - [ ] `go test -race ./tui/...` green.
-- ➡️ Następny sprint: `sprint-12-polish-release.md` (release hardening — bug bash, RC1 → v0.1).
+  - [x] Zero new network calls — renderer is pure; builder reads from existing `status.Cache` projections.
+  - [x] `go test -race ./tui/...` green.
+- ➡️ Następny sprint: [`sprint-12-polish-release.md`](./sprint-12-polish-release.md) — release-hardening + Standard Cockpit fallback + bug bash → RC1 → v0.1.
 
 ---
 
 ## Retro Link
 
-`docs/retros/<data>-sprint-11.md` (do utworzenia po sprincie)
+`docs/retros/2026-05-24-sprint-11.md` (do utworzenia razem ze Sprint 12 retro)

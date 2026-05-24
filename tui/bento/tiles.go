@@ -57,7 +57,7 @@ func (t *projectsTile) WithWidth(w int) BentoTile {
 func (t *projectsTile) Render(mode Mode, focused bool) string {
 	if len(t.rows) == 0 {
 		return renderTilePanel(tilePanelOptions{
-			Header:   "[Active Projects]",
+			Header:   "📂 [Active Projects]",
 			Body:     "No projects yet.\nPress [n] to start the new-project wizard.",
 			Mode:     mode,
 			Focused:  focused,
@@ -97,7 +97,7 @@ func (t *projectsTile) Render(mode Mode, focused bool) string {
 	}
 	body := strings.Join(rendered, "\n")
 	return renderTilePanel(tilePanelOptions{
-		Header:   "[Active Projects]",
+		Header:   "📂 [Active Projects]",
 		Body:     body,
 		Mode:     mode,
 		Focused:  focused,
@@ -178,12 +178,12 @@ func (t *overviewTile) WithWidth(w int) BentoTile {
 // Render satisfies [BentoTile].
 func (t *overviewTile) Render(mode Mode, focused bool) string {
 	tokens := theme.Default()
-	header := "[SERVER: " + nonEmpty(t.snap.ProjectAlias, "(no project)") + "]"
+	header := "🖥  [SERVER: " + nonEmpty(t.snap.ProjectAlias, "(no project)") + "]"
 
 	if len(t.snap.Lines) == 0 {
 		return renderTilePanel(tilePanelOptions{
 			Header:   header,
-			Body:     "Select a project to inspect status.",
+			Body:     "Select a project to inspect status.\nUse ↑/↓ on the projects panel.",
 			Mode:     mode,
 			Focused:  focused,
 			Accent:   AccentPrimary,
@@ -247,7 +247,7 @@ func (metricsPlaceholderTile) Slot() Slot { return SlotMetrics }
 // Render satisfies [BentoTile].
 func (metricsPlaceholderTile) Render(mode Mode, focused bool) string {
 	return renderTilePanel(tilePanelOptions{
-		Header:  "[Header Metrics]",
+		Header:  "📊 [Header Metrics]",
 		Body:    "CPU / RAM / Disk pulse\nAwaiting first SSH poll…",
 		Mode:    mode,
 		Focused: focused,
@@ -309,7 +309,7 @@ func (t *headerMetricsTile) Render(mode Mode, focused bool) string {
 		"Ping:   " + nonEmpty(t.snap.RTTLabel, "—"),
 	}, "\n")
 	return renderTilePanel(tilePanelOptions{
-		Header:  "[Header Metrics]",
+		Header:  "📊 [Header Metrics]",
 		Body:    body,
 		Mode:    mode,
 		Focused: focused,
@@ -348,7 +348,7 @@ func (t *placeholderCICDTile) WithWidth(w int) BentoTile {
 // Render satisfies [BentoTile].
 func (t *placeholderCICDTile) Render(mode Mode, focused bool) string {
 	return renderTilePanel(tilePanelOptions{
-		Header:   "[CI/CD PIPELINE: Main Branch]",
+		Header:   "🚀 [CI/CD PIPELINE: Main Branch]",
 		Body:     "GitHub Actions stream\nNo GitHub-linked project selected.\nPress [n] to create a new project.",
 		Mode:     mode,
 		Focused:  focused,
@@ -525,7 +525,7 @@ func (t *cicdPipelineTile) Render(mode Mode, focused bool) string {
 	}
 
 	return renderTilePanel(tilePanelOptions{
-		Header:   "[CI/CD PIPELINE: Main Branch]",
+		Header:   "🚀 [CI/CD PIPELINE: Main Branch]",
 		Body:     strings.TrimRight(b.String(), "\n"),
 		Mode:     mode,
 		Focused:  focused,
@@ -676,7 +676,7 @@ func (t *logsPlaceholderTile) WithWidth(w int) BentoTile {
 // Render satisfies [BentoTile].
 func (t *logsPlaceholderTile) Render(mode Mode, focused bool) string {
 	return renderTilePanel(tilePanelOptions{
-		Header:   "[Live Server Logs]",
+		Header:   "📜 [Live Server Logs]",
 		Body:     "SSH tail with secret redaction\nSelect a project to start streaming.",
 		Mode:     mode,
 		Focused:  focused,
@@ -743,7 +743,7 @@ func (t *microLogsTile) Render(mode Mode, focused bool) string {
 	tokens := theme.Default()
 	if len(t.lines) == 0 {
 		return renderTilePanel(tilePanelOptions{
-			Header:   "[Live Server Logs]",
+			Header:   "📜 [Live Server Logs]",
 			Body:     "Streaming " + nonEmpty(t.domain, "—") + " — waiting for first line.",
 			Mode:     mode,
 			Focused:  focused,
@@ -756,7 +756,7 @@ func (t *microLogsTile) Render(mode Mode, focused bool) string {
 		rows = append(rows, renderLogLine(line, tokens))
 	}
 	return renderTilePanel(tilePanelOptions{
-		Header:   "[Live Server Logs]",
+		Header:   "📜 [Live Server Logs]",
 		Body:     strings.Join(rows, "\n"),
 		Mode:     mode,
 		Focused:  focused,
@@ -874,8 +874,8 @@ func (t *topologyPlaceholderTile) WithWidth(w int) BentoTile {
 // Render satisfies [BentoTile].
 func (t *topologyPlaceholderTile) Render(mode Mode, focused bool) string {
 	return renderTilePanel(tilePanelOptions{
-		Header:   "[Topology]",
-		Body:     "Service dependency graph\nLive wiring: Sprint 11",
+		Header:   "🌐 [Live Service Topology]",
+		Body:     "Service dependency graph\nSelect a project to render the live wiring.",
 		Mode:     mode,
 		Focused:  focused,
 		Accent:   AccentCyan,
@@ -935,18 +935,20 @@ func accentColor(t TileAccent, tokens theme.Theme) string {
 }
 
 // renderTilePanel composes a single bento cell: header line + body, wrapped
-// in a rounded-border panel. The border color tracks the accent so the
+// in a thick-border panel. The border color tracks the accent so the
 // cockpit can visually group tiles into role columns; the focus state
-// brightens the same accent without swapping it.
+// thickens the border further (double line) for the active panel.
+//
+// 2026-05-24 UX refresh: cockpit tiles use [lipgloss.ThickBorder]
+// (┏━━━┓) instead of the original rounded border (╭───╮). Thick
+// borders give the cockpit a stronger sense of "framed widgets" and
+// improve contrast on low-saturation terminals (Windows Terminal,
+// older xterm). Focused tiles upgrade to [lipgloss.DoubleBorder]
+// (╔═══╗) so the operator's eye lands on them immediately.
 func renderTilePanel(opts tilePanelOptions) string {
 	tokens := theme.Default()
 	accentHex := accentColor(opts.Accent, tokens)
-	// 2026-05-24 refresh: tiles keep their accent border in both
-	// focus states so the operator can identify panels by colour
-	// alone. Focus is communicated through the brighter header
-	// foreground; the border stays accented.
 	border := lipgloss.Color(accentHex)
-	_ = opts.Focused
 
 	header := lipgloss.NewStyle().
 		Bold(true).
@@ -962,8 +964,12 @@ func renderTilePanel(opts tilePanelOptions) string {
 		Foreground(lipgloss.Color(tokens.TextBright)).
 		Render(body)
 
+	borderStyle := lipgloss.ThickBorder()
+	if opts.Focused {
+		borderStyle = lipgloss.DoubleBorder()
+	}
 	style := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
+		Border(borderStyle).
 		BorderForeground(border).
 		Padding(0, 1)
 	if opts.MinWidth > 0 {

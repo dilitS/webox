@@ -112,7 +112,7 @@ func TestEngineRendersUltraPlusGetsExtraSection(t *testing.T) {
 	if !strings.Contains(out, "[BENTO Ultra+]") {
 		t.Fatalf("UltraPlus mode marker missing\n--- output ---\n%s", out)
 	}
-	if !strings.Contains(out, "[Topology]") {
+	if !strings.Contains(out, "[Live Service Topology]") {
 		t.Fatalf("UltraPlus should show topology tile\n--- output ---\n%s", out)
 	}
 }

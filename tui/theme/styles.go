@@ -18,11 +18,19 @@ type Styles struct {
 }
 
 // NewStyles builds component styles for a theme.
+//
+// As of the 2026-05-24 UX refresh, panels render with
+// [lipgloss.ThickBorder] (┏━━━┓) while active panels upgrade to
+// [lipgloss.DoubleBorder] (╔═══╗). This matches the bento cockpit
+// tiles so wizards / detail screens / dashboard share the same
+// frame language end-to-end.
 func NewStyles(t Theme) Styles {
 	basePanel := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
+		Border(lipgloss.ThickBorder()).
 		BorderForeground(lipgloss.Color(t.Muted)).
 		Padding(0, 1)
+
+	activePanelBorder := lipgloss.DoubleBorder()
 
 	return Styles{
 		Header: lipgloss.NewStyle().
@@ -31,8 +39,10 @@ func NewStyles(t Theme) Styles {
 			Padding(0, 1),
 		Panel: basePanel.
 			Foreground(lipgloss.Color(t.TextBright)),
-		ActivePanel: basePanel.
+		ActivePanel: lipgloss.NewStyle().
+			Border(activePanelBorder).
 			BorderForeground(lipgloss.Color(t.Primary)).
+			Padding(0, 1).
 			Foreground(lipgloss.Color(t.TextBright)),
 		ProjectRow: lipgloss.NewStyle().
 			Foreground(lipgloss.Color(t.TextBright)),

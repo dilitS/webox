@@ -16,6 +16,35 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- **Sprint 11 — Live Service Topology Map (2026-05-24).**
+  - `tui/components/asciigraph/` — new pure-function renderer for the cockpit's service-topology tile. Exposes `Graph`, `Node`, `Edge`, `EdgeGlyphs(state, pulse)` and `Render(g, width)`. Heavy box-drawing nodes (`┏━━┓`) connect via state-aware glyph pairs (`──────────` + `✓` for ONLINE, `╌╌ ╌╌ ╌╌ ╌` + `▶` for BUILDING, `━━━━━━━━━━` + `⚠` for DEGRADED, `⚡ ⚡ ⚡ ⚡ ⚡` + `✗` for OFFLINE). 12 unit tests pin the glyph contract, online/offline/building/DB-leaf paths, label truncation, and determinism.
+  - `tui/bento/topology.go` — `NewTopologyTile(TopologySnapshot)` exposes the renderer via the `BentoTile` interface; the snapshot carries `Graph`, `Pulse`, and a `HelpHint` line ("All systems nominal" / "Deploy in flight" / etc.).
+  - `tui/topology.go::buildTopologySnapshot` — pure builder that folds `config.Project`, `ProjectStatus`, and `cicdSnapshotEntry` into an `asciigraph.Graph`. Edge states mirror the underlying signals (CI status → repo→server edge; HTTP/SSL → server→subdomain edge; SSL<14d demotes to DEGRADED without flipping to OFFLINE). 5 unit tests cover healthy / SSL-degraded / offline-cascade / building / missing-status paths.
+  - `tui/bento/engine.go` — Ultra (`120×35`) **and** Ultra+ (`160×45`) now render the topology tile under the logs row (TASK-11.* explicitly promoted topology to MVP per the new cockpit reference image; previously Ultra+ only).
+  - Pulse animation driven by `m.nowFn().Second()%2` so BUILDING/OFFLINE edges shimmer on the existing refresh tick — no extra timer, no goroutine, no leak risk.
+- **UI/UX refresh round 2 (2026-05-24).**
+  - All bento tiles now render with `lipgloss.ThickBorder()` (`┏━━━┓`) instead of `lipgloss.RoundedBorder()`. Focused tiles upgrade to `lipgloss.DoubleBorder()` (`╔═══╗`) so the active panel always reads as the brightest frame.
+  - `theme.Styles.Panel` / `Styles.ActivePanel` rebuilt around the same thick/double border pair so wizard and detail screens share the cockpit's frame language end-to-end.
+  - Tile headers gained tone-on-tone emoji prefixes: `📂 [Active Projects]`, `🖥 [SERVER: …]`, `🚀 [CI/CD PIPELINE: Main Branch]`, `📜 [Live Server Logs]`, `🌐 [Live Service Topology]`, `📊 [Header Metrics]`. Emoji live only in headers (where they sit on their own line); data rows keep 1-cell geometric glyphs (▣ ◆ ◉ ✓ ↔ ⚿ ⎇ ⏲) so column alignment stays intact.
+  - `tui/views/init_wizard.go` — new ASCII WEBOX banner painted above step 1 of the init flow:
+    ```
+    ╦ ╦╔═╗╔╗ ╔═╗═╗ ╦
+    ║║║║╣ ╠╩╗║ ║╔╩╦╝
+    ╚╩╝╚═╝╚═╝╚═╝╩ ╚═  ·  v0.1 cockpit
+    ```
+  - `tui/view.go::chromeWrap` — every non-dashboard surface (Init Wizard, Project Detail, Live Logs, Project Wizard, Resume Wizard, Import Preview) now renders the global status bar + footer hints around its body so the cockpit feels coherent across screens. Surfaces below the Standard threshold (`100×30`) keep the legacy split-pane silhouette.
+- **`cmd/webox/run.go` — `tea.WithAltScreen()` + `tea.WithMouseCellMotion()`.**
+  - The TUI is now a true full-screen app (like vim / htop / lazygit): screen swaps replace the current frame instead of scrolling host terminal history. Alternate screen buffer is released on quit so the operator returns to a clean prompt.
+  - Mouse cell motion is enabled at program level so future click-through surfaces (CI/CD step click → open run, log scroll) can opt in without bumping program options.
+- **`docs/sprints/sprint-12-polish-release.md`** — full plan for the v0.1 RC1 release sprint (Standard Cockpit topology fallback, chrome consistency audit, asciinema demos, performance budget enforcement, release tooling smoke-test, CHANGELOG release notes + tag).
+- **`docs/sprints/sprint-13-v01-ga-and-post-mvp-foundation.md`** — full plan for v0.1 GA + post-MVP foundation (GA tag, provider research, OAuth Device Flow PoC behind `WEBOX_EXPERIMENTAL`, `config.json` schema v3 with optional DB fields, ADR-0010 for generic DAG layout deferral, bug bash round 2).
+
+### Changed
+- `docs/sprints/sprint-11-topology-map.md` — closed out with full `Outcome` section: 12 + 5 unit tests, coverage metrics, decisions (asciigraph stays a leaf renderer, topology first-class in Ultra, thick borders adopted cockpit-wide), surprises (emoji column width, alt-screen mode fix), security validation (zero new network calls).
+- `tui/bento/tiles.go::renderTilePanel` — focus state now upgrades the border style from thick to double instead of merely brightening the colour. The accent colour stays consistent so role-grouping (magenta column / cyan column) reads at a glance.
+- `tui/view.go` overview lines reverted to 1-cell geometric glyphs (▣ ◆ ◉ ✓ ↔ ⚿ ⎇ ⏲) after the emoji set introduced subtle column-shift glitches in the first polish round.
+
+### Added (previous entries continue)
 - **UI/UX refresh (2026-05-24) — Bento Ultra cockpit polish + offline mock mode.**
   - `tui/components/statusbar.go` introduces a new full-width cockpit status bar (`WEBOX vX.Y.Z [LIVE]` badge on the left, pipe-delimited `clock · profile · uptime · load · RAM · ping` stream on the right). Tone (success/warning/info/error) drives the `LIVE`/`STALE`/`PENDING`/`OFFLINE` pill colour. Pure renderer — no I/O, no time calls, fully unit-tested in `statusbar_test.go`.
   - `tui/bento/tiles.go` rebrands every tile to match the reference cockpit: `[Active Projects]` with dot-suffixed rows (`●` Success/Warning/Error/Muted) and rounded selection pill; `[SERVER: <project>]` with iconified key-value rows (Profile / Stack / Node.js / Status / HTTP / SSL / Repo / Last Deploy) and status-tinted dots; `[CI/CD PIPELINE: Main Branch]` with `Build #N: STATUS` badge and `[1] step ✓` rows; `[Live Server Logs]` with timestamped `INFO/WARN/ERROR/DEBUG` colour-coded lines; cyan `[Topology]` placeholder tile. Each tile picks its own `TileAccent` (Primary/Cyan/Warning/Error) which paints the rounded border so the operator can identify panes by colour alone.

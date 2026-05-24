@@ -97,10 +97,10 @@ func TestPlaceholderTilesShowMeaningfulFallbackCopy(t *testing.T) {
 			hints:  []string{"No GitHub-linked project selected", "[n]"},
 		},
 		{
-			name:   "topology placeholder (live wiring in Sprint 11)",
+			name:   "topology placeholder (no project selected)",
 			tile:   bento.NewTopologyPlaceholderTile(),
-			header: "[Topology]",
-			hints:  []string{"Sprint 11"},
+			header: "[Live Service Topology]",
+			hints:  []string{"Service dependency graph"},
 		},
 	}
 

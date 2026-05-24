@@ -53,7 +53,7 @@ func TestViewRendersInitWizardDashboardAndProjectDetail(t *testing.T) {
 				"WEBOX",
 				"[Active Projects]",
 				"[SERVER: sui.demo.smallhost.pl]",
-				"[Topology]",
+				"Live Service Topology",
 			},
 		},
 		{

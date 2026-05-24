@@ -66,26 +66,37 @@ func renderInitStep(s Screen, panelWidth int) string {
 	}
 }
 
+// webloxBanner is the ASCII logo painted above the welcome step. We
+// keep it compact (≤56 cols) so it never overflows the
+// initWizardMinWidth. The block letters use double-line box drawing
+// characters that render in every Lipgloss-supported terminal.
+const weboxBanner = `╦ ╦╔═╗╔╗ ╔═╗═╗ ╦
+║║║║╣ ╠╩╗║ ║╔╩╦╝
+╚╩╝╚═╝╚═╝╚═╝╩ ╚═  ·  v0.1 cockpit`
+
 func renderInitWelcome(s Screen, panelWidth int) string {
+	banner := s.Styles.Value.Render(weboxBanner)
 	lines := []string{
+		banner,
+		"",
 		"Step 1/6: System & Agent Environment",
 		"",
 		s.Styles.Panel.Width(panelWidth).Render(strings.Join([]string{
-			"System Pre-requisites",
+			"🛠  System Pre-requisites",
 			"",
-			"Git Engine:       pending doctor check",
-			"GitHub CLI (gh):  pending doctor check",
-			"Keyring Backend: pending doctor check",
+			" Git Engine:      pending doctor check",
+			" GitHub CLI (gh): pending doctor check",
+			" Keyring Backend: pending doctor check",
 		}, "\n")),
 		"",
 		s.Styles.Panel.Width(panelWidth).Render(strings.Join([]string{
-			"Default SSH Keypair",
+			"🔑 Default SSH Keypair",
 			"",
-			"Path: ~/.ssh/id_ed25519_webox",
-			"Fingerprint: deferred to v0.2 (auto-inject flow)",
+			" Path:        ~/.ssh/id_ed25519_webox",
+			" Fingerprint: deferred to v0.2 (auto-inject flow)",
 			"",
-			"Webox captures the SSH profile only at this stage; keypair",
-			"generation and auto-deploy to the host land in v0.2.",
+			" Webox captures the SSH profile only at this stage;",
+			" keypair generation and auto-deploy land in v0.2.",
 		}, "\n")),
 		"",
 		"[ Enter ] Continue   [ Esc ] Quit",

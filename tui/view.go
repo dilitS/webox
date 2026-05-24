@@ -14,27 +14,78 @@ import (
 )
 
 // View renders the current model without mutating it.
+//
+// Every full-screen surface is wrapped with [chromeWrap] so the
+// operator sees the same status bar + footer hint strip on the init
+// wizard, the dashboard, project detail, and the wizard flows.
+// Modals (CI/CD F8, doctor errors) keep their existing overlay
+// rendering — they paint on top of the wrapped surface.
 func (m Model) View() string {
 	screen := m.screen()
 	switch m.state {
 	case StateInitWizard:
-		return views.RenderInitWizard(screen)
+		return m.chromeWrap(screen, "Init Wizard", views.RenderInitWizard(screen))
 	case StateDashboard:
 		return m.renderDashboard(screen)
 	case StateProjectDetail:
 		if m.activeTab == TabLogs {
-			return views.RenderLiveLogs(screen)
+			return m.chromeWrap(screen, "Live Logs", views.RenderLiveLogs(screen))
 		}
-		return views.RenderProjectDetail(screen)
+		return m.chromeWrap(screen, "Project Detail", views.RenderProjectDetail(screen))
 	case StateProjectWizard:
-		return views.RenderProjectWizard(screen)
+		return m.chromeWrap(screen, "Project Wizard", views.RenderProjectWizard(screen))
 	case StateResumeWizard:
-		return views.RenderResumeWizard(screen)
+		return m.chromeWrap(screen, "Resume Wizard", views.RenderResumeWizard(screen))
 	case StateImportPreview:
-		return views.RenderImportPreview(screen)
+		return m.chromeWrap(screen, "Import Preview", views.RenderImportPreview(screen))
 	default:
 		return m.styles.Panel.Render(fmt.Sprintf("%s is not enabled", m.state))
 	}
+}
+
+// chromeWrap paints the cockpit-wide chrome (status bar + footer
+// hints) around any non-dashboard view. The dashboard renders its
+// own status bar inside the bento engine, so we skip the wrap there.
+//
+// crumb is the surface name displayed in the status-bar breadcrumb
+// cell (e.g. "Init Wizard", "Project Detail"). The wrap is a no-op
+// when the terminal is below the Standard threshold so the cockpit
+// falls back to the legacy split-pane silhouette.
+func (m Model) chromeWrap(screen views.Screen, crumb, body string) string {
+	if screen.Width < bentoStandardMinWidth || screen.Height < bentoStandardMinHeight {
+		return body
+	}
+	opts := m.dashboardStatusBar(screen.Width)
+	if crumb != "" {
+		opts.Sections = append([]string{crumb}, opts.Sections...)
+	}
+	statusBar := components.RenderStatusBar(opts)
+	footer := m.renderFooterHints(screen.Width)
+	parts := []string{statusBar, body}
+	if footer != "" {
+		parts = append(parts, footer)
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
+}
+
+// bentoStandardMinWidth/Height mirror [bento.DetectMode]'s Standard
+// threshold. Below it the cockpit hides the chrome and renders the
+// raw view (Standard fallback owns its own header).
+const (
+	bentoStandardMinWidth  = 100
+	bentoStandardMinHeight = 30
+)
+
+// renderFooterHints draws the global keybinding strip below every
+// chrome-wrapped surface. We keep the hint set tight (≤80 cols) so
+// even Standard Cockpit renders it without wrapping.
+func (m Model) renderFooterHints(width int) string {
+	tokens := theme.Default()
+	hints := "  [q] quit · [?] help · [/] command palette · [Tab] cycle panels"
+	style := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(tokens.TextDim)).
+		Width(width)
+	return style.Render(hints)
 }
 
 func (m Model) renderDashboard(screen views.Screen) string {
@@ -209,9 +260,31 @@ func (m Model) dashboardBentoTiles() []bento.BentoTile {
 		registry.Register(bento.NewCICDPlaceholderTile())
 	}
 	registry.Register(m.dashboardLiveLogsTile())
-	registry.Register(bento.NewTopologyPlaceholderTile())
+	registry.Register(m.dashboardTopologyTile())
 
 	return registry.Tiles()
+}
+
+// dashboardTopologyTile builds the live service-topology tile for the
+// currently selected project. When the operator has not picked one
+// (or there are no projects yet) we fall back to the cyan placeholder
+// so the cockpit silhouette never collapses.
+func (m Model) dashboardTopologyTile() bento.BentoTile {
+	projects := cfgProjects(m.cfg)
+	if len(projects) == 0 || m.selectedIndex < 0 || m.selectedIndex >= len(projects) {
+		return bento.NewTopologyPlaceholderTile()
+	}
+	project := projects[m.selectedIndex]
+	status, hasStatus := m.statuses[project.ID]
+	ci, hasCI := m.cicdSnapshots[project.ID]
+	// Pulse is driven by the model clock: even seconds → off, odd
+	// seconds → on. The bento engine repaints the cockpit on every
+	// `RefreshDashboardMsg`, so this naturally shimmers BUILDING /
+	// OFFLINE edges without an extra ticker.
+	const pulseModulus = 2
+	pulse := m.nowFn().Second()%pulseModulus == 1
+	snap := buildTopologySnapshot(project, status, hasStatus, ci, hasCI, pulse)
+	return bento.NewTopologyTile(snap)
 }
 
 func (m Model) dashboardProjectRows() []bento.ProjectRowSnapshot {
@@ -265,15 +338,19 @@ func (m Model) dashboardServerSnapshot() bento.ServerOverviewSnapshot {
 		fallbackString(project.NodeVersion, "unknown"),
 	)
 
+	// Icon column intentionally uses 1-cell glyphs (not emoji) so the
+	// value column stays vertically aligned. The 2026-05-24 UX
+	// refresh routes emoji to the tile *headers* where they sit on
+	// their own line; data rows keep the geometric icon set.
 	lines := []bento.ServerOverviewLine{
-		{Icon: "⊟", Label: "Profile", Value: fallbackString(project.ProfileAlias, "(unbound)")},
-		{Icon: "◎", Label: "Stack", Value: fallbackString(project.Stack, "—")},
-		{Icon: "◆", Label: "Node.js", Value: nodeVer, Status: state},
+		{Icon: "▣", Label: "Profile", Value: fallbackString(project.ProfileAlias, "(unbound)")},
+		{Icon: "◆", Label: "Stack", Value: fallbackString(project.Stack, "—")},
+		{Icon: "◉", Label: "Node.js", Value: nodeVer, Status: state},
 		{Icon: "✓", Label: "Status", Value: state, Status: state},
-		{Icon: "⇄", Label: "HTTP", Value: httpHealth},
+		{Icon: "↔", Label: "HTTP", Value: httpHealth},
 		{Icon: "⚿", Label: "SSL", Value: ssl, Status: sslState},
-		{Icon: "⌬", Label: "Repo", Value: fallbackString(project.Repo, "not linked")},
-		{Icon: "⏱", Label: "Last Deploy", Value: fallbackString(valueIfStatus(hasStatus, status.LastDeploy), "—")},
+		{Icon: "⎇", Label: "Repo", Value: fallbackString(project.Repo, "not linked")},
+		{Icon: "⏲", Label: "Last Deploy", Value: fallbackString(valueIfStatus(hasStatus, status.LastDeploy), "—")},
 	}
 	return bento.ServerOverviewSnapshot{
 		ProjectAlias: project.Domain,
