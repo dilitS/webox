@@ -102,6 +102,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:gocyclo // To
 		}
 		return m, nil
 	case StatusRefreshFailedMsg:
+		if m.tryRaiseHostKeyModal(msg.Err) {
+			return m, scheduleRefresh(m.refreshInterval)
+		}
 		m.alert = "status refresh failed; showing cached data"
 		return m, scheduleRefresh(m.refreshInterval)
 	case RefreshTickMsg:
@@ -152,6 +155,24 @@ func (m Model) updateMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Host-key modal is a strict-block overlay: while it is open we
+	// only accept `Esc` (close) and `q`/`Ctrl+C` (quit). Any other
+	// key would silently route to the underlying state — confusing
+	// at best, security-relevant at worst (e.g. accidentally
+	// triggering a wizard step while a MITM warning is on screen).
+	if m.hostKeyModal.Open {
+		switch msg.String() {
+		case "q", "ctrl+c":
+			m.cancel()
+			return m, tea.Quit
+		case "esc", "enter":
+			m.dismissHostKeyModal()
+			return m, nil
+		default:
+			return m, nil
+		}
+	}
+
 	switch msg.String() {
 	case "q", "ctrl+c":
 		m.cancel()
