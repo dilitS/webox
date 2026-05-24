@@ -9,6 +9,7 @@ import (
 	"github.com/dilitS/webox/internal/version"
 	"github.com/dilitS/webox/tui/bento"
 	"github.com/dilitS/webox/tui/components"
+	"github.com/dilitS/webox/tui/surface"
 	"github.com/dilitS/webox/tui/theme"
 	"github.com/dilitS/webox/tui/views"
 )
@@ -96,7 +97,18 @@ func (m Model) surfaceCrumb() string {
 // renderRootBody returns the active screen's body (no chrome). Per
 // the Sprint 13 chrome contract, top/bottom strips are composed by
 // [View]; surfaces only describe their scrollable content.
+//
+// As of the Sprint 13 surface-foundation pass, the function first
+// asks `m.surfaceFor()` whether a [surface.Surface] adapter exists
+// for the current state. Migrated states (today: `dashboard`) flow
+// through the surface contract; everything else falls back to the
+// legacy switch below until Sprint 14 finishes the migration. This
+// gives us a single seam to walk states off the god-package without
+// a flag-day refactor.
 func (m Model) renderRootBody(screen views.Screen) string {
+	if s := m.surfaceFor(); s != nil {
+		return s.Body(surface.Context{Screen: screen})
+	}
 	switch m.state {
 	case StateInitWizard:
 		return views.RenderInitWizard(screen)

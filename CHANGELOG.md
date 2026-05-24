@@ -16,6 +16,12 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+- **Sprint 13 — Surface contract foundation (2026-05-24).**
+  - `tui/surface/` — new leaf package with the [`Surface`](./tui/surface/surface.go) interface (`Body` / `Crumb` / `Footer` / `AcceptsScroll`), a read-only [`Context`](./tui/surface/surface.go) snapshot, a structured [`FooterHint`](./tui/surface/surface.go), and a thread-safe [`Registry`](./tui/surface/registry.go) for tests / future per-Model lookups. Six unit tests pin the contract (`registry register/lookup/reset`, `FooterHint.Empty()`, compile-time contract guard).
+  - `tui/surface_adapters.go` — `Model.surfaceFor()` returns a fresh [`dashboardSurface`](./tui/surface_adapters.go) per render so the value-typed Model semantics stay intact (no stale pointer captured between ticks). The dashboard adapter is the first migrated state; remaining surfaces (init wizard, project detail, wizards, import preview) keep flowing through `renderRootBody` until Sprint 14.
+  - `tui/view.go::renderRootBody` now prefers `m.surfaceFor()` and falls back to the legacy switch — one seam for the gradual decomposition of the `tui/` god-package.
+  - Regression suite: `TestDashboardSurface_BodyMatchesLegacyRenderer` proves the adapter is byte-identical to the legacy path across `100×30 / 120×35 / 160×45`; `TestSurfaceFor_UnmigratedStatesReturnNil` guards the fallback path and fails loudly the day a new state is migrated without updating expectations.
+
 - **Sprint 13 — Chrome contract + Bento height budgets (2026-05-24).**
   - `tui/view.go::View` now composes every surface in three pinned slots: a one-line top chrome (cockpit status bar — dashboard reuses the bento engine's bar via `WithStatusBar`; every other state gets a pinned bar from `renderChromeTop`), a scrollable body (sliced by `renderViewport`), and a one-line bottom chrome (key-hints + `↕ scroll: PgUp/PgDn · Home/End · Mouse · (offset/max)` indicator). Tiny mode (`< 70×22`) intentionally skips the chrome so the "Terminal too small" warning stays self-contained.
   - `tui/update.go::updateMouse` — mouse-wheel scrolling for the body slot using the post-1.3 Bubble Tea API (`MouseActionPress` × `MouseButtonWheelUp / WheelDown`). Long-press / drag does not loop scrolls (we only react to press). Step is 3 lines so a trackpad flick feels precise but a real wheel does not stall.
