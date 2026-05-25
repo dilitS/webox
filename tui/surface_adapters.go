@@ -2,11 +2,19 @@ package tui
 
 import (
 	"github.com/dilitS/webox/tui/surface"
+	"github.com/dilitS/webox/tui/surface/importpreview"
+	"github.com/dilitS/webox/tui/surface/initwizard"
+	"github.com/dilitS/webox/tui/surface/projectdetail"
+	"github.com/dilitS/webox/tui/surface/projectwizard"
+	"github.com/dilitS/webox/tui/surface/resumewizard"
 )
 
 // surfaceFor returns the [surface.Surface] implementation responsible
-// for the model's current state, or nil when the state has not yet
-// been migrated off the legacy `renderRootBody` switch.
+// for the model's current state. After Sprint 14 TASK-14.1 every
+// production state has an adapter — the legacy
+// `tui/view.go::renderRootBody` switch keeps only a defensive default
+// branch so a future state added without a surface fails loudly
+// instead of silently returning the empty body.
 //
 // The cockpit creates a fresh adapter per render rather than storing a
 // pointer in a global registry. That keeps the value-typed [Model]
@@ -17,15 +25,30 @@ import (
 // frame, which is dwarfed by the bento engine's own per-frame work
 // (see `BenchmarkRenderUltra` in `tui/bento/engine_bench_test.go`).
 //
-// Sprint 13 ships the dashboard adapter as the foundation; Sprint 14
-// will migrate the remaining states (init wizard, project detail,
-// wizards, import preview) and move each adapter into its own
-// `tui/surface/<state>/` subpackage.
+// The dashboard adapter intentionally lives in this file (rather than
+// a `tui/surface/dashboard/` subpackage like the other states) because
+// it is tightly coupled to the cockpit's bento engine, header
+// metrics, host-key modal overlay, and CI/CD modal overlay — moving
+// it would require either re-exporting all of those internals or
+// duplicating them. Sprint 15 will revisit the layering once the
+// modal overlay system is generalised.
 func (m Model) surfaceFor() surface.Surface {
-	if m.state == StateDashboard {
+	switch m.state {
+	case StateDashboard:
 		return dashboardSurface{m: m}
+	case StateInitWizard:
+		return initwizard.Surface{}
+	case StateProjectDetail:
+		return projectdetail.Surface{}
+	case StateProjectWizard:
+		return projectwizard.Surface{}
+	case StateResumeWizard:
+		return resumewizard.Surface{}
+	case StateImportPreview:
+		return importpreview.Surface{}
+	default:
+		return nil
 	}
-	return nil
 }
 
 // dashboardSurface adapts the cockpit's dashboard renderer to the
@@ -36,9 +59,7 @@ type dashboardSurface struct {
 	m Model
 }
 
-// Body delegates to the cockpit's legacy dashboard renderer so the
-// Sprint 13 surface foundation is byte-identical to the pre-surface
-// behaviour (see TestDashboardSurface_BodyMatchesLegacyRenderer).
+// Body delegates to the cockpit's dashboard renderer.
 func (d dashboardSurface) Body(ctx surface.Context) string {
 	return d.m.renderDashboardBody(ctx.Screen)
 }

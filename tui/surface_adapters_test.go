@@ -81,15 +81,18 @@ func TestDashboardSurface_FooterAndCrumb(t *testing.T) {
 	}
 }
 
-// TestSurfaceFor_UnmigratedStatesReturnNil confirms the fallback path
-// is intact: states that have not been migrated to the Surface contract
-// return nil from `surfaceFor()` so `renderRootBody` keeps using the
-// legacy switch. The day a new state is migrated this test fails
-// loudly, prompting the contributor to update the expectations.
-func TestSurfaceFor_UnmigratedStatesReturnNil(t *testing.T) {
+// TestSurfaceFor_AllProductionStatesMigrated is the post-migration
+// inversion of the Sprint 13 fallback guard: after Sprint 14
+// TASK-14.1 every production state MUST have a registered surface
+// so the legacy `renderRootBody` switch can be reduced to its
+// defensive default. A regression that drops a `case` from
+// `surfaceFor()` surfaces here immediately rather than as a silent
+// blank body in production.
+func TestSurfaceFor_AllProductionStatesMigrated(t *testing.T) {
 	t.Parallel()
 
 	for _, s := range []State{
+		StateDashboard,
 		StateInitWizard,
 		StateProjectDetail,
 		StateProjectWizard,
@@ -101,9 +104,25 @@ func TestSurfaceFor_UnmigratedStatesReturnNil(t *testing.T) {
 			t.Parallel()
 			m := New(Options{InitialWidth: 120, InitialHeight: 35}).withConfig(fixtureConfig())
 			m.state = s
-			if got := m.surfaceFor(); got != nil {
-				t.Fatalf("state %s already has a surface adapter; update the fallback test", s)
+			if got := m.surfaceFor(); got == nil {
+				t.Fatalf("state %s has no surface adapter — Sprint 14 TASK-14.1 requires every production state to be migrated", s)
 			}
 		})
+	}
+}
+
+// TestSurfaceFor_UnknownStateReturnsNil pins the defensive default
+// branch in `surfaceFor`: a future state constant that ships
+// without a registered surface MUST surface as nil so the chrome
+// renders the "X is not enabled" placeholder, not a silently empty
+// body.
+func TestSurfaceFor_UnknownStateReturnsNil(t *testing.T) {
+	t.Parallel()
+
+	const sentinelUnknownState State = 999
+	m := New(Options{InitialWidth: 120, InitialHeight: 35}).withConfig(fixtureConfig())
+	m.state = sentinelUnknownState
+	if got := m.surfaceFor(); got != nil {
+		t.Fatalf("unknown state %d returned %T — defensive default broken", sentinelUnknownState, got)
 	}
 }

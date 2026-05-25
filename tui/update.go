@@ -9,6 +9,7 @@ import (
 	"github.com/dilitS/webox/providers"
 	ghsvc "github.com/dilitS/webox/services/github"
 	"github.com/dilitS/webox/status"
+	"github.com/dilitS/webox/tui/bento"
 	"github.com/dilitS/webox/tui/components"
 	"github.com/dilitS/webox/wizard"
 )
@@ -145,8 +146,21 @@ const mouseWheelStep = 3
 // (left/middle/wheel-up/wheel-down/…) pair. We only react to *press*
 // actions on the two scroll-wheel buttons so a long mouse drag does
 // not accidentally fire repeated viewport jumps.
+//
+// Sprint 14 TASK-14.2 — when a tile is focused the wheel scrolls
+// that tile's offset instead of the global body viewport. Matches
+// the keyboard contract documented in [Model.handleViewportKey].
 func (m Model) updateMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if msg.Action != tea.MouseActionPress {
+		return m, nil
+	}
+	if m.focusedTile != nil {
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
+			m.scrollFocusedTileBy(-mouseWheelStep)
+		case tea.MouseButtonWheelDown:
+			m.scrollFocusedTileBy(mouseWheelStep)
+		}
 		return m, nil
 	}
 	switch msg.Button {
@@ -193,6 +207,28 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Sprint 14 TASK-14.2 — focus rotation MUST take precedence over
+	// the legacy `Tab → Project Detail` routing on the dashboard so
+	// the operator can cycle scrollable tiles. The router consumes
+	// Tab / Shift+Tab when the dashboard is the active state and
+	// hands the keystroke off to `cycleFocusedTile`. Other states
+	// (wizards, detail, etc.) keep their pre-existing Tab semantics.
+	if m.state == StateDashboard {
+		switch msg.String() {
+		case "tab":
+			m.cycleFocusedTile(+1)
+			return m, nil
+		case "shift+tab":
+			m.cycleFocusedTile(-1)
+			return m, nil
+		case "esc":
+			if m.focusedTile != nil {
+				m.focusedTile = nil
+				return m, nil
+			}
+		}
+	}
+
 	if handled := m.handleViewportKey(msg); handled {
 		return m, nil
 	}
@@ -219,7 +255,33 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 const viewportPageMargin = 4
 
+// tileScrollStep is the number of lines a single PgUp / PgDn moves a
+// focused tile. Smaller than the viewport page step because tiles
+// are shorter than the full body — flicking a wheel feels jerky if
+// the offset jumps half the buffer at once.
+const tileScrollStep = 5
+
 func (m *Model) handleViewportKey(msg tea.KeyMsg) bool {
+	// Sprint 14 TASK-14.2 — when a tile is focused the scroll keys
+	// move that tile's offset instead of the global body viewport.
+	// Non-scrollable tiles never appear in `focusedTile` (the
+	// rotation skips them) so we can treat focus as a strict signal.
+	if m.focusedTile != nil {
+		switch msg.String() {
+		case "pgup":
+			m.scrollFocusedTileBy(-tileScrollStep)
+			return true
+		case "pgdown":
+			m.scrollFocusedTileBy(tileScrollStep)
+			return true
+		case "home":
+			m.tileScrollOffsets[*m.focusedTile] = 0
+			return true
+		case "end":
+			m.scrollFocusedTileBy(maxTileScrollOffset)
+			return true
+		}
+	}
 	switch msg.String() {
 	case "pgup":
 		m.scrollViewportBy(-m.viewportPageStep())
@@ -236,6 +298,108 @@ func (m *Model) handleViewportKey(msg tea.KeyMsg) bool {
 	default:
 		return false
 	}
+}
+
+// maxTileScrollOffset is a sentinel "End" value passed to
+// scrollFocusedTileBy. The renderer clamps to the actual maximum
+// (live-log buffer length minus one row) on the next frame, so we
+// can be generous here without overshooting.
+const maxTileScrollOffset = 1 << 16
+
+// cycleFocusedTile advances the focus across scrollable tiles.
+// `direction` is +1 (Tab) or -1 (Shift+Tab). The cycle includes a
+// "no-focus" slot so the operator can return to global viewport
+// scrolling without leaving the dashboard.
+//
+// Sequence: nil → Logs → CICD → nil → Logs … (when both are
+// scrollable). Non-scrollable slots are silently skipped, satisfying
+// the AC's "fokus na nie-scrollowalnym kafelku" guard: the rotation
+// never lands on a tile that cannot consume PgUp / PgDn.
+func (m *Model) cycleFocusedTile(direction int) {
+	cycle := m.scrollableSlotCycle()
+	if len(cycle) == 0 {
+		return
+	}
+	// Position 0 in cycle == "no focus" sentinel. Translating
+	// `m.focusedTile` into a cycle index keeps the rotation logic a
+	// single integer addition modulo len(cycle).
+	current := 0
+	if m.focusedTile != nil {
+		for i, slot := range cycle {
+			if i == 0 {
+				continue
+			}
+			if slot == *m.focusedTile {
+				current = i
+				break
+			}
+		}
+	}
+	next := (current + direction + len(cycle)) % len(cycle)
+	if next == 0 {
+		m.focusedTile = nil
+		return
+	}
+	slot := cycle[next]
+	m.focusedTile = &slot
+}
+
+// scrollableSlotCycle returns the rotation order: a "no focus"
+// sentinel followed by every scrollable slot present in the current
+// frame's tiles. Computed per call so a future tile registry change
+// does not require model surgery.
+//
+// The sentinel `bento.SlotProjects` value at index 0 is a placeholder
+// — index 0 always means "no focus", regardless of the slot value.
+func (m *Model) scrollableSlotCycle() []bento.Slot {
+	tiles := m.dashboardBentoTiles()
+	cycle := make([]bento.Slot, 0, len(tiles)+1)
+	// Sentinel: index 0 == no focus. Slot value is a don't-care.
+	cycle = append(cycle, bento.SlotProjects)
+	for _, tile := range tiles {
+		if _, ok := tile.(bento.ScrollableTile); ok {
+			cycle = append(cycle, tile.Slot())
+		}
+	}
+	if len(cycle) == 1 {
+		// No scrollable tiles in this frame — disable the cycle so
+		// Tab / Shift+Tab become a no-op rather than infinitely
+		// landing on the sentinel.
+		return nil
+	}
+	return cycle
+}
+
+// scrollFocusedTileBy advances the offset for the currently focused
+// tile by `delta`, clamping to its scrollable range. The clamp uses
+// the freshly built tile so the bound always reflects the latest
+// snapshot (e.g. the live-log buffer growing between frames).
+func (m *Model) scrollFocusedTileBy(delta int) {
+	if m.focusedTile == nil {
+		return
+	}
+	if m.tileScrollOffsets == nil {
+		m.tileScrollOffsets = make(map[bento.Slot]int)
+	}
+	target := *m.focusedTile
+	current := m.tileScrollOffsets[target]
+	candidate := current + delta
+	if candidate < 0 {
+		candidate = 0
+	}
+	for _, tile := range m.dashboardBentoTiles() {
+		if tile.Slot() != target {
+			continue
+		}
+		s, ok := tile.(bento.ScrollableTile)
+		if !ok {
+			return
+		}
+		clamped := s.Scroll(candidate - s.ScrollOffset()).ScrollOffset()
+		m.tileScrollOffsets[target] = clamped
+		return
+	}
+	m.tileScrollOffsets[target] = candidate
 }
 
 func (m *Model) viewportPageStep() int {
@@ -388,7 +552,7 @@ func (m Model) updateDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.selectedIndex = clampIndex(m.selectedIndex-1, projectCount)
 	case "down", "j":
 		m.selectedIndex = clampIndex(m.selectedIndex+1, projectCount)
-	case "right", "tab":
+	case "right":
 		if projectCount > 0 {
 			m.state = StateProjectDetail
 			m.activeTab = TabOverview

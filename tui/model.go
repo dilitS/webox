@@ -110,6 +110,18 @@ type Model struct {
 	helpVisible     bool
 	alert           string
 
+	// focusedTile is the cockpit tile currently receiving Tab-routed
+	// scroll events (Sprint 14 TASK-14.2). nil = no focus, the
+	// global viewport scroll handles PgUp / PgDn / Home / End.
+	// Non-nil = the focused slot's scroll routing wins; the chrome
+	// renders the tile with a double-line border for visual feedback.
+	focusedTile *bento.Slot
+	// tileScrollOffsets stores the per-tile scroll offset. Persisted
+	// on the Model so it survives across the value-typed Update
+	// returns; the bento engine reads it via WithTileScrollOffsets
+	// each frame.
+	tileScrollOffsets map[bento.Slot]int
+
 	cfg      *config.Config
 	statuses map[string]ProjectStatus
 

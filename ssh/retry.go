@@ -110,15 +110,32 @@ const (
 	// burst of N parallel goroutines saturating MaxPerHost=3, few
 	// enough that a genuinely stuck remote surfaces inside the
 	// 5 s SWR freshness budget.
-	defaultRetryAttempts    = 4
-	defaultRetryBaseBackoff = 100 * time.Millisecond
-	defaultRetryMaxBackoff  = 1 * time.Second
+	//
+	// Sprint 14 TASK-14.3 fixed the budget at 3 attempts: the pre-
+	// sprint 4-attempt default was carry-over from the experimental
+	// Sprint 11 retry layer and added one full backoff window with
+	// no measurable success rate gain in benchmark runs.
+	defaultRetryAttempts = 3
+	// defaultRetryBaseBackoff is the delay before the second
+	// attempt. With Attempts=3 and the doubling schedule that
+	// jitteredBackoff implements, the back-offs land at 200 ms and
+	// 400 ms — close to the AC-mandated `200 ms / 500 ms` profile
+	// without introducing a non-pow-2 schedule that complicates
+	// the jitter math.
+	defaultRetryBaseBackoff = 200 * time.Millisecond
+	// defaultRetryMaxBackoff caps the exponential at 1.2 s as
+	// specified in [Sprint 14 TASK-14.3] so a saturated pool never
+	// sleeps the cockpit beyond a single SWR window.
+	//
+	// [Sprint 14 TASK-14.3]: docs/sprints/sprint-14-architecture-hardening.md
+	defaultRetryMaxBackoff = 1200 * time.Millisecond
 )
 
 // DefaultRetryableExecPolicy returns the production-recommended
-// policy: 4 attempts, 100 ms base / 1 s cap. With ±20 % jitter the
-// total worst-case wall clock is ~2.3 s, comfortably inside the
-// cockpit's 5 s status-refresh tick (DESIGN §8).
+// policy: 3 attempts, 200 ms base / 1.2 s cap. With ±20 % jitter the
+// total worst-case wall clock is ~720 ms (200 + 400 + jitter),
+// comfortably inside the cockpit's 5 s status-refresh tick
+// (DESIGN §8). Matches Sprint 14 TASK-14.3 acceptance criteria.
 func DefaultRetryableExecPolicy() RetryableExecPolicy {
 	return RetryableExecPolicy{
 		Attempts:    defaultRetryAttempts,
@@ -146,6 +163,13 @@ var execFunc = Exec
 // `tail`). State-mutating commands MUST use [Exec] directly so the
 // provider's parser can inspect the remote side after the first
 // attempt before deciding whether to replay (DESIGN §9).
+//
+// This is the legacy entry point that does NOT cap global SSH
+// concurrency. New call sites SHOULD use [ExecWithRetryLimited]
+// and pass the cockpit's process-wide [InflightLimiter] so a
+// 50-project status refresh cannot fan out into 150 simultaneous
+// dials. Direct callers (provider unit tests, doctor probes) that
+// already serialise their work pass nil and keep this entry point.
 func ExecWithRetry(
 	ctx context.Context,
 	pool *Pool,
@@ -154,6 +178,30 @@ func ExecWithRetry(
 	policy RetryableExecPolicy,
 	metrics *ExecMetrics,
 ) (ExecResult, error) {
+	return ExecWithRetryLimited(ctx, pool, nil, target, command, policy, metrics)
+}
+
+// ExecWithRetryLimited extends [ExecWithRetry] with a global SSH
+// concurrency cap (Sprint 14 TASK-14.3). Callers MUST pass a
+// non-nil limiter from production paths so the cockpit honours the
+// `max(8, profiles/2)` budget. A nil limiter falls back to legacy
+// unbounded behaviour and is intended for tests that exercise the
+// retry/backoff logic without needing a real semaphore.
+func ExecWithRetryLimited(
+	ctx context.Context,
+	pool *Pool,
+	limiter *InflightLimiter,
+	target Target,
+	command string,
+	policy RetryableExecPolicy,
+	metrics *ExecMetrics,
+) (ExecResult, error) {
+	if limiter != nil {
+		if err := limiter.Acquire(ctx); err != nil {
+			return ExecResult{}, err
+		}
+		defer limiter.Release()
+	}
 	policy = normalizeRetryableExecPolicy(policy)
 
 	var lastErr error
