@@ -17,6 +17,34 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ### Added
 
+- **Launch readiness scaffolding — Sprint 15-20+ plans + `.local/` ops room (2026-05-25).** Post-Sprint-14 strategic planning iteration that captures the decision to push `v0.1` GA into a **public OSS launch** rather than staying in technical-only mode. Six new sprint plans now own the post-MVP path:
+  - `docs/sprints/sprint-15-launch-readiness.md` — README EN, asciinema z `--mock`, `webox provider new` generator, `docs/contributing/PROVIDER.md` walkthrough, AGENTS.md slim (≤150 linii), Apache-2.0 consistency, repo public-readiness audit. Głównie nie-kod.
+  - `docs/sprints/sprint-16-public-launch.md` — Tydzień 1 PL soft launch + Tydzień 2 Show HN + r/golang + r/selfhosted (środa rano EST). Partnership outreach H88 (small.pl/lh.pl) + cPanel test account purchase + `docs/providers/cpanel.md` real-world expansion.
+  - `docs/sprints/sprint-17-cpanel-adapter.md` — `providers/cpanel/` skeleton, UAPI client (token auth `:2083`), SSH `uapi` fallback, read-only ops (ListProjects, GetStatus, GetLogs, Restart), `webox doctor cpanel`.
+  - `docs/sprints/sprint-18-cpanel-polish.md` — Mutating ops (CreateSubdomain via Application Manager, CreateDatabase, IssueSSL z AutoSSL), idempotentne `Remove*`, wizard integration, E2E, v0.2.0-rc1 cut.
+  - `docs/sprints/sprint-19-preset-registry.md` — `assets/provider-presets/*.json` JSON schema, `presets/loader.go` + `embed.FS`, Provider Catalog TUI (positioning: „Webox zna Twój hosting, nie tylko Twój panel"), `webox doctor preset`, ADR-0008.
+  - `docs/sprints/sprint-20-plus-options.md` — Decision matrix po Sprint 19 retro: A) DirectAdmin adapter (community-driven), B) OAuth Device Flow + Quality Polish (default), C) Repositioning + content marketing.
+  - `docs/sprints/README.md` i `docs/ROADMAP.md` zaktualizowane z nową tabelą sprintów 15-20+.
+- **AGENTS.md docs refactor (Sprint 15 TASK-15.9 prep, 2026-05-25).** Trzy nowe wydzielone dokumenty + skrót AGENTS.md:
+  - `docs/dependencies.md` — autoritatywny katalog Go zależności + toolchain + tool/`go.mod` pinning + supply chain policy (Apache/MIT/BSD only).
+  - `docs/conventions.md` — pełne konwencje kodu Go (naming, error handling, context discipline, generics, logging, testing, Conventional Commits, PR structure).
+  - `docs/gotchas.md` — Top 15 anty-pattern-ów (keyring detection, AES-GCM nonce, PID lockfiles, hardcoded provider name, secrets w log, `t.Parallel()` z global stubs, raw goroutines w Bubble Tea, etc.).
+  - `docs/contributing/PROVIDER.md` — 4-godzinny walkthrough EN dla zewnętrznych kontrybutorów dodających adapter providera (preset vs adapter decision, scaffold generator, fixtures, TDD parsery, integration sshmock, capability probe, PR template z pair-review request).
+  - `AGENTS.md` skrócony z 619 → ~150 linii: TL;DR, guardrails skrót, documentation map (pytanie → doc), workflow TDD, scope discipline, decision policy, skills reference. **Wszystkie guardraile nadal w pełni egzekwowane** przez `.cursor/rules/00-charter.mdc`.
+- **`.local/` private operations room scaffolding (2026-05-25).** Gitignorowany katalog (dodany do `.gitignore`) z drafts dla launch + partnerships + portfolio + metrics:
+  - `.local/strategy/` — go-to-market timeline + Reddit/HN/Twitter/dev.to drafts.
+  - `.local/partnerships/` — outreach drafts dla H88 (small.pl/lh.pl), PL/EU/US hosters list, cPanel vendor partner path.
+  - `.local/portfolio/` — one-pager + elevator pitches (30s/60s/180s).
+  - `.local/metrics/analytics.md` — KPI tracking + weekly snapshot template + funnel mental model.
+  - `.local/notes/2026-05-25-initial-launch-strategy.md` — pełny zapis decyzji strategicznych z dzisiejszej sesji planowania (8 lock-in decisions, hidden assumptions, ścieżki ryzyka).
+
+### Changed
+
+- **License: MIT → Apache-2.0 (2026-05-25).** Wymiana wymuszona przez explicit patent grant ważny przy adapterach paneli komercyjnych (cPanel LLC, DirectAdmin Inc., CyberPanel/OpenLiteSpeed). `docs/CONTRIBUTING.md` TL;DR zaktualizowane. **TODO w Sprint 15 TASK-15.7:** `landing/index.html` + `landing/en/index.html` Schema.org JSON-LD `"license"` field nadal wskazuje MIT — fix part of Sprint 15 audit.
+- **`docs/ROADMAP.md` (2026-05-25).** Sekcja v0.2 całkowicie przepisana z nową roadmap'ą post-MVP: Sprint 15 (Launch Readiness) → Sprint 16 (Public Launch + cPanel Research) → Sprint 17-18 (cPanel Adapter delivery + v0.2.0-rc1) → Sprint 19 (Preset Registry → marketing differentiator) → Sprint 20+ (Decision Matrix). Poprzedni `sprint-15-v02-foundation-plan` (z TASK-14.8) zostaje jako notion historical — Sprint 15 jest teraz Launch Readiness, nie v0.2 foundation. Konsekwencje tej zmiany ujęte w `docs/sprints/sprint-14-architecture-hardening.md` TASK-14.8 retro section.
+
+### Added (Sprint 14 - prior entries continue below)
+
 - **Sprint 14 — Surface migration completed (TASK-14.1, 2026-05-25).** Every production state in the cockpit now has a dedicated `surface.Surface` adapter under `tui/surface/<state>/`:
   - `tui/surface/initwizard/` — initial setup wizard (Crumb: "Init Wizard", AcceptsScroll: false).
   - `tui/surface/projectdetail/` — project detail (overview + live logs tabs, AcceptsScroll: true).

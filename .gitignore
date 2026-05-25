@@ -85,3 +85,8 @@ go.work.sum
 *.sig
 /landing
 /main-view-mock.png
+
+### Private operations room — NEVER commit (strategy drafts, partnerships,
+### portfolio notes, metrics snapshots). Lives in repo for AI agent access
+### but is gitignored. See .local/README.md (if you have one) for layout.
+/.local/
