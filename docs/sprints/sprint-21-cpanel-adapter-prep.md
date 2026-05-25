@@ -2,7 +2,7 @@
 
 > **Daty:** 2026-06-08 → 2026-06-22 (2 tygodnie) · **Cel:** Pierwsza warstwa cPanel adaptera (UAPI client + read-only ops + `webox doctor cpanel`) i jednoczesne przygotowanie public launch — repo polish, asciinema, cPanel test account.
 >
-> **Status:** 📝 Planned · **Properties:** code + ops mix · **Decision gate:** see "Path selection" below.
+> **Status:** 🚧 In progress (kicked off 2026-05-25) · **Properties:** code + ops mix · **Path selected:** **A** (full parallel — code + ops tracks both active).
 
 ## Kontekst
 
@@ -132,9 +132,9 @@ The choice is captured at sprint start in this document under "Outcome".
 
 ## Outcome (wypełnij po sprincie)
 
-- 📌 Path selected: A / B / C
-- ✅ Done: TASK-21.X
-- ⏭️ Carry-over: TASK-21.X → Sprint 22 (powód: …)
+- 📌 Path selected: **A** — full parallel (code + ops tracks both active). Maintainer chose "B and C" which functionally maps to A (the two alternatives in the path-selection menu, when both picked, equal the full-parallel scope). Recorded at sprint start 2026-05-25.
+- ✅ Done: <fill in per task>
+- ⏭️ Carry-over: <task → Sprint 22 + reason>
 - 📌 Decyzje: <ADR jeśli powstał>
 - 🧠 Surprises: <co się okazało inne niż w docs>
 - 📊 Metrics: cPanel UAPI test pass-rate, coverage delta, asciinema cast wall-clock.
