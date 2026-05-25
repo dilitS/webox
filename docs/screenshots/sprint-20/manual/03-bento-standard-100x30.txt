@@ -1,0 +1,31 @@
+
+╔══════════════════════════════════════════╗  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+║ 📂 [Active Projects]                     ║  ┃ 🖥  [SERVER: ShopEase-Web]
+║                                          ║  ┃
+║ ╭──────────────╮                         ║  ┃  ONLINE
+║ │ ShopEase-Web │ ●                       ║  ┃
+║ ╰──────────────╯                         ║  ┃ HTTP Health:   200 OK
+║   API-Gateway ●                          ║  ┃ SSL:           114 days remaining
+║   Auth-Service ●                         ║  ┃ Node:          v20.11.0
+║   Dashboard ●                            ║  ┃ Repo:          dilitS-demo/shopease-web
+║   Dashboard-Admin ●                      ║  ┃ Last Deploy:   2h ago · success
+║   Payment-UI ●                           ║  ┃
+║                                          ║  ┃ Connections:
+║                                          ║  ┃ GitHub → Server : ✓ Active (2h ago · success, succes
+║                                          ║  ┃ Server → App    : ✓ Active (200 OK)
+║                                          ║  ┃
+║                                          ║  ┃ [r] Restart  [s] SSL Renew  [v] Tail Logs
+║                                          ║  ┃
+║                                          ║  ┃
+╚══════════════════════════════════════════╝  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ⚡ [CI/CD]                                                                                       │
+│ Run #412 · SUCCESS · 20m ago                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ 📜 [Live Logs]                                                                                   │
+│ · [14:32:16] INFO - cockpit: telemetry.Sink = Disabled (no --debug-trace flag)                   │
+│ · [14:32:17] DEBUG - ssh.pool: MaxPerHost=3, ExecMetrics{acquires=0, busy=0, retries=0}          │
+│ ✗ [14:32:18] ERROR - Payment-UI: 502 backend timeout                                             │
+  [q] quit · [?] help · [Tab] cycle panels · [Right/Enter] open · [n] new · [i] import · [p] catalog
+·  ↕ scroll: PgUp/PgDn (0/1)

@@ -1,0 +1,28 @@
+
+WEBOX v0.1.0-rc1-13-g48a5379-dirty  LIVE  Database │ 14:32:01 │ us-east-1 │ Uptime: 24d 11h │ Load: 0.12, 0.28, 0.31 │ R
+╔═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+║ 🖥 [Project Detail: ShopEase-Web]
+║
+║ [1] Overview  [2] Env Diff  [3] Database  [4] Logs
+║
+║ 💾 [Database] · Stack: node-express
+║
+║ Webox does NOT store DB credentials in config.json. Credentials live in the OS keyring or secrets.enc.
+║
+║ Conventional database name (Devil panel format):
+║   <devil_user>_ShopEase_Web
+║
+║ Connect via:
+║   # MySQL / MariaDB
+║   mysql -h s1.small.pl -u <devil_user>_<dbuser> -p <devil_user>_ShopEase_Web
+║
+║   # PostgreSQL
+║   psql -h s1.small.pl -U <devil_user>_<dbuser> <devil_user>_ShopEase_Web
+║
+║ Retrieve credentials (Sprint 21+):
+║   webox doctor db creds ShopEase-Web
+║
+║ Provider docs: https://small.pl/docs/db · GH: dilitS/webox/docs/providers/smallhost.md
+║ [1] overview  [2] env  [4] logs  esc/tab: back
+╚═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+  [q] quit · [?] help · [Esc/Tab] back · [1] overview · [2] env · [3] db · [4] logs · [r] restart · [s] ssl · [v] tail

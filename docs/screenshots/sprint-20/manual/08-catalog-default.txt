@@ -1,0 +1,23 @@
+
+WEBOX v0.1.0-rc1-13-g48a5379-dirty  LIVE  Provider Catalog │ 14:32:01 │ us-east-1 │ Uptime: 24d 11h │ Load: 0.12, 0.28, 0.31 │ RAM: 3.4/8.0
+╔═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+║ 🗂 [Provider Catalog]
+║
+║ Read-only browser over the embedded preset registry. Use this to discover supported hosting providers before running the new-project
+║ wizard.
+║
+║ 🇵🇱 Poland
+    Dashboard ●                                          ┃┃ ⚿ SSL: Valid (114 days remaining) ●                                            ┃
+║    ▶ smallhost-devil                VERIFIED     SSH · API · Node · SSL · DB · Logs · Safe Restart · Fixtures
+║
+║ 🌍 Global
+║     mock                          VERIFIED     Logs · Safe Restart · Fixtures
+║     cpanel-cloudlinux-selector    RESEARCH     SSH · API · Node · SSL · DB · Logs · Safe Restart
+║     cpanel-generic                RESEARCH     SSH · API · Node · SSL · DB · Logs · Safe Restart
+║     cyberpanel-generic            RESEARCH     SSH · API · Node · SSL · DB
+║     directadmin-generic           RESEARCH     SSH · API · Node · SSL · DB · Logs · Safe Restart
+║
+║
+║ [↑/↓] select  [Enter] toggle detail  [c] copy briefing  [Esc] back  [q] quit
+╚═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+  [q] quit · [?] help · [↑/↓] select · [Enter] toggle detail · [c] copy briefing · [Esc] back

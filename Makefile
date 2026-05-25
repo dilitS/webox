@@ -150,6 +150,15 @@ mock: build ## Launch the cockpit with deterministic mock data (no SSH/HTTP/GitH
 doctor-security: build ## Run `webox doctor security` (post-MVP).
 	$(BIN_DIR)/webox doctor security
 
+.PHONY: smoke-test
+smoke-test: build ## Drive ./bin/webox --mock through Sprint 20 scenarios via tuistory PTY (requires Node 24+ and one-time `npm --prefix scripts/manual-test install`).
+	@if [ ! -d scripts/manual-test/node_modules ]; then \
+		printf "$(COLOR_RED)✗ scripts/manual-test/node_modules missing.$(COLOR_RESET) Run: npm --prefix scripts/manual-test install\n"; \
+		exit 1; \
+	fi
+	@node --version | awk -F'.' '{ if ($$1 < "v24") { print "✗ Node "$$0" too old; need v24+"; exit 1 } }'
+	cd scripts/manual-test && node --experimental-strip-types --no-warnings smoke.ts
+
 # ── Modules / Tools ────────────────────────────────────────────────────
 
 .PHONY: deps

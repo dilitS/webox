@@ -1,0 +1,15 @@
+
+WEBOX v0.1.0-rc1-13-g48a5379-dirty  LIVE  Live Logs │ 14:32:01 │ us-east-1 │ Uptime: 24d 11h │ Load: 0.12, 0.28, 0.31 │
+╔═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+║ 📜 [Live Logs: ShopEase-Web]
+║
+║ [1] Overview  [2] Env Diff  [3] Database  [4] Logs
+║
+║ Active File: (awaiting log path) · Stream: Tail -f: On · Disconnected · Buffer: 0/1024 lines
+║
+║ Waiting for the first log line…
+║
+║ [f] toggle auto-scroll  [c] clear buffer  [Esc] back
+║ up/down: scroll · q: quit
+╚═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+  [q] quit · [?] help · [Esc/Tab] back · [1] overview · [2] env · [3] db · [4] logs · [r] restart · [s] ssl · [v] tail

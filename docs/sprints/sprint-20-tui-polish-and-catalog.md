@@ -153,14 +153,15 @@ Czego **nie** umiemy: cPanel adapter (Sprint 21+), CI/CD step click-through (car
 
 ## Outcome (2026-05-25, sprint zamknięty wcześniej niż planowano)
 
-- ✅ **Done (6/6 taski):**
+- ✅ **Done (6/6 taski + bonus operator-validation):**
   - TASK-20.1 — `bento.LayoutMap` + click hit-testing (focus scrollable tile / drill non-scrollable / status-bar no-op).
   - TASK-20.2 — Provider Catalog screen pod `[p]`, kursor `↑/↓`, detail toggle `Enter`, copy-briefing `c` (clipboard via `pbcopy`/`xsel`/`xclip`/`wl-copy`/`clip.exe` z graceful fallback hintem).
   - TASK-20.3 — Standard mode redesign na proper mini-bento (top: projects + server, bottom: CI/CD strip + Live Log strip), 5 nowych regression testów dla budgetu wiersza/clippingu.
   - TASK-20.4 — Project Detail tabs `[2] Env Diff` i `[3] Database` jako read-only views; Env Diff czyta `SecretsMeta` (z badge stale), Database to stack-aware cheatsheet z naming convention z domeny.
   - TASK-20.5 — Help overlay (`?`) jako fullscreen centered modal nad każdym ekranem, surface keys parsowane z `Footer().Text` (live, never drifts), strict-block routing kluczy (tylko `?`/`Esc`/`Enter`/`q`/`Ctrl+C` reach the model). Refactor `updateKey` → `handleOverlayKey` zbił cyclomatic complexity poniżej lint gate.
-  - TASK-20.6 — CHANGELOG `[Unreleased]` z 4 wpisami Added (catalog, help, screenshot tool, mouse semantics) + 1 Changed; 14 screenshotów w `docs/screenshots/sprint-20/`; retrospective w `docs/retros/2026-05-25-sprint-20.md`.
-- ⏭️ Carry-over: brak — wszystkie taski zamknięte w jednej sesji.
+  - TASK-20.6 — CHANGELOG `[Unreleased]` z 5 wpisami Added (catalog, help, screenshot tool, mouse semantics, smoke-test runner) + 1 Changed; 14 statycznych screenshotów w `docs/screenshots/sprint-20/`; 17 smoke-snapshotów + REPORT.md w `docs/screenshots/sprint-20/manual/`; retrospective w `docs/retros/2026-05-25-sprint-20.md`.
+  - **BONUS — `make smoke-test` (tuistory PTY driver).** Operator validation problem zidentyfikowany w retro Sprint 20 (Open Question #3) został zaadresowany w tej samej sesji: `scripts/manual-test/` z 5 scenariuszami × 34 assertions × ~83s end-to-end pokrywa każdą Sprint 20 zmianę widoczną dla operatora (resize bento, help overlay, catalog, project detail tabs, mouse click). Wynik: `✓ all 5 scenarios passed` w pierwszym uruchomieniu, snapshoty diff-friendly.
+- ⏭️ Carry-over: brak — wszystkie taski + bonus zamknięte w jednej sesji.
 - 📌 **Decyzje (bez nowych ADR):**
   - Help overlay zastępuje cały `View()` zamiast composite-paint-on-top — uniknęliśmy double-border artefaktów z bento engine i nie musieliśmy modyfikować layout viewport math. Decyzja udokumentowana w komentarzu `helpOverlayFullscreen`.
   - Clipboard via `os/exec` + per-OS allowlist (`pbcopy` macOS, `xsel`/`xclip`/`wl-copy` Linux/Wayland, `clip.exe` Windows) zamiast nowej `go.mod` zależności (`atotto/clipboard`) — uniknęliśmy procedury sign-off maintainera.
@@ -173,7 +174,8 @@ Czego **nie** umiemy: cPanel adapter (Sprint 21+), CI/CD step click-through (car
 - 📊 **Metrics:**
   - `make test`: 100% pass · coverage **80.1% ≥ 70%** (`+0.4pp` vs Sprint 19 close).
   - `make bench-check`: worst `BenchmarkRenderMode/ultraplus-160x45` = **199µs ≤ 5ms budget** (40× margines).
-  - `make vulncheck`: 0 vulnerabilities.
+  - `make vulncheck`: 0 vulnerabilities (Go side; tuistory dev-only deps mają 23 transitive low/moderate — udokumentowane w `scripts/manual-test/README.md`).
   - `make lint`: 0 issues po naprawie 9 (mnd, gosec G204 false-positive, gocyclo, prealloc, unconvert).
+  - `make smoke-test`: 5/5 scenarios, 34/34 assertions, ~83s wall-clock end-to-end.
   - 36 nowych unit testów (catalog model 7, catalog views 5, catalog surface 2, help overlay 6, env diff 5, database 4, mini-bento 5, layout map 2).
-  - 14 screenshotów w `docs/screenshots/sprint-20/` (od `01-dashboard-tiny-60x18.txt` do `14-help-overlay-detail-120x35.txt`).
+  - 14 statycznych screenshotów w `docs/screenshots/sprint-20/` (od `01-dashboard-tiny-60x18.txt` do `14-help-overlay-detail-120x35.txt`) + 17 smoke-snapshotów w `docs/screenshots/sprint-20/manual/`.

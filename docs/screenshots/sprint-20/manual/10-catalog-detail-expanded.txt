@@ -1,0 +1,46 @@
+
+WEBOX v0.1.0-rc1-13-g48a5379-dirty  LIVE  Provider Catalog │ 14:32:01 │ us-east-1 │ Uptime: 24d 11h │ Load: 0.12, 0.28, 0.31 │ RAM: 3.4/8.0
+╔═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+║ 🗂 [Provider Catalog]
+║
+║ Read-only browser over the embedded preset registry. Use this to discover supported hosting providers before running the new-project
+║ wizard.
+║
+║ 🇵🇱 Poland
+║     smallhost-devil               VERIFIED     SSH · API · Node · SSL · DB · Logs · Safe Restart · Fixtures
+║    ▶ smallhost-devil                VERIFIED     SSH · API · Node · SSL · DB · Logs · Safe Restart · Fixtures
+║
+║     mock                          VERIFIED     Logs · Safe Restart · Fixtures
+║    ▶ cpanel-cloudlinux-selector     RESEARCH     SSH · API · Node · SSL · DB · Logs · Safe Restart
+║     cpanel-cloudlinux-selector    RESEARCH     SSH · API · Node · SSL · DB · Logs · Safe Restart
+║     cpanel-generic                RESEARCH     SSH · API · Node · SSL · DB · Logs · Safe Restart
+║     cyberpanel-generic            RESEARCH     SSH · API · Node · SSL · DB
+║     directadmin-generic           RESEARCH     SSH · API · Node · SSL · DB · Logs · Safe Restart
+║ ────
+║ 📖 [Detail: cPanel + CloudLinux Node.js Selector]
+║ id:            cpanel-cloudlinux-selector
+║ status:        research
+║ region:        Global
+║ markets:       global
+║
+║ panel name:    cPanel
+║ panel API:     uapi (:2083)
+║ ssh required:  yes
+║
+║ node runtime:  cloudlinux_selector
+║ restart method: passenger
+║ ssl provider:  autossl
+║ databases:     mysql
+║ badges:        SSH · API · Node · SSL · DB · Logs · Safe Restart
+║
+║ deploy path:   /home/{{user}}/nodejs/{{app_root}}/public
+║ log path:      /home/{{user}}/nodejs/{{app_root}}/logs
+║ env path:      /home/{{user}}/nodejs/{{app_root}}/.env
+║
+║ Probes (documentation; not executed in v0.2 baseline):
+║   - command -v cloudlinux-selector
+║   - command -v selectorctl
+║   - command -v nodejs_selector
+║   - uapi --output=json Version get_version
+║   - uapi --output=json PassengerApps list_applications
+  [q] quit · [?] help · [↑/↓] select · [Enter] toggle detail · [c] copy briefing · [Esc] back  ·  ↕ scroll: PgUp/PgDn (0/12)

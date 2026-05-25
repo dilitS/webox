@@ -1,0 +1,22 @@
+
+WEBOX v0.1.0-rc1-13-g48a5379-dirty  LIVE  Project Detail │ 14:32:01 │ us-east-1 │ Uptime: 24d 11h │ Load: 0.12, 0.28, 0.
+╔═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+║ 🖥 [Project Detail: ShopEase-Web]
+║
+║ [1] Overview  [2] Env Diff  [3] Database  [4] Logs
+║
+║  ONLINE
+║
+║ HTTP:          200 OK
+║ Node:          v20.11.0
+║ SSL:           114 days remaining
+║ Deploy path:   ~/domains/ShopEase-Web/public_html
+║ Repo:          dilitS-demo/shopease-web
+║ Last Deploy:   2h ago · success
+║
+║ no action yet
+║
+║ [r] Restart  [s] SSL Renew  [v] Tail Logs
+║ left/esc:back  q:quit
+╚═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+  [q] quit · [?] help · [Esc/Tab] back · [1] overview · [2] env · [3] db · [4] logs · [r] restart · [s] ssl · [v] tail
