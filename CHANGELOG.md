@@ -15,6 +15,10 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ## [Unreleased]
 
+### Changed
+
+- **Sprint 15 — README.md rewritten as v0.1 launch landing (TASK-15.1, 2026-05-25).** The repo's front page now follows the conversion structure from `docs/sprints/sprint-15-launch-readiness.md` TASK-15.1: Hero (badges + demo links) → **Why Webox** (one paragraph, magnet words `cPanel` / `DirectAdmin` / `shared hosting` / `Node.js` / `terminal`) → **Try it in 30 seconds** (`git clone && make build && ./bin/webox --mock`, no SSH, no config) → **What you can do today** (one verified provider, 8 implemented capabilities) → **Add your hosting in 4 hours** (`webox provider new` demo + 4-preset matrix + 4-hour walkthrough link + explicit pair-review promise) → **Architecture highlights** (Provider Pattern, MVU Bubble Tea, SSH pool + SWR, keyring + AES-GCM, atomic config + 80 % coverage) → **Status & roadmap** (small.pl v0.1 → cPanel v0.2 → DirectAdmin v0.3) → **Contributing** (3 paths + guardrail summary) → **License & credits** (Apache-2.0 + Charmbracelet + small.pl + Go ecosystem ack). All 22 links absolute so the README works in forks. 136 lines vs. previous 506 — strict adherence to "no testimonials, no `go install`, no >10 feature list" from the AC. Demo + screenshot embeds reference the recorder-script READMEs so the page remains clean before the operator records the canonical `demo.cast` and `dashboard.png` for v0.1.0 GA.
+
 ### Added
 
 - **Sprint 15 — Landing-page license-regression guard (TASK-15.5 partial, 2026-05-25).**
