@@ -1,0 +1,71 @@
+package {{.PackageName}}
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"github.com/dilitS/webox/providers"
+)
+
+// validConfig returns a minimal ProviderConfig that satisfies the
+// registry's shared invariants so adapter-specific tests can focus on
+// {{.DisplayName}} semantics.
+func validConfig() providers.ProviderConfig {
+	return providers.ProviderConfig{
+		Alias:      "{{.Name}}-test",
+		Type:       providerName,
+		Host:       "panel.example.com",
+		Port:       22,
+		User:       "webox-test",
+		Properties: map[string]string{},
+	}
+}
+
+func TestNew_RejectsWrongType(t *testing.T) {
+	t.Parallel()
+
+	cfg := validConfig()
+	cfg.Type = "something-else"
+
+	if _, err := New(cfg); !errors.Is(err, providers.ErrInvalidProviderConfig) {
+		t.Fatalf("New(cfg.Type=%q) err = %v, want ErrInvalidProviderConfig", cfg.Type, err)
+	}
+}
+
+// TestNew_AcceptsValidConfig is a TDD red test. It currently passes
+// because New is a thin pass-through, but it will start exercising
+// parsed Properties as soon as you wire parseProperties — keep the
+// test green at every step of the implementation.
+func TestNew_AcceptsValidConfig(t *testing.T) {
+	t.Parallel()
+
+	p, err := New(validConfig())
+	if err != nil {
+		t.Fatalf("New(valid) err = %v", err)
+	}
+	if p == nil {
+		t.Fatal("New(valid) returned nil provider")
+	}
+	if p.Name() != providerName {
+		t.Errorf("Name() = %q, want %q", p.Name(), providerName)
+	}
+}
+
+// TestCheckStatus_IsTheFirstMethodToReplace pins the TDD entry point
+// for new contributors. The assertion is intentionally weak (errors.Is
+// against ErrNotImplemented) so the test starts failing the moment
+// CheckStatus gains real behaviour — at which point you delete this
+// test and replace it with a proper transport-level scenario.
+func TestCheckStatus_IsTheFirstMethodToReplace(t *testing.T) {
+	t.Parallel()
+
+	p, err := New(validConfig())
+	if err != nil {
+		t.Fatalf("New(valid) err = %v", err)
+	}
+	_, err = p.CheckStatus(context.Background())
+	if !errors.Is(err, ErrNotImplemented) {
+		t.Fatalf("CheckStatus err = %v, want ErrNotImplemented (replace this test once you implement CheckStatus)", err)
+	}
+}

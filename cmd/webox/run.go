@@ -25,14 +25,15 @@ const (
 const helpText = `webox — keyboard-driven cockpit for shared-hosting deployments
 
 Usage:
-  webox                       launch the cockpit (TUI; arrives with v0.1 MVP)
-  webox --mock                launch the cockpit with seeded demo data (offline)
-  webox doctor                run local diagnostics and print a text report
-  webox doctor --json         run local diagnostics and print JSON
-  webox doctor github         run read-only GitHub integration diagnostics
-  webox doctor github --json  run GitHub integration diagnostics as JSON
-  webox --version             print build metadata and exit
-  webox --help                print this help and exit
+  webox                                  launch the cockpit (TUI)
+  webox --mock                           launch the cockpit with seeded demo data (offline)
+  webox doctor                           run local diagnostics and print a text report
+  webox doctor --json                    run local diagnostics and print JSON
+  webox doctor github                    run read-only GitHub integration diagnostics
+  webox doctor github --json             run GitHub integration diagnostics as JSON
+  webox provider new <name> [--preset P] scaffold a new hosting provider adapter
+  webox --version                        print build metadata and exit
+  webox --help                           print this help and exit
 
 Flags:
   --debug              enable verbose diagnostic logging
@@ -46,6 +47,11 @@ Flags:
                        created with mode 0600 and every line is passed
                        through the redactor before write — see
                        docs/SECURITY.md §6 for the policy.
+  --preset=PRESET      (only with ` + "`provider new`" + `) seed the generated
+                       skeleton with vendor-specific scaffolding. Supported:
+                       blank (default), cpanel-uapi, directadmin, cyberpanel.
+  --dry-run            (only with ` + "`provider new`" + `) report what would be
+                       written without touching the filesystem.
 
 Documentation:
   https://github.com/dilitS/webox/tree/main/docs
@@ -69,6 +75,14 @@ type opts struct {
 	// [telemetry.Disabled] no-op sink so production runs never touch
 	// disk (TASK-14.6).
 	debugTracePath string
+	// providerNew toggles the `webox provider new <name>` generator
+	// path. The remaining provider* fields hold the subcommand's
+	// own options (name + preset + dry-run); they are zero values
+	// when providerNew is false.
+	providerNew     bool
+	providerNewName string
+	providerPreset  string
+	providerDryRun  bool
 }
 
 // doctorDispatcher is the seam that lets tests run the CLI router
@@ -126,6 +140,12 @@ func runWithFullDeps(
 		default:
 			return dispatchCore(parsed.doctorJSON, stdout, stderr)
 		}
+	case parsed.providerNew:
+		return runProviderNew(providerNewOpts{
+			name:   parsed.providerNewName,
+			preset: parsed.providerPreset,
+			dryRun: parsed.providerDryRun,
+		}, stdout, stderr)
 	}
 
 	// The --debug modifier is parsed (so order-independent invocations such
@@ -367,43 +387,121 @@ func logsFetcherFor(client *ghsvc.Client) tui.GitHubLogsFetcher {
 
 func parseArgs(args []string) (parsed opts, errMsg string) {
 	for _, arg := range args {
-		switch arg {
-		case "doctor":
-			parsed.doctor = true
-		case "github":
-			if !parsed.doctor {
-				return opts{}, "webox: `github` is only valid after `doctor`."
-			}
-			if parsed.doctorTarget != "" && parsed.doctorTarget != "github" {
-				return opts{}, fmt.Sprintf("webox: doctor target already set to %q.", parsed.doctorTarget)
-			}
-			parsed.doctorTarget = "github"
-		case "--version":
-			parsed.showVersion = true
-		case "--help", "-h":
-			parsed.showHelp = true
-		case "--debug":
-			parsed.debug = true
-		case "--mock":
-			parsed.mock = true
-		case "--json":
-			parsed.doctorJSON = true
-		default:
-			if path, ok := strings.CutPrefix(arg, "--debug-trace="); ok {
-				if path == "" {
-					return opts{}, "webox: --debug-trace requires a non-empty PATH (e.g. --debug-trace=/tmp/webox.jsonl)"
-				}
-				parsed.debugTracePath = path
-				continue
-			}
-			return opts{}, fmt.Sprintf(
-				"webox: unknown argument %q. Run `webox --help` for usage.",
-				arg,
-			)
+		if errMsg = applySimpleFlag(&parsed, arg); errMsg != "" {
+			return opts{}, errMsg
 		}
+		if simpleFlagHandled(arg) {
+			continue
+		}
+		if errMsg = applyPrefixedFlag(&parsed, arg); errMsg != "" {
+			return opts{}, errMsg
+		}
+		if prefixedFlagHandled(arg) {
+			continue
+		}
+		if parsed.providerNew && parsed.providerNewName == "" && !strings.HasPrefix(arg, "-") {
+			parsed.providerNewName = arg
+			continue
+		}
+		return opts{}, fmt.Sprintf("webox: unknown argument %q. Run `webox --help` for usage.", arg)
 	}
-	if parsed.doctorJSON && !parsed.doctor {
-		return opts{}, "webox: --json is only valid with `webox doctor`."
+	if errMsg := postParseValidation(parsed); errMsg != "" {
+		return opts{}, errMsg
 	}
 	return parsed, ""
+}
+
+// applySimpleFlag handles the closed-set of literal token / flag args.
+// It returns a non-empty `errMsg` only when the token is recognised
+// AND the operator combined it incorrectly (e.g. `--dry-run` outside
+// `provider new`). It returns "" both for "handled" and "not mine";
+// the caller disambiguates via [simpleFlagHandled].
+func applySimpleFlag(parsed *opts, arg string) string {
+	switch arg {
+	case "doctor":
+		parsed.doctor = true
+	case "github":
+		if !parsed.doctor {
+			return "webox: `github` is only valid after `doctor`."
+		}
+		if parsed.doctorTarget != "" && parsed.doctorTarget != "github" {
+			return fmt.Sprintf("webox: doctor target already set to %q.", parsed.doctorTarget)
+		}
+		parsed.doctorTarget = "github"
+	case "provider":
+		parsed.providerNew = true
+	case "new":
+		if !parsed.providerNew {
+			return "webox: `new` is only valid after `provider` (usage: webox provider new <name>)."
+		}
+	case "--version":
+		parsed.showVersion = true
+	case "--help", "-h":
+		parsed.showHelp = true
+	case "--debug":
+		parsed.debug = true
+	case "--mock":
+		parsed.mock = true
+	case "--json":
+		parsed.doctorJSON = true
+	case "--dry-run":
+		if !parsed.providerNew {
+			return "webox: --dry-run is only valid with `provider new`."
+		}
+		parsed.providerDryRun = true
+	}
+	return ""
+}
+
+// simpleFlagHandled returns true when applySimpleFlag consumed the
+// argument, false otherwise. The split keeps parseArgs's main loop
+// flat — without it, gocyclo flags the function as too complex.
+func simpleFlagHandled(arg string) bool {
+	switch arg {
+	case "doctor", "github", "provider", "new",
+		"--version", "--help", "-h", "--debug",
+		"--mock", "--json", "--dry-run":
+		return true
+	}
+	return false
+}
+
+// applyPrefixedFlag handles `--key=value` form options. Returns
+// non-empty `errMsg` on validation failure; otherwise "" (handled or
+// not mine — caller checks [prefixedFlagHandled]).
+func applyPrefixedFlag(parsed *opts, arg string) string {
+	if path, ok := strings.CutPrefix(arg, "--debug-trace="); ok {
+		if path == "" {
+			return "webox: --debug-trace requires a non-empty PATH (e.g. --debug-trace=/tmp/webox.jsonl)"
+		}
+		parsed.debugTracePath = path
+		return ""
+	}
+	if preset, ok := strings.CutPrefix(arg, "--preset="); ok {
+		if !parsed.providerNew {
+			return "webox: --preset is only valid with `provider new`."
+		}
+		if preset == "" {
+			return "webox: --preset requires a value (one of blank, cpanel-uapi, directadmin, cyberpanel)."
+		}
+		parsed.providerPreset = preset
+		return ""
+	}
+	return ""
+}
+
+func prefixedFlagHandled(arg string) bool {
+	return strings.HasPrefix(arg, "--debug-trace=") || strings.HasPrefix(arg, "--preset=")
+}
+
+// postParseValidation enforces cross-flag invariants that cannot be
+// decided in a single token's switch arm.
+func postParseValidation(parsed opts) string {
+	if parsed.doctorJSON && !parsed.doctor {
+		return "webox: --json is only valid with `webox doctor`."
+	}
+	if parsed.providerNew && parsed.providerNewName == "" {
+		return "webox: `provider new` requires a name (usage: webox provider new <name> [--preset PRESET])."
+	}
+	return ""
 }

@@ -1,0 +1,156 @@
+package {{.PackageName}}
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/dilitS/webox/providers"
+)
+
+// providerName is the registered type token shared with
+// `config.Profile.Type` and the operator-facing docs. Exported as a
+// constant so wizard / doctor never carry stringly-typed literals.
+const providerName = "{{.Name}}"
+
+// ErrNotImplemented is the placeholder sentinel every generated
+// HostingProvider method returns until the contributor wires the
+// real {{.DisplayName}} transport. Tests check that callers branch
+// on it via [errors.Is] rather than message equality so swapping
+// the stub for the real implementation does not break the wizard
+// flow halfway through implementation.
+var ErrNotImplemented = errors.New("{{.Name}}: method not implemented yet — see docs/contributing/PROVIDER.md")
+
+// Provider is the {{.DisplayName}} HostingProvider implementation.
+// It is constructed via [New] (registered with providers.Register in
+// init()); business logic NEVER instantiates it directly.
+//
+// Replace the `// TODO` placeholders one by one — start with
+// [Provider.CheckStatus] (cheapest probe), then [Provider.ListSubdomains]
+// (read-only), then the mutating methods in the order the wizard
+// exercises them (CreateSubdomain → SetupSSL → CreateDatabase →
+// RestartNodeApp). Idempotent Remove* methods come last and reuse the
+// same parsers as their Create counterparts.
+type Provider struct {
+	cfg providers.ProviderConfig
+}
+
+// New is the [providers.Factory] registered under "{{.Name}}".
+// The registry already validated shared invariants (alias / host /
+// user / port / Properties non-nil); the constructor only needs to
+// run adapter-specific checks (panel URL, token presence, etc.).
+//
+// TODO: parse [cfg.Properties] into a typed struct (mirror
+// `providers/smallhost/config.go`'s [parseProperties]).
+func New(cfg providers.ProviderConfig) (providers.HostingProvider, error) {
+	if cfg.Type != providerName {
+		return nil, fmt.Errorf("%w: {{.PackageName}} factory invoked with type %q", providers.ErrInvalidProviderConfig, cfg.Type)
+	}
+	return &Provider{cfg: cfg}, nil
+}
+
+// Name satisfies [providers.HostingProvider] — return the registered
+// type rather than the alias so logs survive alias renames.
+func (p *Provider) Name() string { return providerName }
+
+// CreateSubdomain provisions a Node.js subdomain.
+//
+// TODO: validate `domain` + `nodeVersion`, build the panel command,
+// run via your transport, and parse the response with a typed parser
+// that returns providers.ErrSubdomainExists / providers.ErrNodeVersionUnsupported
+// for the known panel responses.
+func (p *Provider) CreateSubdomain(_ context.Context, _ string, _ string) error {
+	return ErrNotImplemented
+}
+
+// SetupSSL provisions a Let's Encrypt certificate.
+//
+// TODO: surface ErrDNSNotResolving / ErrRateLimitLetsEncrypt verbatim
+// so the status loop applies the right backoff.
+func (p *Provider) SetupSSL(_ context.Context, _ string) error {
+	return ErrNotImplemented
+}
+
+// CreateDatabase provisions a database and the matching user.
+// Returns the panel-generated `user` and `password` — callers MUST
+// move `password` into a memguard.LockedBuffer immediately.
+//
+// TODO: accept providers.DatabaseMySQL / providers.DatabasePostgres
+// (string-typed for forward compatibility); reject unknown kinds with
+// providers.ErrInvalidProviderConfig.
+func (p *Provider) CreateDatabase(_ context.Context, _ string, _ string) (user, password string, err error) {
+	return "", "", ErrNotImplemented
+}
+
+// RestartNodeApp triggers a panel-side restart of the Node.js app.
+//
+// TODO: map panel-side "not found" / "not a node app" responses to
+// providers.ErrAppNotFound / providers.ErrAppNotNode.
+func (p *Provider) RestartNodeApp(_ context.Context, _ string) error {
+	return ErrNotImplemented
+}
+
+// GetDeployPath returns the absolute path the deploy workflow rsyncs
+// build artifacts into. Pure function: no I/O.
+//
+// TODO: derive from `p.cfg.User` + the panel's webroot convention.
+func (p *Provider) GetDeployPath(_ string) string { return "" }
+
+// GetLogPath returns the absolute path containing the Node.js app
+// stdout/stderr logs. Pure function: no I/O.
+//
+// TODO: derive from `p.cfg.User` + the panel's log convention.
+func (p *Provider) GetLogPath(_ string) string { return "" }
+
+// TailLog returns the last `lines` log entries for the subdomain.
+// Implementations clamp `lines` to a safe upper bound and accept
+// zero/negative as "use adapter default".
+//
+// TODO: invoke the remote `tail` (or panel API) against
+// [Provider.GetLogPath]; swallow "no traffic yet" exit codes and
+// return combined stdout/stderr verbatim.
+func (p *Provider) TailLog(_ context.Context, _ string, _ int) ([]byte, error) {
+	return nil, ErrNotImplemented
+}
+
+// CheckStatus runs the cheap sanity probe consumed by the dashboard's
+// health badge and `webox doctor`.
+//
+// TODO: dial transport, run a CLI version probe, populate
+// providers.ProviderStatus, surface providers.ErrCLINotFound when the
+// panel CLI is missing.
+func (p *Provider) CheckStatus(_ context.Context) (*providers.ProviderStatus, error) {
+	return nil, ErrNotImplemented
+}
+
+// ListSubdomains enumerates the subdomains currently provisioned so
+// the wizard can detect drift between `config.json` and the panel.
+//
+// TODO: parse the panel's list output into []providers.Subdomain.
+func (p *Provider) ListSubdomains(_ context.Context) ([]providers.Subdomain, error) {
+	return nil, ErrNotImplemented
+}
+
+// RemoveSubdomain deprovisions the subdomain.
+// Idempotent: nil when the panel reports "not found".
+func (p *Provider) RemoveSubdomain(_ context.Context, _ string) error {
+	return ErrNotImplemented
+}
+
+// RemoveDatabase deprovisions the database and its user.
+// Idempotent: nil when the panel reports "not found".
+func (p *Provider) RemoveDatabase(_ context.Context, _ string, _ string) error {
+	return ErrNotImplemented
+}
+
+// RemoveSSL deprovisions the SSL certificate.
+// Idempotent: nil when the panel reports "no cert".
+func (p *Provider) RemoveSSL(_ context.Context, _ string) error {
+	return ErrNotImplemented
+}
+
+func init() {
+	if err := providers.Register(providerName, New); err != nil {
+		panic(fmt.Sprintf("{{.PackageName}}: register: %v", err))
+	}
+}
