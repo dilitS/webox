@@ -235,27 +235,41 @@ Sprint 15 może wymagać:
 
 ---
 
-## Outcome (wypełnij po sprincie)
+## Outcome (zamknięty 2026-05-25)
 
-- ✅ Done: ...
-- ⏭️ Carry-over → Sprint 16: ...
-- 📌 Decyzje:
-  - README hero converts? TAK / NIE (z liczbą stars w pierwsze 7 dni Sprint 16)
-  - Generator scaffold mainline binary vs `webox-dev`: ...
-  - EN-only landing post-launch: TAK / NIE
-- 🧠 Surprises: ...
-- 📊 Metryki:
-  - README hero conversion (heat map jeśli landing analytics): ?
-  - `webox provider new` generator working end-to-end: ?
-  - `docs/contributing/PROVIDER.md` tested by 3rd party (znajomy dev): ?
-- 🔒 Security validation:
-  - [ ] `govulncheck` zielony (regression — nie powinno być nic).
-  - [ ] Repo audit (TASK-15.7) zamknięty.
-  - [ ] Brak path absolute w docs.
-- ➡️ Następny sprint: `sprint-16-public-launch.md`
+- ✅ **Done — wszystkie 8 tasków (15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.7, 15.9):**
+  - **15.1** — `README.md` przepisany do 136-liniowego launch-landing (hero → why → 30s try → v0.1 caps → 4h add-provider → arch → roadmap → contributing → license). Wszystkie 22 linki absolute. AC „no testimonials / no go install / no >10 features" spełnione.
+  - **15.2** — `scripts/record-demo.sh` (expect-driven, 120×35 enforce, 7-beat scenariusz) + `scripts/capture-screenshot.sh` + `assets/demo|screenshots/` scaffolded z per-folder README. Cast + PNG nagrywane przez operatora przed v0.1.0 GA (interactive terminal session).
+  - **15.3** — Root `CONTRIBUTING.md` EN on-ramp (143 linii) + `docs/CONTRIBUTING.md` oznaczony jako legacy PL detailed reference. Three contribution paths (provider / i18n / fix) z explicit pair-review promise.
+  - **15.4** — `webox provider new <name> [--preset]` generator (`cmd/webox/provider_new.go` + `assets/provider-template/`). Decyzja poniżej: **zostaje w mainline binary** (nie `webox-dev`).
+  - **15.5** — `scripts/lint-landing-license.sh` (committable artefakt dla gitignored landing/) + lokalny `landing/en/index.html` head/meta layer translated. Body translation deferred do operator deploy cycle z native-speaker pass.
+  - **15.6** — `.github/issue-drafts/` × 5 (cPanel skeleton 🟢 4-8h, DA skeleton 🟡 4-6h, CyberPanel research 🔴 2-3h, Next.js scaffolding 🟢 1-2h, DE translation 🟢 1h) + `create-all.sh` shipping script.
+  - **15.7** — Repo hygiene audit: `.github/ISSUE_TEMPLATE/provider_request.yml` + `.github/FUNDING.yml` placeholder + Apache-2.0 backfill (README badge/footer, PRD §12.1, release-check skill, lokalny landing) + hardcoded-credential clean-up (CONTRIBUTING placeholders, UX mockup convention note).
+  - **15.9** — `AGENTS.md` slim (≤150 linii) + 3 wydzielone docs: `docs/conventions.md`, `docs/dependencies.md`, `docs/gotchas.md`, `docs/providers/preconfiguration-vision.md`, `docs/contributing/PROVIDER.md`. ([Już wykonane w pre-sprint-15 commits — patrz CHANGELOG `Added/AGENTS.md docs refactor`.])
+- ⏭️ **Carry-over → Sprint 16:**
+  - **15.2 artefacts (cast + PNG):** rzeczywiste nagranie 45-60s asciinema + capture statycznego PNG `dashboard.png` (T+8s) — wymaga interactive 120×35 terminal session, operator-only.
+  - **15.5 body translation:** pełne EN tłumaczenie landing body (1100+ linii marketing copy + ASCII mockups) — wymaga native-speaker / Grammarly Premium review pass (w AC); head/meta layer już gotowy.
+- 📌 **Decyzje:**
+  - **Generator scaffold zostaje w mainline `webox` binary** (nie wydzielamy do `webox-dev`). Powody: (a) `webox provider new` to operatorska/contributor-facing komenda, nie debug; (b) generator dodaje +1.7k LoC do binary, ale `assets/provider-template/*.tmpl` są małe (~12 KB); (c) wymaganie osobnego `webox-dev` binary podniosłoby tarcie wejścia z "single binary" do "find the right binary first" — sprzeczne z DX celem v0.1.
+  - **EN-only landing post-launch decyzja przeniesiona do Sprint 16 retro.** Sprint 15 dostarcza obie wersje (PL canonical + EN scaffold); Sprint 16 mierzy ruch i decyduje czy/kiedy wyłączyć PL z deploymentu (file zostaje w repo, deployment się rozłącza).
+  - **README hero conversion:** **mierzone w Sprint 16** (pierwsze 7 dni post-launch stars + clone counts). Sprint 15 dostarcza wersję; Sprint 16 ocenia.
+- 🧠 **Surprises:**
+  - Generator (TASK-15.4) okazał się znacznie większym dostarczenikiem wartości niż estymowane M — wyłonił się jako prawdziwy "single strongest contributor magnet". 7 plików `.tmpl` + 514-liniowy `provider_new.go` + 478-liniowy test file. Decyzja: w Sprint 17 audit czy template wymaga update'u po pierwszym real-world cPanel adapterze.
+  - Landing JSON-LD `license` MIT odkryto w **dwóch** miejscach (PL `index.html` Schema.org + `landing-page-plan.md` JSON-LD example), nie jednym. Linter (`scripts/lint-landing-license.sh`) złapał regression dwa razy podczas iteracji — wzmacnia argument za stałym committed linterem na otherwise-gitignored asset folderem.
+  - `docs/UX.md` mockupy zawierały realny dogfooding username (`biuromody`, `sui.biuromody.smallhost.pl`). Rozwiązanie: dodano "konwencja mockupów" note w preamble zamiast całościowej sanityzacji — preserves authentic context dla użytkowników, ale flagi jasno że to fikcyjne dane.
+- 📊 **Metryki (post-sprint):**
+  - 8/8 tasków done (100 %).
+  - **15 commits**, **15 PR merges** (`feat/s15-*` branches) w **1 dzień** — ostatecznie all-tasks-in-one-session burst zamiast 1-2 tygodniowego planu. Sygnał: dla docs-heavy sprintów estymata `M` to overestimate gdy autor zna domenę.
+  - CHANGELOG `[Unreleased]` zawiera **8 osobnych Sprint 15 entries** + 1 `Changed` entry (README rewrite + good-first-issue drafts).
+  - Łącznie **~3500 linii** dodanych w docs/templates/scripts (1700 generator, 600 docs/contributing/PROVIDER, 459 issue drafts, 339 demo scaffold, 343 issue drafts README+scripts, reszta repo polish).
+- 🔒 **Security validation:**
+  - [ ] `govulncheck` — uruchom w verification step (TASK-verify) przed v0.1.0.
+  - [x] Repo audit (TASK-15.7) zamknięty — zero exploit narratives w AUDIT, zero personal frustration content w retros, zero `/Users/seba/...` absolute paths.
+  - [x] Brak path absolute w docs — `MIGRATION_NOTES.md` clean, `docs/CONTRIBUTING.md §1.4` używa `<your-test-host.example.com>` placeholderów.
+- ➡️ **Następny sprint:** [`sprint-16-public-launch.md`](sprint-16-public-launch.md) — public launch + cPanel research foundation.
 
 ---
 
 ## Retro Link
 
-`docs/retros/<data>-sprint-15.md` (do utworzenia po zakończeniu sprintu)
+[`docs/retros/2026-05-25-sprint-15.md`](../retros/2026-05-25-sprint-15.md)

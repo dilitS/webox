@@ -243,7 +243,7 @@ Wszystkie powtarzalne kroki są skryptowane. Główne komendy z `Makefile`:
 | 12 | Polish, beta release, RC1 → v0.1 | 📝 Planned | [sprint-12-polish-release.md](sprint-12-polish-release.md) | — |
 | 13 | RC1 hardening + Surface foundation | 📝 Planned | [sprint-13-v01-ga-and-post-mvp-foundation.md](sprint-13-v01-ga-and-post-mvp-foundation.md) | — |
 | 14 | Architecture hardening (post-RC, pre-v0.2) | 📝 Planned | [sprint-14-architecture-hardening.md](sprint-14-architecture-hardening.md) | — |
-| 15 | **Launch Readiness** — README EN, asciinema, generator szkieletu adaptera, walkthrough PROVIDER.md, AGENTS.md slim, repo polish | 📝 Planned | [sprint-15-launch-readiness.md](sprint-15-launch-readiness.md) | — |
+| 15 | **Launch Readiness** — README EN, asciinema scaffold, generator szkieletu adaptera, walkthrough PROVIDER.md, AGENTS.md slim, repo polish, 5 launch-day issues | ✅ Done (2026-05-25) | [sprint-15-launch-readiness.md](sprint-15-launch-readiness.md) | [2026-05-25-sprint-15.md](../retros/2026-05-25-sprint-15.md) |
 | 16 | **Public Launch + cPanel Research** — soft launch PL → Show HN/r/golang/r/selfhosted, partnership outreach H88, cPanel test account + fixtures | 📝 Planned | [sprint-16-public-launch.md](sprint-16-public-launch.md) | — |
 | 17 | **cPanel Adapter MVP (part 1)** — UAPI client + SSH fallback, read-only ops, `webox doctor cpanel` | 📝 Planned | [sprint-17-cpanel-adapter.md](sprint-17-cpanel-adapter.md) | — |
 | 18 | **cPanel Adapter (part 2) + v0.2.0-rc1** — mutating ops, wizard integration, E2E, release | 📝 Planned | [sprint-18-cpanel-polish.md](sprint-18-cpanel-polish.md) | — |
@@ -301,4 +301,4 @@ Sprinty 15-20+ dodane 2026-05-25 — launch readiness + cPanel adapter + preset 
 
 ---
 
-_Last reviewed: 2026-05-23. Reviewer: project owner. Trigger: [ADR-0007](../adr/0007-bento-ultra-eskalacja-mvp.md) — eskalacja Bento Ultra do MVP._
+_Last reviewed: 2026-05-25. Reviewer: project owner. Trigger: Sprint 15 zamknięcie (Launch Readiness) — generator + README EN + repo polish ready dla v0.1.0 GA. Następny rewizor: po v0.1.0 release._

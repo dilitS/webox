@@ -17,6 +17,8 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ### Changed
 
+- **Sprint 15 — Sprint outcome + Sprint 16 pre-planning refresh (TASK-15.8, 2026-05-25).** Sprint 15 zamknięte z 8/8 tasków done (15.1-15.7 + 15.9; 15.2 / 15.5 carry-overy są **operator-only** artefakty: asciinema recording + landing body native-speaker pass). [`docs/sprints/sprint-15-launch-readiness.md`](./docs/sprints/sprint-15-launch-readiness.md) Outcome section wypełniona — explicit decyzja: **generator zostaje w mainline `webox` binary** (nie `webox-dev`), bo to operator/contributor-facing komenda, nie debug. [`docs/sprints/README.md`](./docs/sprints/README.md) Sprint 15 status → ✅ Done z retro linkiem. [`docs/sprints/sprint-16-public-launch.md`](./docs/sprints/sprint-16-public-launch.md) Pre-flight Checklist zaktualizowany: tasks z Sprint 15 oznaczone jako gotowe, 3 nowe carry-over checkboxes (cast recording, screenshot capture, landing EN body), 1 nowa decyzja-do-Sprint-16-retro (community vs. maintainer-led cPanel skeleton). [`docs/ROADMAP.md`](./docs/ROADMAP.md) Sprint 15 row zaktualizowany. Nowy retro plik [`docs/retros/2026-05-25-sprint-15.md`](./docs/retros/2026-05-25-sprint-15.md) — 4 sekcje (what worked, what didn't, surprises, changes to apply going forward) + 3 open questions kierujące Sprint 16 planning.
+
 - **Sprint 15 — 5 launch-day `good-first-issue` body drafts (TASK-15.6, 2026-05-25).** `.github/issue-drafts/` now holds five maintainer-approved issue bodies ready for `gh issue create --body-file …`:
   1. **cPanel UAPI skeleton** (🟢 mainstream · 4-8 h · `good-first-issue` `help wanted` `provider`).
   2. **DirectAdmin skeleton** (🟡 mixed API · 4-6 h · `good-first-issue` `help wanted` `provider`).
