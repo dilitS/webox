@@ -17,6 +17,12 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ### Added
 
+- **Sprint 15 — Asciinema + static-PNG demo capture scaffolding (TASK-15.2, 2026-05-25).**
+  - `scripts/record-demo.sh` — deterministic 45-60 s `expect`-driven asciinema recording of the `--mock` cockpit. Enforces exactly **120×35 terminal** (Bento Ultra framing); auto-builds `./bin/webox` if missing; validates `asciinema` + `expect` dependencies upfront; emits both `assets/demo/demo.cast` and `assets/demo/demo.sh.log` (companion keystroke script for reviewers diffing timing). The scripted scenario follows the 7 beats in `docs/sprints/sprint-15-launch-readiness.md` TASK-15.2: boot → 5-tile Tab tour → shop-ease detail → CI/CD pipeline modal (F8) + step scroll → Live Log Stream → Esc to Topology Map → quit. Re-running the script always produces the same cast — no ad-libbing in canonical artefacts.
+  - `scripts/capture-screenshot.sh` — renders `assets/screenshots/dashboard.png` (cockpit-at-rest frame @ t=8s) using [`agg`](https://github.com/asciinema/agg) + `ffmpeg`; prints fallback manual-capture instructions when `agg` is missing. Documents how to capture `assets/screenshots/wizard.png` (manual screenshot of new-project wizard step 3).
+  - `assets/demo/` and `assets/screenshots/` directories scaffolded with `.gitkeep` markers + per-folder `README.md` explaining the render commands, the < 100 kB / Git LFS threshold, and the "never commit ad-libbed casts" policy.
+  - Actual `.cast` + `.png` files are intentionally *not* committed yet — recording requires an interactive operator with a 120×35 terminal. The scaffolding lets any contributor produce them with a single command before v0.1.0 GA.
+
 - **Sprint 15 — Repo hygiene & public-readiness audit (TASK-15.7, 2026-05-25).**
   - `.github/ISSUE_TEMPLATE/provider_request.yml` — new form-based template for community-driven panel adapter requests / volunteers. Fields: panel name, vendor URL, public API/CLI docs URL, SSH availability dropdown, Node.js runtime dropdown, target-market paragraph, commitment-level dropdown (suggesting / want to implement / want pair-review / want to co-maintain), test-account availability, free-form notes. Pre-submit checklist links the 4-hour `docs/contributing/PROVIDER.md` walkthrough. Labels: `provider`, `needs-triage`.
   - `.github/FUNDING.yml` — placeholder funding configuration (GitHub Sponsors / Ko-fi / custom). All keys are empty so GitHub renders no Sponsor button until real handles are wired up before v0.1.0 — see Sprint 16.
