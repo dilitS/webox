@@ -29,13 +29,17 @@ Klucze:
 
 ## Pre-flight Checklist
 
-- [ ] Sprint 15 zakończony, TASK-15.1-15.9 wszystkie ✅.
-- [ ] `README.md` EN merged, asciinema dostępna pod publiczne URL.
-- [ ] `webox provider new` generator end-to-end działa (`go build ./...` po generacie).
+- [x] Sprint 15 zakończony, TASK-15.1, 15.3, 15.4, 15.6, 15.7, 15.9 ✅ (closed 2026-05-25, [retro](../retros/2026-05-25-sprint-15.md)).
+- [x] `README.md` EN merged (136 linii, all-absolute links).
+- [x] `webox provider new` generator end-to-end działa (verified: `go build ./...` po `webox provider new test_provider --preset cpanel-uapi`).
+- [ ] **Carry-over z Sprint 15 TASK-15.2** — operator nagrywa `assets/demo/demo.cast` przez `bash scripts/record-demo.sh` (wymaga 120×35 terminal + asciinema + expect). Tu dopiero asciinema URL może trafić do README.
+- [ ] **Carry-over z Sprint 15 TASK-15.2** — operator robi capture `assets/screenshots/dashboard.png` przez `bash scripts/capture-screenshot.sh` (wymaga `agg` + `ffmpeg` lub manual screenshot).
+- [ ] **Carry-over z Sprint 15 TASK-15.5** — native-speaker / Grammarly Premium pass na `landing/en/index.html` body. Decyzja kiedy flipnąć `https://webox.dev/en/` deployment — patrz Sprint 16 retro.
 - [ ] `docs/contributing/PROVIDER.md` przeczytany przez znajomego dev (poza Twoim wzrokiem) — feedback udokumentowany.
 - [ ] `.local/strategy/go-to-market.md` zaktualizowany konkretnymi datami launch days.
 - [ ] `.local/partnerships/small-lh-devilweb-outreach.md` — szablon maila gotowy.
 - [ ] `.local/strategy/reddit-launches.md` + `hn-show-draft.md` — drafty post-by-post po review.
+- [ ] **Decyzja do Sprint 16 retro:** czy `01-cpanel-skeleton.md` issue zostanie zostawiony do community, czy maintainer sam dostarcza skeleton w Sprint 17 żeby seed-ować ekosystem? Patrz [Sprint 15 retro Open questions](../retros/2026-05-25-sprint-15.md).
 
 ---
 
