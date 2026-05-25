@@ -40,6 +40,16 @@ import (
 // stays self-contained.
 func (m Model) View() string {
 	screen := m.screen()
+	// Sprint 20 TASK-20.5 — Help overlay is a top-of-stack
+	// surface: the operator pressed `?` to ask what they can
+	// do *now*, so we replace the entire body with a centered
+	// modal. Rendering at View() level (rather than per-state)
+	// guarantees the overlay shows up on every state — wizards,
+	// catalog, project detail — without each surface needing to
+	// opt in.
+	if m.helpVisible {
+		return helpOverlayFullscreen(m, screen)
+	}
 	mode := bento.DetectMode(screen.Width, screen.Height)
 	if mode == bento.ModeTiny {
 		return m.renderRootBody(screen)
@@ -669,6 +679,7 @@ func (m Model) screen() views.Screen {
 		Connections:   dashboardConnectionsSnapshot(m),
 		CICDMini:      cicdMiniSnapshot(m),
 		Secrets:       secretsSnapshot(m),
+		Catalog:       catalogSnapshot(m),
 	}
 }
 

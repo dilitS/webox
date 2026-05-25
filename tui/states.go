@@ -22,6 +22,13 @@ const (
 	// (PRD F9). The operator can accept the unmanaged rows to seed
 	// stub `config.Project` entries without mutating the server.
 	StateImportPreview
+	// StateProviderCatalog hosts the Sprint 20 TASK-20.2 read-only
+	// browser over the embedded preset registry (`presets.Default`).
+	// The screen lets operators discover supported hosting
+	// providers, see capability badges + known risks, and copy a
+	// plain-text briefing to clipboard for sharing in incident /
+	// onboarding channels.
+	StateProviderCatalog
 	// StateCommandPalette hosts the `/` fuzzy command launcher.
 	StateCommandPalette
 	// StateConfirmDialog renders modal destructive confirmations.
@@ -42,6 +49,8 @@ func (s State) String() string {
 		return "ResumeWizard"
 	case StateImportPreview:
 		return "ImportPreview"
+	case StateProviderCatalog:
+		return "ProviderCatalog"
 	case StateCommandPalette:
 		return "CommandPalette"
 	case StateConfirmDialog:

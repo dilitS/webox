@@ -2,6 +2,7 @@ package tui
 
 import (
 	"github.com/dilitS/webox/tui/surface"
+	"github.com/dilitS/webox/tui/surface/catalog"
 	"github.com/dilitS/webox/tui/surface/importpreview"
 	"github.com/dilitS/webox/tui/surface/initwizard"
 	"github.com/dilitS/webox/tui/surface/projectdetail"
@@ -46,6 +47,8 @@ func (m Model) surfaceFor() surface.Surface {
 		return resumewizard.Surface{}
 	case StateImportPreview:
 		return importpreview.Surface{}
+	case StateProviderCatalog:
+		return catalog.Surface{}
 	default:
 		return nil
 	}
@@ -79,7 +82,7 @@ func (d dashboardSurface) Crumb(_ surface.Context) string { return "" }
 // when applicable, so we leave ScrollHint=false here.
 func (d dashboardSurface) Footer(_ surface.Context) surface.FooterHint {
 	return surface.FooterHint{
-		Text: "  [q] quit · [?] help · [Tab] cycle panels · [Right/Enter] open · [n] new · [i] import",
+		Text: "  [q] quit · [?] help · [Tab] cycle panels · [Right/Enter] open · [n] new · [i] import · [p] catalog",
 	}
 }
 

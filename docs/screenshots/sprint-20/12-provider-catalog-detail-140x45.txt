@@ -1,0 +1,45 @@
+WEBOX v0.0.0-dev  LIVE  Provider Catalog │ 14:32:01 │ us-east-1 │ Uptime: 24d 11h │ Load: 0.12, 0.28, 0.31 │ RAM: 3.4/8.0 GB (42%) │ Ping: 18ms (SF01)
+╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗        
+║ 🗂 [Provider Catalog]                                                                                                                       ║        
+║                                                                                                                                            ║        
+║ Read-only browser over the embedded preset registry. Use this to discover supported hosting providers before running the new-project       ║        
+║ wizard.                                                                                                                                    ║        
+║                                                                                                                                            ║        
+║ 🇵🇱 Poland                                                                                                                                  ║        
+║    ▶ smallhost-devil                VERIFIED     SSH · API · Node · SSL · DB · Logs · Safe Restart · Fixtures                              ║        
+║                                                                                                                                            ║        
+║ 🌍 Global                                                                                                                                  ║        
+║     mock                          VERIFIED     Logs · Safe Restart · Fixtures                                                              ║        
+║     cpanel-cloudlinux-selector    RESEARCH     SSH · API · Node · SSL · DB · Logs · Safe Restart                                           ║        
+║     cpanel-generic                RESEARCH     SSH · API · Node · SSL · DB · Logs · Safe Restart                                           ║        
+║     cyberpanel-generic            RESEARCH     SSH · API · Node · SSL · DB                                                                 ║        
+║     directadmin-generic           RESEARCH     SSH · API · Node · SSL · DB · Logs · Safe Restart                                           ║        
+║                                                                                                                                            ║        
+║ ────                                                                                                                                       ║        
+║ 📖 [Detail: small.pl (Devil panel)]                                                                                                        ║        
+║ id:            smallhost-devil                                                                                                             ║        
+║ status:        verified                                                                                                                    ║        
+║ region:        Poland                                                                                                                      ║        
+║ markets:       PL, global                                                                                                                  ║        
+║                                                                                                                                            ║        
+║ panel name:    Devil                                                                                                                       ║        
+║ panel API:     devil_cli                                                                                                                   ║        
+║ ssh required:  yes                                                                                                                         ║        
+║                                                                                                                                            ║        
+║ node runtime:  devil                                                                                                                       ║        
+║ restart method: devil                                                                                                                      ║        
+║ ssl provider:  letsencrypt                                                                                                                 ║        
+║ databases:     mysql                                                                                                                       ║        
+║ badges:        SSH · API · Node · SSL · DB · Logs · Safe Restart · Fixtures                                                                ║        
+║                                                                                                                                            ║        
+║ deploy path:   /home/{{user}}/domains/{{domain}}/public_html                                                                               ║        
+║ log path:      /home/{{user}}/domains/{{domain}}/logs                                                                                      ║        
+║ env path:      /home/{{user}}/domains/{{domain}}/.env                                                                                      ║        
+║                                                                                                                                            ║        
+║ Probes (documentation; not executed in v0.2 baseline):                                                                                     ║        
+║   - devil --version                                                                                                                        ║        
+║   - devil node list                                                                                                                        ║        
+║   - devil www list                                                                                                                         ║        
+║   - devil mysql db list                                                                                                                    ║        
+║                                                                                                                                            ║        
+  [q] quit · [?] help · [↑/↓] select · [Enter] toggle detail · [c] copy briefing · [Esc] back  ·  ↕ scroll: PgUp/PgDn (0/14)                          

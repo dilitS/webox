@@ -310,29 +310,52 @@ func (m Model) dashboardLayout() bento.LayoutMap {
 		ComputeLayout(m.width, m.height, m.BentoMode())
 }
 
-func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Host-key modal is a strict-block overlay: while it is open we
-	// only accept `Esc` (close) and `q`/`Ctrl+C` (quit). Any other
-	// key would silently route to the underlying state — confusing
-	// at best, security-relevant at worst (e.g. accidentally
-	// triggering a wizard step while a MITM warning is on screen).
+// handleOverlayKey routes keystrokes when a strict-block overlay
+// is on screen (host-key warning or help). Returns
+// `handled=true` when the overlay consumed the key. The split
+// keeps `updateKey` below the `gocyclo` threshold and makes the
+// modal contracts trivial to audit in isolation.
+//
+// Contracts:
+//
+//   - Host-key modal: only `Esc` / `Enter` (dismiss) and `q` /
+//     `Ctrl+C` (force quit) reach the model. Every other key is
+//     silently ignored so a stray paste cannot accept the host
+//     key by accident.
+//   - Help overlay: same dismiss-or-quit contract, but with `?`
+//     also acting as a toggle so the operator can press the
+//     same key to open and close the panel.
+func (m Model) handleOverlayKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) {
 	if m.hostKeyModal.Open {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			m.cancel()
-			return m, tea.Quit
+			return true, m, tea.Quit
 		case "esc", "enter":
-			// Inline mutation rather than calling a pointer-
-			// receiver helper: Bubble Tea's MVU contract returns
-			// a value copy; we want the dismissal visible in
-			// the returned Model regardless of how Go handles
-			// the implicit address-of in the method call. Keeps
-			// the data-flow obvious to readers.
 			m.hostKeyModal = hostKeyModalForm{}
-			return m, nil
+			return true, m, nil
 		default:
-			return m, nil
+			return true, m, nil
 		}
+	}
+	if m.helpVisible {
+		switch msg.String() {
+		case "q", "ctrl+c":
+			m.cancel()
+			return true, m, tea.Quit
+		case "?", "esc", "enter":
+			m.helpVisible = false
+			return true, m, nil
+		default:
+			return true, m, nil
+		}
+	}
+	return false, m, nil
+}
+
+func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if handled, model, cmd := m.handleOverlayKey(msg); handled {
+		return model, cmd
 	}
 
 	switch msg.String() {
@@ -340,7 +363,7 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.cancel()
 		return m, tea.Quit
 	case "?":
-		m.helpVisible = !m.helpVisible
+		m.helpVisible = true
 		m.viewportOffsetY = 0
 		return m, nil
 	}
@@ -386,6 +409,8 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateResumeWizardKey(msg)
 	case StateImportPreview:
 		return m.updateImportPreviewKey(msg)
+	case StateProviderCatalog:
+		return m.updateProviderCatalogKey(msg)
 	default:
 		return m, nil
 	}
@@ -559,6 +584,78 @@ func (m *Model) scrollViewportBy(delta int) {
 	m.viewportOffsetY = clampViewportOffset(m.viewportOffsetY, available, len(viewportLines(body)))
 }
 
+// updateProviderCatalogKey routes keys on the Sprint 20
+// TASK-20.2 catalog screen.
+//
+//   - `up` / `down` / `k` / `j` walk the row cursor across the
+//     flattened catalog (groups are joined preserving region
+//     order). The cursor wraps at top / bottom.
+//   - `enter` / `right` toggle the deep-dive detail strip.
+//   - `c` (or `C`) copies the selected preset's plain-text
+//     briefing to the OS clipboard via [clipboardCopy]. On
+//     success the model surfaces a green ack inside the catalog
+//     body; on failure (clipboard unavailable in the host
+//     environment) the model surfaces a dim error so operators
+//     can fall back to copying from the deep-dive panel.
+//   - `esc` / `left` / `q` returns to the dashboard.
+func (m Model) updateProviderCatalogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	snap := catalogSnapshot(m)
+	rows := catalogRows(snap)
+	switch msg.String() {
+	case "esc", "left":
+		m.state = StateDashboard
+		m.catalog.CopyHint = ""
+		return m, nil
+	case "up", "k":
+		m.catalog.CopyHint = ""
+		if len(rows) == 0 {
+			return m, nil
+		}
+		idx := catalogRowIndex(rows, snap.SelectedID)
+		if idx <= 0 {
+			idx = len(rows)
+		}
+		m.catalog.SelectedID = rows[idx-1].ID
+		return m, nil
+	case "down", "j":
+		m.catalog.CopyHint = ""
+		if len(rows) == 0 {
+			return m, nil
+		}
+		idx := catalogRowIndex(rows, snap.SelectedID)
+		next := (idx + 1) % len(rows)
+		if idx < 0 {
+			next = 0
+		}
+		m.catalog.SelectedID = rows[next].ID
+		return m, nil
+	case "enter", "right":
+		m.catalog.CopyHint = ""
+		m.catalog.ShowDetail = !m.catalog.ShowDetail
+		if m.catalog.SelectedID == "" && len(rows) > 0 {
+			m.catalog.SelectedID = rows[0].ID
+		}
+		return m, nil
+	case "c", "C":
+		// Force the detail snapshot so the briefing carries
+		// the latest fields even when the operator hasn't
+		// pressed Enter yet.
+		m.catalog.ShowDetail = true
+		fresh := catalogSnapshot(m)
+		if fresh.Detail.BriefingPlainText == "" {
+			m.catalog.CopyHint = "select a preset first"
+			return m, nil
+		}
+		if err := clipboardCopy(fresh.Detail.BriefingPlainText); err != nil {
+			m.catalog.CopyHint = "clipboard unavailable: " + err.Error()
+			return m, nil
+		}
+		m.catalog.CopyHint = "briefing copied to clipboard"
+		return m, nil
+	}
+	return m, nil
+}
+
 func (m Model) updateImportPreviewKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.importForm.Loading || m.importForm.Saving {
 		return m, nil
@@ -710,6 +807,13 @@ func (m Model) updateDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.wizardStack = newStackSlot()
 	case "i":
 		return m.beginImportScan()
+	case "p":
+		// Sprint 20 TASK-20.2 — provider catalog screen.
+		// Operator drills into the embedded preset registry
+		// without leaving the cockpit.
+		m.state = StateProviderCatalog
+		m.catalog.CopyHint = ""
+		return m, nil
 	case "f8":
 		return m.openCICDLogsModal()
 	}

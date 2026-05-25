@@ -212,4 +212,96 @@ type Screen struct {
 	// reaching back to the provider — the sensitive values stay
 	// in the keyring / secrets.enc by design.
 	Secrets []SecretMetaSnapshot
+	// Catalog carries the Provider Catalog snapshot for the
+	// Sprint 20 TASK-20.2 read-only catalog screen.
+	Catalog ProviderCatalogSnapshot
+}
+
+// ProviderCatalogSnapshot is the view-layer projection of
+// [presets.Registry] consumed by [RenderProviderCatalog]. The
+// catalog is grouped by region and surfaces capability badges +
+// status + known-risk summary so operators can shop for a
+// hosting target without leaving the cockpit.
+//
+// The view package cannot import `presets` (would be a cycle:
+// presets is a leaf, views is a leaf — the model layer pulls
+// both together). We mirror only the operator-visible fields
+// here.
+type ProviderCatalogSnapshot struct {
+	// Groups is the catalog rendered as ordered region buckets
+	// (Poland → Europe → Global → Advanced). Within each bucket
+	// presets are sorted verified → candidate → research →
+	// community → deprecated, ties broken by id ASC. Empty
+	// regions are omitted so the renderer never paints a stub
+	// header.
+	Groups []ProviderCatalogGroup
+	// SelectedID is the id of the row the operator has cursor
+	// on. The renderer renders a thick selection pill on the
+	// matching row; empty value disables the highlight (used
+	// for the "no selection" pre-keypress state).
+	SelectedID string
+	// Detail is the deep-dive payload for the selected preset.
+	// The renderer paints it as a bottom strip when non-empty.
+	Detail ProviderCatalogDetail
+	// LoadErrors carries the per-file errors `presets.Registry`
+	// recorded during boot. The renderer surfaces a small dim
+	// line so operators know the catalog is partial without
+	// silently swallowing schema drift.
+	LoadErrors []string
+	// CopyHint is the inline acknowledgement after a successful
+	// `c` keypress (e.g. "briefing copied to clipboard"). Empty
+	// when no recent copy has occurred.
+	CopyHint string
+}
+
+// ProviderCatalogGroup is one region bucket in
+// [ProviderCatalogSnapshot]. The renderer prints `Region` as a
+// bold heading and the rows below it.
+type ProviderCatalogGroup struct {
+	Region string
+	Rows   []ProviderCatalogRow
+}
+
+// ProviderCatalogRow is a single preset entry in the catalog.
+// Fields are pre-formatted for display so the renderer stays
+// pure (no `presets.Preset` import) and tests can build cases
+// without spinning up the embedded registry.
+type ProviderCatalogRow struct {
+	ID           string
+	DisplayName  string
+	ProviderType string
+	Status       string
+	Markets      []string
+	Badges       []string
+}
+
+// ProviderCatalogDetail is the deep-dive section painted when a
+// row is selected. It shadows [presets.Preset] but only carries
+// the fields the renderer actually uses, so future schema bumps
+// in the presets package do not ripple into the views API.
+type ProviderCatalogDetail struct {
+	ID                string
+	DisplayName       string
+	Status            string
+	Region            string
+	Markets           []string
+	PanelName         string
+	PanelAPI          string
+	PanelAPIPort      int
+	PanelSSHRequired  bool
+	NodeRuntime       string
+	RestartMethod     string
+	SSLProvider       string
+	DatabaseEngines   []string
+	Badges            []string
+	DeployPath        string
+	LogPath           string
+	EnvPath           string
+	Probes            []string
+	KnownRisks        []string
+	Sources           []string
+	VerifiedFixture   string
+	VerifiedAt        string
+	VerifiedBy        string
+	BriefingPlainText string // ready for clipboard copy
 }

@@ -1,0 +1,35 @@
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                        ╭──────────────────────────────────────────────────────────────────────╮                        
+                        │  ? Help                                                              │                        
+                        │  Surface: Cockpit                                                    │                        
+                        │                                                                      │                        
+                        │  Surface keys                                                        │                        
+                        │  [q]          quit                                                   │                        
+                        │  [?]          help                                                   │                        
+                        │  [Tab]        cycle panels                                           │                        
+                        │  [Right/Enter] open                                                  │                        
+                        │  [n]          new                                                    │                        
+                        │  [i]          import                                                 │                        
+                        │  [p]          catalog                                                │                        
+                        │                                                                      │                        
+                        │  Global keys                                                         │                        
+                        │  [?]          toggle this help overlay                               │                        
+                        │  [Esc]        dismiss overlay / back                                 │                        
+                        │  [Enter]      confirm / dismiss overlay                              │                        
+                        │  [q]          quit cockpit                                           │                        
+                        │  [Ctrl+C]     force quit cockpit                                     │                        
+                        │                                                                      │                        
+                        │  Press ? or Esc to close.                                            │                        
+                        ╰──────────────────────────────────────────────────────────────────────╯                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
