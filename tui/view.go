@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -666,6 +667,87 @@ func (m Model) screen() views.Screen {
 		ImportForm:    importFormSnapshot(m),
 		LiveLogs:      liveLogsSnapshot(m),
 		Connections:   dashboardConnectionsSnapshot(m),
+		CICDMini:      cicdMiniSnapshot(m),
+	}
+}
+
+// cicdMiniSnapshot returns the compact CI/CD projection consumed by
+// the Standard cockpit mini-bento strip. Empty when the operator
+// has no project selected, no CI run has been observed yet, or
+// the snapshot map is uninitialised — the renderer paints the
+// `[CI/CD] (no run yet)` placeholder for those branches.
+func cicdMiniSnapshot(m Model) views.CICDMiniSnapshot {
+	project, ok := m.selectedProject()
+	if !ok {
+		return views.CICDMiniSnapshot{}
+	}
+	entry, has := m.cicdSnapshots[project.ID]
+	if !has || entry.Run == nil {
+		return views.CICDMiniSnapshot{}
+	}
+	snap := views.CICDMiniSnapshot{
+		HasRun:    true,
+		Status:    cicdStatusVerb(entry.Run.Status, entry.Run.Conclusion),
+		JobName:   entry.Run.Name,
+		RunNumber: int64(entry.Run.RunNumber),
+	}
+	if !entry.Run.HeaderTime.IsZero() {
+		snap.UpdatedAt = relativeTime(m.nowFn(), entry.Run.HeaderTime)
+	}
+	for _, step := range entry.Steps {
+		if step.Conclusion == "failure" {
+			snap.FailedStep = step.Name
+			break
+		}
+	}
+	return snap
+}
+
+// cicdStatusVerb maps the GitHub status/conclusion enum pair to the
+// upper-case verb the mini-bento ribbon renders. Mirrors
+// [bento.CICDStatus] but lives here because the views package
+// cannot import bento (cycle).
+func cicdStatusVerb(status, conclusion string) string {
+	if conclusion != "" {
+		switch strings.ToLower(conclusion) {
+		case "success":
+			return "SUCCESS"
+		case "failure":
+			return "FAILED"
+		case "cancelled":
+			return "CANCELLED"
+		case "skipped":
+			return "SKIPPED"
+		}
+	}
+	switch strings.ToLower(status) {
+	case "in_progress":
+		return "IN_PROGRESS"
+	case "queued":
+		return "QUEUED"
+	case "completed":
+		return "DONE"
+	}
+	return "UNKNOWN"
+}
+
+// relativeTime formats `t` as a human-readable "Nh ago" / "Nm ago"
+// string, capped at "1d ago" granularity so the strip stays narrow.
+// Future times (clock skew, mock data) collapse to "just now".
+func relativeTime(now, t time.Time) string {
+	const hoursPerDay = 24
+	d := now.Sub(t)
+	switch {
+	case d < 0:
+		return "just now"
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < hoursPerDay*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/hoursPerDay))
 	}
 }
 

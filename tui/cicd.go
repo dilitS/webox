@@ -275,6 +275,7 @@ type cicdSnapshotEntry struct {
 type cicdRunSummary struct {
 	RunID      int64
 	RunNumber  int
+	Name       string
 	Status     string
 	Conclusion string
 	HeaderTime time.Time
@@ -302,6 +303,7 @@ func summarizeRun(run *ghsvc.WorkflowRun) *cicdRunSummary {
 	return &cicdRunSummary{
 		RunID:      run.ID,
 		RunNumber:  run.RunNumber,
+		Name:       run.Name,
 		Status:     run.Status,
 		Conclusion: run.Conclusion,
 		HeaderTime: header,

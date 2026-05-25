@@ -135,6 +135,29 @@ type LiveLogsSnapshot struct {
 	Err        string
 }
 
+// CICDMiniSnapshot is the compact view-layer projection of the
+// CI/CD pipeline state, used by the Standard cockpit mini-bento
+// strip and any future at-a-glance summaries. It MUST stay smaller
+// than [github/services.WorkflowSummary] so future renderers can
+// derive the strip without paying for the full step list.
+//
+// Status is the upper-case verb (`SUCCESS`, `FAILED`,
+// `IN_PROGRESS`, `QUEUED`, `CANCELLED`, `SKIPPED`, `UNKNOWN`).
+// FailedStep is the short name of the failing job step when the
+// run conclusion is FAILED — empty otherwise. Branch is the head
+// ref. JobName is the workflow's `name:` field. Empty fields are
+// expected when no run has been observed yet for the current
+// project; the renderer falls back to a `pending` ribbon.
+type CICDMiniSnapshot struct {
+	HasRun     bool
+	Status     string
+	JobName    string
+	Branch     string
+	RunNumber  int64
+	FailedStep string
+	UpdatedAt  string
+}
+
 // Screen contains the immutable data needed by pure render functions.
 type Screen struct {
 	Width         int
@@ -154,4 +177,5 @@ type Screen struct {
 	ImportForm    ImportPreviewSnapshot
 	LiveLogs      LiveLogsSnapshot
 	Connections   []string
+	CICDMini      CICDMiniSnapshot
 }
