@@ -245,7 +245,7 @@ func TestRun_DoctorPreset_AcceptsTokensAndDispatches(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var stdout, stderr bytes.Buffer
-			got := runWithFullDeps(tt.args, &stdout, &stderr, runDoctor, runDoctorGitHub, stub, brokenTUI)
+			got := runWithFullDeps(tt.args, &stdout, &stderr, runDoctor, runDoctorGitHub, stub, brokenCpanelDispatcher, brokenTUI)
 			if got != exitOK {
 				t.Fatalf("exit = %d (stderr=%q)", got, stderr.String())
 			}
@@ -264,7 +264,7 @@ func TestRun_DoctorPreset_RejectsProbeWithoutID(t *testing.T) {
 	got := runWithFullDeps(
 		[]string{"doctor", "preset", "--probe"},
 		&stdout, &stderr,
-		runDoctor, runDoctorGitHub, stub, brokenTUI,
+		runDoctor, runDoctorGitHub, stub, brokenCpanelDispatcher, brokenTUI,
 	)
 	if got != exitMisuse {
 		t.Fatalf("exit = %d, want exitMisuse=%d", got, exitMisuse)
@@ -282,7 +282,7 @@ func TestRun_DoctorPreset_RejectsIDWithoutPresetTarget(t *testing.T) {
 	got := runWithFullDeps(
 		[]string{"doctor", "--id=cpanel-generic"},
 		&stdout, &stderr,
-		runDoctor, runDoctorGitHub, stub, brokenTUI,
+		runDoctor, runDoctorGitHub, stub, brokenCpanelDispatcher, brokenTUI,
 	)
 	if got != exitMisuse {
 		t.Fatalf("exit = %d, want exitMisuse=%d (stderr=%q)", got, exitMisuse, stderr.String())
@@ -290,4 +290,13 @@ func TestRun_DoctorPreset_RejectsIDWithoutPresetTarget(t *testing.T) {
 	if !strings.Contains(stderr.String(), "--id is only valid") {
 		t.Fatalf("stderr should explain --id requires preset target; got %q", stderr.String())
 	}
+}
+
+// brokenCpanelDispatcher is the sentinel dispatcher used by tests
+// that should never reach the `doctor cpanel` route; if it does,
+// the test fails with a clear error message instead of silently
+// succeeding.
+func brokenCpanelDispatcher(_ cpanelOpts, _, stderr io.Writer) int {
+	_, _ = stderr.Write([]byte("brokenCpanelDispatcher should not be reached\n"))
+	return exitGeneric
 }

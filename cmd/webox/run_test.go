@@ -231,7 +231,7 @@ func TestRunWith_DoctorGitHubRoutesToGitHubDispatcher(t *testing.T) {
 			coreStub, coreCalls := stubDispatcher(t, 0, false, "core doctor\n", "")
 
 			var stdout, stderr bytes.Buffer
-			got := runWithFullDeps(tt.args, &stdout, &stderr, coreStub, ghStub, defaultPresetDispatcher, brokenTUI)
+			got := runWithFullDeps(tt.args, &stdout, &stderr, coreStub, ghStub, defaultPresetDispatcher, brokenCpanelDispatcher, brokenTUI)
 			if got != 0 {
 				t.Fatalf("exit = %d, want 0; stderr=%q", got, stderr.String())
 			}

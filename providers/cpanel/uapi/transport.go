@@ -129,14 +129,18 @@ func (t *transport) call(ctx context.Context, module Module, function Function) 
 
 // sleepWithCtx blocks for d while honouring ctx cancellation. If
 // the test suite has zeroed backoffFor (returns 0), this returns
-// immediately without spinning a timer goroutine.
+// immediately without spinning a timer goroutine. Context errors
+// surface wrapped in [ErrTransportUnavailable] so the composite
+// fallback layer can fail over to the alternate transport on
+// timeout, and `doctor cpanel` reports UNREACHABLE instead of a
+// generic FAILED for context-cancelled sections.
 func (t *transport) sleepWithCtx(ctx context.Context, d time.Duration) error {
 	if d <= 0 {
 		return nil
 	}
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return fmt.Errorf("%w: %w", ErrTransportUnavailable, ctx.Err())
 	case <-time.After(d):
 		return nil
 	}
