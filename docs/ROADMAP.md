@@ -80,6 +80,17 @@ GA = `v1.0.0`. Wymagania (wszystkie naraz):
 | 13 | RC1 hardening + Surface foundation | RC1 / GA gate, `tui/surface/` interface + dashboard adapter, `internal/e2e/`, per-frame bench + `make bench-check`. |
 | 14 | Architecture hardening (post-RC) | Migracja pozostałych powierzchni na `Surface`, per-tile scroll + focus rotation, SSH semaphore + retry, host-key modal, e2e rozbudowa, lokalny `--debug-trace`. |
 
+**Post-MVP, pre-public release** (planowanie z 2026-05-25, na podstawie strategicznej decyzji „solid foundation → public OSS launch → cPanel as contributor magnet"):
+
+| Sprint | Temat | Co dostarcza |
+|--------|-------|--------------|
+| 15 | **Launch Readiness** | README EN przepisany, asciinema z `--mock`, `webox provider new` generator szkieletu adaptera, `docs/contributing/PROVIDER.md` walkthrough, slim `AGENTS.md` (≤150 linii), 5 issue'ów `good-first-issue`, Apache-2.0 consistency, repo public-readiness audit. **Głównie nie-kod.** Patrz [sprint-15](./sprints/sprint-15-launch-readiness.md). |
+| 16 | **Public Launch + cPanel Research** | Tydzień 1: soft launch PL (Discord, r/Polska, r/programming.pl, 4programmers). Tydzień 2: Show HN + r/golang + r/selfhosted (środa rano US-East). Partnership outreach H88 (small.pl/lh.pl). cPanel test account purchase + `docs/providers/cpanel.md` real-world findings. **Bez kodu cPanel adapter.** Patrz [sprint-16](./sprints/sprint-16-public-launch.md). |
+| 17 | **cPanel Adapter (part 1)** | `providers/cpanel/` pakiet, UAPI client (token auth `:2083`), SSH `uapi` fallback, read-only ops (ListProjects, GetStatus, GetLogs, Restart), `webox doctor cpanel`. Patrz [sprint-17](./sprints/sprint-17-cpanel-adapter.md). |
+| 18 | **cPanel Adapter (part 2) + v0.2.0-rc1** | Mutating ops (CreateSubdomain via Application Manager, CreateDatabase, IssueSSL z AutoSSL/Let's Encrypt), idempotentne `Remove*`, wizard integration, E2E test, README badge „verified providers: smallhost, cPanel", `v0.2.0-rc1` cut. Patrz [sprint-18](./sprints/sprint-18-cpanel-polish.md). |
+| 19 | **Preset Registry Foundation** | `assets/provider-presets/*.json` (JSON schema v1), `presets/loader.go` + `embed.FS`, runtime registry, **Provider Catalog TUI** (positioning: „Webox zna Twój hosting, nie tylko Twój panel"), `webox doctor preset`, ADR-0008. Patrz [sprint-19](./sprints/sprint-19-preset-registry.md). |
+| 20+ | **Decision Matrix** | Wybór ścieżki post-Sprint 19 retro: **A** DirectAdmin adapter (community-driven, jeśli pojawi się contributor). **B** OAuth GitHub Device Flow + Quality Polish (default jeśli brak jasnego sygnału). **C** Repositioning + content marketing (jeśli launch < 100 stars). Patrz [sprint-20-plus-options](./sprints/sprint-20-plus-options.md). |
+
 Pełna dekompozycja per sprint: [`sprints/`](./sprints/).
 
 ### 3.1 Zakres ficzerowy

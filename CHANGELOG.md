@@ -16,6 +16,56 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 ## [Unreleased]
 
 ### Added
+
+- **Launch readiness scaffolding — Sprint 15-20+ plans + `.local/` ops room (2026-05-25).** Post-Sprint-14 strategic planning iteration that captures the decision to push `v0.1` GA into a **public OSS launch** rather than staying in technical-only mode. Six new sprint plans now own the post-MVP path:
+  - `docs/sprints/sprint-15-launch-readiness.md` — README EN, asciinema z `--mock`, `webox provider new` generator, `docs/contributing/PROVIDER.md` walkthrough, AGENTS.md slim (≤150 linii), Apache-2.0 consistency, repo public-readiness audit. Głównie nie-kod.
+  - `docs/sprints/sprint-16-public-launch.md` — Tydzień 1 PL soft launch + Tydzień 2 Show HN + r/golang + r/selfhosted (środa rano EST). Partnership outreach H88 (small.pl/lh.pl) + cPanel test account purchase + `docs/providers/cpanel.md` real-world expansion.
+  - `docs/sprints/sprint-17-cpanel-adapter.md` — `providers/cpanel/` skeleton, UAPI client (token auth `:2083`), SSH `uapi` fallback, read-only ops (ListProjects, GetStatus, GetLogs, Restart), `webox doctor cpanel`.
+  - `docs/sprints/sprint-18-cpanel-polish.md` — Mutating ops (CreateSubdomain via Application Manager, CreateDatabase, IssueSSL z AutoSSL), idempotentne `Remove*`, wizard integration, E2E, v0.2.0-rc1 cut.
+  - `docs/sprints/sprint-19-preset-registry.md` — `assets/provider-presets/*.json` JSON schema, `presets/loader.go` + `embed.FS`, Provider Catalog TUI (positioning: „Webox zna Twój hosting, nie tylko Twój panel"), `webox doctor preset`, ADR-0008.
+  - `docs/sprints/sprint-20-plus-options.md` — Decision matrix po Sprint 19 retro: A) DirectAdmin adapter (community-driven), B) OAuth Device Flow + Quality Polish (default), C) Repositioning + content marketing.
+  - `docs/sprints/README.md` i `docs/ROADMAP.md` zaktualizowane z nową tabelą sprintów 15-20+.
+- **AGENTS.md docs refactor (Sprint 15 TASK-15.9 prep, 2026-05-25).** Trzy nowe wydzielone dokumenty + skrót AGENTS.md:
+  - `docs/dependencies.md` — autoritatywny katalog Go zależności + toolchain + tool/`go.mod` pinning + supply chain policy (Apache/MIT/BSD only).
+  - `docs/conventions.md` — pełne konwencje kodu Go (naming, error handling, context discipline, generics, logging, testing, Conventional Commits, PR structure).
+  - `docs/gotchas.md` — Top 15 anty-pattern-ów (keyring detection, AES-GCM nonce, PID lockfiles, hardcoded provider name, secrets w log, `t.Parallel()` z global stubs, raw goroutines w Bubble Tea, etc.).
+  - `docs/contributing/PROVIDER.md` — 4-godzinny walkthrough EN dla zewnętrznych kontrybutorów dodających adapter providera (preset vs adapter decision, scaffold generator, fixtures, TDD parsery, integration sshmock, capability probe, PR template z pair-review request).
+  - `AGENTS.md` skrócony z 619 → ~150 linii: TL;DR, guardrails skrót, documentation map (pytanie → doc), workflow TDD, scope discipline, decision policy, skills reference. **Wszystkie guardraile nadal w pełni egzekwowane** przez `.cursor/rules/00-charter.mdc`.
+- **`.local/` private operations room scaffolding (2026-05-25).** Gitignorowany katalog (dodany do `.gitignore`) z drafts dla launch + partnerships + portfolio + metrics:
+  - `.local/strategy/` — go-to-market timeline + Reddit/HN/Twitter/dev.to drafts.
+  - `.local/partnerships/` — outreach drafts dla H88 (small.pl/lh.pl), PL/EU/US hosters list, cPanel vendor partner path.
+  - `.local/portfolio/` — one-pager + elevator pitches (30s/60s/180s).
+  - `.local/metrics/analytics.md` — KPI tracking + weekly snapshot template + funnel mental model.
+  - `.local/notes/2026-05-25-initial-launch-strategy.md` — pełny zapis decyzji strategicznych z dzisiejszej sesji planowania (8 lock-in decisions, hidden assumptions, ścieżki ryzyka).
+
+### Changed
+
+- **License: MIT → Apache-2.0 (2026-05-25).** Wymiana wymuszona przez explicit patent grant ważny przy adapterach paneli komercyjnych (cPanel LLC, DirectAdmin Inc., CyberPanel/OpenLiteSpeed). `docs/CONTRIBUTING.md` TL;DR zaktualizowane. **TODO w Sprint 15 TASK-15.7:** `landing/index.html` + `landing/en/index.html` Schema.org JSON-LD `"license"` field nadal wskazuje MIT — fix part of Sprint 15 audit.
+- **`docs/ROADMAP.md` (2026-05-25).** Sekcja v0.2 całkowicie przepisana z nową roadmap'ą post-MVP: Sprint 15 (Launch Readiness) → Sprint 16 (Public Launch + cPanel Research) → Sprint 17-18 (cPanel Adapter delivery + v0.2.0-rc1) → Sprint 19 (Preset Registry → marketing differentiator) → Sprint 20+ (Decision Matrix). Poprzedni `sprint-15-v02-foundation-plan` (z TASK-14.8) zostaje jako notion historical — Sprint 15 jest teraz Launch Readiness, nie v0.2 foundation. Konsekwencje tej zmiany ujęte w `docs/sprints/sprint-14-architecture-hardening.md` TASK-14.8 retro section.
+
+### Added (Sprint 14 - prior entries continue below)
+
+- **Sprint 14 — Surface migration completed (TASK-14.1, 2026-05-25).** Every production state in the cockpit now has a dedicated `surface.Surface` adapter under `tui/surface/<state>/`:
+  - `tui/surface/initwizard/` — initial setup wizard (Crumb: "Init Wizard", AcceptsScroll: false).
+  - `tui/surface/projectdetail/` — project detail (overview + live logs tabs, AcceptsScroll: true).
+  - `tui/surface/projectwizard/` — new project wizard.
+  - `tui/surface/resumewizard/` — resume wizard for paused project creations.
+  - `tui/surface/importpreview/` — import preview list (AcceptsScroll: true).
+  - The big switch in `tui/view.go::renderRootBody` is now empty for production states; the only remaining branch is a defensive default that surfaces a placeholder string for unmigrated `State` values, replacing what used to be a silent empty-body bug class. `TestSurfaceFor_AllProductionStatesMigrated` pins this contract.
+- **Sprint 14 — Per-tile scroll + focus rotation (TASK-14.2, 2026-05-25).** `Tab` and `Shift+Tab` now cycle keyboard focus between scrollable tiles in the dashboard (CI/CD pipeline, Live Server Logs). While a tile is focused, `PgUp` / `PgDn` / `Home` / `End` and the mouse wheel scroll *that* tile's offset; the global body viewport stays inert. `Esc` releases focus without leaving the dashboard.
+  - New `bento.ScrollableTile` interface (`Scroll(delta) ScrollableTile` + `ScrollOffset() int`) is implemented by `microLogsTile` and `cicdPipelineTile`. Non-scrollable tiles deliberately skip the interface so the focus rotation never lands on them.
+  - State lifted to `tui.Model` (`focusedTile *bento.Slot`, `tileScrollOffsets map[bento.Slot]int`) so the offsets survive the value-typed Update returns.
+  - Footer hint dynamically swaps from the global "PgUp/PgDn (offset/max)" form to "focus: <name> · [PgUp/PgDn] scroll panel · [Esc] release" so the operator always knows which scope the next scroll key will affect.
+  - Legacy `Tab → Project Detail` mapping moved to `Right` / `Enter`; the existing e2e scenario was updated.
+  - Tests: 6 new unit scenarios (`tui/tile_focus_test.go`) + 2 new e2e scenarios (`internal/e2e/cockpit_test.go::TestCockpit_FocusedTileScrollsIndependentOfViewport`, `TestCockpit_TileFocusReleasesOnEsc`, `TestCockpit_TabBackwardsLandsOnLogsCycle`).
+- **Sprint 14 — `ssh.InflightLimiter` + `ExecWithRetryLimited` (TASK-14.3, 2026-05-25).** Global SSH concurrency cap built on `golang.org/x/sync/semaphore.Weighted`, sized via `max(8, profiles/2)` per the Sprint 14 AC. Where the per-host `Pool.MaxPerHost` cap protects an individual remote from a thundering herd, the in-flight limiter protects the operator's machine and the upstream provider from cumulative pressure — a 50-project cockpit refresh used to fan out into ~150 simultaneous SSH dials, the limiter clamps that at ~25.
+  - `ssh/inflight.go` — `NewInflightLimiter(profiles)`, `Acquire(ctx)`, `TryAcquire()`, `Release()`. Nil-safe (callers can disable the cap by passing nil).
+  - `ssh/retry.go` — new `ExecWithRetryLimited(ctx, pool, limiter, ...)` entry point; legacy `ExecWithRetry` delegates with `limiter == nil` to keep test seams stable.
+  - Default retry policy realigned to the AC: 3 attempts, 200 ms base, 1.2 s cap (was 4 / 100 ms / 1 s).
+  - Race test (`ssh/inflight_test.go::TestInflightLimiter_GoroutineCapHonoured`) spawns 100 simulated profiles × 200 ticks, asserts peak in-flight stays ≤ budget × 3 (overshoot factor accounts for cooperative scheduling between Acquire and the body increment).
+- **Sprint 14 — Nightly E2E workflow (`.github/workflows/nightly.yml`, TASK-14.5, 2026-05-25).** New scheduled workflow runs `go test -race -count=1 -v ./internal/e2e/...` daily at 03:13 UTC and uploads the verbatim output as an artefact (7-day retention). The `internal/e2e/` package now ships 12 multi-tick teatest scenarios (5 from Sprint 13 + 7 added during Sprint 14: host-key modal, debug trace event, viewport scroll, focused tile scroll, focus release on Esc, Shift+Tab backwards rotation, package load smoke check). Total wall-clock budget per nightly run: well under the 10 s AC ceiling.
+- **Sprint 14 — `bento.TileBlock` + `BlockRenderer` (TASK-14.7, 2026-05-25).** Structured replacement for the string-level `clipTileBlock` heuristic. `TileBlock{TopBorder, Header, Body, BottomBorder, AccentRGB}` decomposes a rendered tile into typed lanes; `clipBlock(block, maxLines)` operates on the structure instead of counting magic-numbered border rows. The legacy `clipTileBlock(rendered, maxLines)` wrapper now parses into a TileBlock via `parseTileBlock`, defers to `clipBlock`, then renders back — the only surviving call site for the old algorithm. Magic constants `borderRows = 2` and `bordersAndHeader = 3` removed from `engine.go`. Bench gate (`make bench-check`) green: 117 / 182 / 195 µs/op (Apple M4), 25× under the 5 ms budget.
+- **Sprint 14 plan — `docs/sprints/sprint-15-v02-foundation-plan.md` (TASK-14.8, 2026-05-25).** New 4-task sprint plan freezing the v0.2 foundation backlog: cPanel adapter (Provider Pattern validation), OAuth Device Flow PoC behind `WEBOX_EXPERIMENTAL=1`, `config.json` schema v3 migration with optional DB fields, ADR-0010 i18n migration plan. `docs/ROADMAP.md` Sprint table updated with Sprint 15 entry.
 - **Sprint 14 — Mock cockpit acknowledges Sprint-14 subsystems (2026-05-25).** `tui/mockdata.go` `MockLiveLogLines()` now seeds two additional log lines that surface the new telemetry sink and SSH pool metrics in the offline demo, so `webox --mock` is self-documenting for operators discovering the Sprint-14 features for the first time. The lines are synthetic ("cockpit: telemetry.Sink = Disabled", "ssh.pool: MaxPerHost=3, ExecMetrics{…}") and contain zero secret-shaped content.
 
 ### Changed

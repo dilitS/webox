@@ -31,9 +31,11 @@ const (
 // the latest tile snapshot. Callers should re-create tiles every frame
 // rather than mutating in place (matches Bubble Tea's MVU pattern).
 type Engine struct {
-	title     string
-	statusBar string
-	tiles     []BentoTile
+	title         string
+	statusBar     string
+	tiles         []BentoTile
+	focusedSlot   *Slot
+	scrollOffsets map[Slot]int
 }
 
 // NewEngine returns an engine pre-loaded with `tiles`. The title appears
@@ -52,6 +54,49 @@ func NewEngine(title string, tiles []BentoTile) *Engine {
 func (e *Engine) WithStatusBar(rendered string) *Engine {
 	e.statusBar = rendered
 	return e
+}
+
+// WithFocus marks one slot as the currently focused tile. The engine
+// renders that tile with `focused=true` so the renderer can swap the
+// thick border for a double-line border (visual indicator).
+//
+// Sprint 14 TASK-14.2 wires this from the cockpit's Tab / Shift+Tab
+// keyboard router so the operator can rotate focus across scrollable
+// tiles without leaving the dashboard.
+func (e *Engine) WithFocus(slot Slot) *Engine {
+	s := slot
+	e.focusedSlot = &s
+	return e
+}
+
+// WithTileScrollOffsets injects the per-slot scroll offsets the
+// cockpit owns on the [tui.Model]. The engine forwards each offset
+// to the matching [ScrollableTile] before rendering so the visible
+// window reflects the operator's PgUp / PgDn input. Slots without an
+// offset entry render at offset 0 (newest content).
+func (e *Engine) WithTileScrollOffsets(offsets map[Slot]int) *Engine {
+	if len(offsets) == 0 {
+		e.scrollOffsets = nil
+		return e
+	}
+	cp := make(map[Slot]int, len(offsets))
+	for k, v := range offsets {
+		cp[k] = v
+	}
+	e.scrollOffsets = cp
+	return e
+}
+
+// scrollOffsetAware is implemented by tiles that accept an injected
+// scroll offset. Kept package-private because the public surface is
+// the [ScrollableTile] interface; this internal helper only exists so
+// [Engine.renderTileWithFocus] can apply the model's offset before
+// calling Render. Tiles get the capability for free by exposing a
+// `WithScrollOffset(offset int) BentoTile` method (mirrors
+// [WidthAware]).
+type scrollOffsetAware interface {
+	BentoTile
+	WithScrollOffset(offset int) BentoTile
 }
 
 // Render composes the cockpit for the given viewport. The width/height
@@ -188,21 +233,21 @@ func (e *Engine) renderUltraGrid(width, height int, mode Mode) string {
 
 	budget := planRowBudgets(height, mode)
 
-	projects := renderTileWithWidth(bySlot[SlotProjects], mode, leftCol-tileBorderOverhead)
-	overview := renderTileWithWidth(bySlot[SlotOverview], mode, rightCol-tileBorderOverhead)
+	projects := e.renderSlot(bySlot[SlotProjects], mode, leftCol-tileBorderOverhead)
+	overview := e.renderSlot(bySlot[SlotOverview], mode, rightCol-tileBorderOverhead)
 	projects = clipTileBlock(projects, budget.TopRow)
 	overview = clipTileBlock(overview, budget.TopRow)
 	projects, overview = equalizeBlockHeights(projects, overview)
 	topRow := lipgloss.JoinHorizontal(lipgloss.Top, projects, overview)
 
-	topology := renderTileWithWidth(bySlot[SlotTopology], mode, leftCol-tileBorderOverhead)
-	cicd := renderTileWithWidth(bySlot[SlotCICD], mode, rightCol-tileBorderOverhead)
+	topology := e.renderSlot(bySlot[SlotTopology], mode, leftCol-tileBorderOverhead)
+	cicd := e.renderSlot(bySlot[SlotCICD], mode, rightCol-tileBorderOverhead)
 	topology = clipTileBlock(topology, budget.SecondRow)
 	cicd = clipTileBlock(cicd, budget.SecondRow)
 	topology, cicd = equalizeBlockHeights(topology, cicd)
 	secondRow := lipgloss.JoinHorizontal(lipgloss.Top, topology, cicd)
 
-	logsRow := renderTileWithWidth(bySlot[SlotLogs], mode, width-tileBorderOverhead)
+	logsRow := e.renderSlot(bySlot[SlotLogs], mode, width-tileBorderOverhead)
 	logsRow = clipTileBlock(logsRow, budget.Logs)
 
 	// Capacity: status bar + top row + second row + logs row + optional
@@ -307,52 +352,24 @@ func planRowBudgets(height int, mode Mode) rowBudget {
 // per-tile scroll affordance (currently the Live Logs tab for tail
 // data; topology scroll keys land in Sprint 14).
 //
-// The function is intentionally string-level (rather than ANSI-aware):
-// every renderer above ships its own ANSI sequences inside the body
-// lines we keep, and the indicator we inject uses dim TextDim only —
-// no border-side cells, so we do not need to know the tile's accent
-// colour.
+// Sprint 14 TASK-14.7 — the function used to count rows manually
+// against magic constants (`borderRows = 2`, `bordersAndHeader = 3`).
+// It now parses the rendered string into a structured [TileBlock]
+// and defers to [clipBlock]. The magic constants are gone; the
+// arithmetic happens in one place against typed lanes.
+//
+// The wrapper is preserved so existing callers (engine + tests)
+// keep working unchanged. Future tile authors SHOULD implement the
+// [BlockRenderer] interface directly so the parse step disappears.
 func clipTileBlock(rendered string, maxLines int) string {
 	if maxLines <= 0 {
 		return rendered
 	}
-	lines := strings.Split(rendered, "\n")
-	if len(lines) <= maxLines {
+	if strings.Count(rendered, "\n") < maxLines {
 		return rendered
 	}
-	const (
-		minBorderedFrame = 4 // top border + header + indicator + bottom border
-		bordersAndHeader = 3 // top border + header + bottom border
-	)
-	if maxLines < minBorderedFrame {
-		// Degenerate viewport — clip naïvely; we cannot keep the
-		// frame intact while showing any meaningful body.
-		return strings.Join(lines[:maxLines], "\n")
-	}
-	visibleBody := maxLines - bordersAndHeader
-	tokens := theme.Default()
-	// `borderRows` excludes the top + bottom border from the source
-	// frame so the hidden-line count reflects only body rows.
-	const borderRows = 2
-	hiddenBody := len(lines) - borderRows - visibleBody
-	// Use the bottom border line as the geometric template so the
-	// indicator line keeps the tile's exact pixel width — `┃` on
-	// both sides plus inner padding. Without this fallback, the
-	// indicator rendered as a bare string with no side borders and
-	// the cockpit frame visibly broke (the next column's left
-	// border would appear adjacent to the indicator text).
-	tileWidth := lipgloss.Width(lines[0])
-	indicator := framedIndicatorLine(
-		tileWidth,
-		"… +"+intString(hiddenBody)+" more lines · scroll inside tab/modal",
-		tokens,
-	)
-
-	out := make([]string, 0, maxLines)
-	out = append(out, lines[0])
-	out = append(out, lines[1:1+visibleBody]...)
-	out = append(out, indicator, lines[len(lines)-1])
-	return strings.Join(out, "\n")
+	block := parseTileBlock(rendered)
+	return clipBlock(block, maxLines).Render()
 }
 
 // framedIndicatorLine returns a single line that mimics the tile's
@@ -398,19 +415,36 @@ type WidthAware interface {
 	WithWidth(int) BentoTile
 }
 
-// renderTileWithWidth tells the tile what column width it has been
-// granted, then renders it. When the tile is nil or does not implement
-// [WidthAware] we fall back to the natural-width render.
-func renderTileWithWidth(tile BentoTile, mode Mode, width int) string {
+// renderSlot is the focus-aware / scroll-aware tile renderer. It
+// applies, in order:
+//
+//  1. The supplied column width via [WidthAware].
+//  2. The model-owned scroll offset (if any) via the package-private
+//     `scrollOffsetAware` shim — only [ScrollableTile] tiles also
+//     expose `WithScrollOffset` so non-scrollable tiles bypass the
+//     branch silently.
+//  3. The focus flag so the tile picks up the double-line border.
+//
+// Tiles that implement none of the optional interfaces fall back to
+// the natural-size, unfocused render.
+func (e *Engine) renderSlot(tile BentoTile, mode Mode, width int) string {
 	if tile == nil {
 		return emptyTilePlaceholder()
 	}
 	if width > 0 {
 		if w, ok := tile.(WidthAware); ok {
-			return w.WithWidth(width).Render(mode, false)
+			tile = w.WithWidth(width)
 		}
 	}
-	return tile.Render(mode, false)
+	if e.scrollOffsets != nil {
+		if offset, has := e.scrollOffsets[tile.Slot()]; has && offset > 0 {
+			if s, ok := tile.(scrollOffsetAware); ok {
+				tile = s.WithScrollOffset(offset)
+			}
+		}
+	}
+	focused := e.focusedSlot != nil && *e.focusedSlot == tile.Slot()
+	return tile.Render(mode, focused)
 }
 
 // indexTilesBySlot turns the linear tile slice into a slot lookup. When

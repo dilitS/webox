@@ -240,9 +240,27 @@ Wszystkie powtarzalne kroki są skryptowane. Główne komendy z `Makefile`:
 | 09 | **Live Log Stream + Header Bar Server Metrics** | 📝 Planned | [sprint-09-live-log-stream.md](sprint-09-live-log-stream.md) | — |
 | 10 | **Live CI/CD Pipeline Panel** | 📝 Planned | [sprint-10-cicd-panel.md](sprint-10-cicd-panel.md) | — |
 | 11 | **Live Service Topology Map** | 📝 Planned | [sprint-11-topology-map.md](sprint-11-topology-map.md) | — |
-| 12 | Polish, beta release, RC1 → v0.1 | 📝 Outlined | — | — |
+| 12 | Polish, beta release, RC1 → v0.1 | 📝 Planned | [sprint-12-polish-release.md](sprint-12-polish-release.md) | — |
+| 13 | RC1 hardening + Surface foundation | 📝 Planned | [sprint-13-v01-ga-and-post-mvp-foundation.md](sprint-13-v01-ga-and-post-mvp-foundation.md) | — |
+| 14 | Architecture hardening (post-RC, pre-v0.2) | 📝 Planned | [sprint-14-architecture-hardening.md](sprint-14-architecture-hardening.md) | — |
+| 15 | **Launch Readiness** — README EN, asciinema, generator szkieletu adaptera, walkthrough PROVIDER.md, AGENTS.md slim, repo polish | 📝 Planned | [sprint-15-launch-readiness.md](sprint-15-launch-readiness.md) | — |
+| 16 | **Public Launch + cPanel Research** — soft launch PL → Show HN/r/golang/r/selfhosted, partnership outreach H88, cPanel test account + fixtures | 📝 Planned | [sprint-16-public-launch.md](sprint-16-public-launch.md) | — |
+| 17 | **cPanel Adapter MVP (part 1)** — UAPI client + SSH fallback, read-only ops, `webox doctor cpanel` | 📝 Planned | [sprint-17-cpanel-adapter.md](sprint-17-cpanel-adapter.md) | — |
+| 18 | **cPanel Adapter (part 2) + v0.2.0-rc1** — mutating ops, wizard integration, E2E, release | 📝 Planned | [sprint-18-cpanel-polish.md](sprint-18-cpanel-polish.md) | — |
+| 19 | **Preset Registry Foundation** — JSON-schema `assets/provider-presets/`, Provider Catalog TUI, `webox doctor preset`, ADR-0008 | 📝 Planned | [sprint-19-preset-registry.md](sprint-19-preset-registry.md) | — |
+| 20+ | **Decision Matrix** — A: DirectAdmin / B: OAuth+Polish / C: Repositioning. Wybór po Sprint 19 retro. | 📝 Decision doc | [sprint-20-plus-options.md](sprint-20-plus-options.md) | — |
+
+**Etapy projektu:**
+- **Sprints 00-12** — MVP delivery (v0.1).
+- **Sprints 13-14** — Architecture hardening + v0.1 GA.
+- **Sprint 15** — Launch readiness (post-MVP, pre-public; głównie nie-kod).
+- **Sprint 16** — Public launch + cPanel research foundation.
+- **Sprints 17-18** — cPanel adapter delivery → v0.2.0-rc1.
+- **Sprint 19** — Preset registry → product differentiator („Webox zna Twój hosting").
+- **Sprint 20+** — Decision-gated post-v0.2 path (A/B/C).
 
 Sprinty 08–11 dodane do MVP po [ADR-0007](../adr/0007-bento-ultra-eskalacja-mvp.md) (2026-05-23) — eskalacja Bento Ultra + live logs + GHA panel + topology z STRETCH (v0.2+) do MVP (v0.1).
+Sprinty 15-20+ dodane 2026-05-25 — launch readiness + cPanel adapter + preset registry, na podstawie strategicznej decyzji post-Sprint 14 review.
 
 ---
 

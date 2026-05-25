@@ -6,7 +6,7 @@
 
 ## TL;DR
 
-Webox jest open-source (MIT). Każdy PR przechodzi przez `golangci-lint`, testy z coverage threshold ≥ 70 % i govulncheck. Dodanie nowego providera = implementacja interfejsu z [DESIGN.md §3](./DESIGN.md#3-provider-pattern) + testy z mock SSH + doc w `docs/providers/<nazwa>.md`. Dodanie tłumaczenia = jeden plik `translations/<lang>.json` + skrypt walidacji kluczy. Maintainer review w ciągu 7 dni roboczych.
+Webox jest open-source (Apache-2.0 — explicit patent grant). Każdy PR przechodzi przez `golangci-lint`, testy z coverage threshold ≥ 70 % i govulncheck. Dodanie nowego providera = implementacja interfejsu z [DESIGN.md §3](./DESIGN.md#3-provider-pattern) + testy z mock SSH + doc w `docs/providers/<nazwa>.md` (pełny walkthrough w [contributing/PROVIDER.md](./contributing/PROVIDER.md)). Dodanie tłumaczenia = jeden plik `translations/<lang>.json` + skrypt walidacji kluczy. Maintainer review w ciągu 7 dni roboczych.
 
 ## Spis treści
 

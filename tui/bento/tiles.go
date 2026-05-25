@@ -1,6 +1,7 @@
 package bento
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -407,8 +408,9 @@ type CICDPipelineSnapshot struct {
 }
 
 type cicdPipelineTile struct {
-	snap  CICDPipelineSnapshot
-	width int
+	snap         CICDPipelineSnapshot
+	width        int
+	scrollOffset int
 }
 
 // NewCICDPipelineTile renders the live GitHub Actions tile. The
@@ -431,6 +433,43 @@ func (t *cicdPipelineTile) WithWidth(w int) BentoTile {
 	clone.width = w
 	return &clone
 }
+
+// WithScrollOffset returns a copy of the tile with the supplied
+// step-list offset. Sprint 14 TASK-14.2 lets the operator scroll
+// through long pipeline step lists (e.g. monorepo builds with 30+
+// jobs) without leaving the dashboard.
+func (t *cicdPipelineTile) WithScrollOffset(offset int) BentoTile {
+	clone := *t
+	clone.scrollOffset = clampNonNegative(offset, t.maxScrollOffset())
+	return &clone
+}
+
+// Scroll satisfies [ScrollableTile]. Returns a clone with the
+// step-list offset advanced by `delta` (clamped to [0, max]).
+func (t *cicdPipelineTile) Scroll(delta int) ScrollableTile {
+	clone := *t
+	clone.scrollOffset = clampNonNegative(t.scrollOffset+delta, t.maxScrollOffset())
+	return &clone
+}
+
+// ScrollOffset satisfies [ScrollableTile].
+func (t *cicdPipelineTile) ScrollOffset() int { return t.scrollOffset }
+
+// maxScrollOffset is the largest valid offset given the current
+// step list. We keep at least one step visible so the tile never
+// renders an empty Pipeline Steps section.
+func (t *cicdPipelineTile) maxScrollOffset() int {
+	maxOffset := len(t.snap.Steps) - cicdMinVisibleSteps
+	if maxOffset < 0 {
+		return 0
+	}
+	return maxOffset
+}
+
+// cicdMinVisibleSteps mirrors microLogsMinVisibleRows: the smallest
+// useful slice of the step list. Set to 1 so heavy-scrollable runs
+// can be peeked at one step at a time.
+const cicdMinVisibleSteps = 1
 
 // Render satisfies [BentoTile].
 func (t *cicdPipelineTile) Render(mode Mode, focused bool) string {
@@ -489,13 +528,21 @@ func (t *cicdPipelineTile) Render(mode Mode, focused bool) string {
 		b.WriteString("No workflow run yet for main branch.\n")
 	}
 
+	steps := t.snap.Steps
+	if t.scrollOffset > 0 && t.scrollOffset < len(steps) {
+		steps = steps[t.scrollOffset:]
+	}
 	if len(t.snap.Steps) > 0 {
+		header := "Pipeline Steps:"
+		if t.scrollOffset > 0 {
+			header = fmt.Sprintf("Pipeline Steps (offset %d/%d):", t.scrollOffset, len(t.snap.Steps))
+		}
 		b.WriteString(lipgloss.NewStyle().
 			Foreground(lipgloss.Color(tokens.TextDim)).
-			Render("Pipeline Steps:"))
+			Render(header))
 		b.WriteString("\n")
 	}
-	for _, step := range t.snap.Steps {
+	for _, step := range steps {
 		numberCell := lipgloss.NewStyle().
 			Foreground(lipgloss.Color(tokens.Accent)).
 			Render("[" + intString(step.Number) + "]")
@@ -703,6 +750,13 @@ type microLogsTile struct {
 	domain string
 	lines  []MicroLogLine
 	width  int
+	// scrollOffset is the number of lines hidden BELOW the visible
+	// window. Sprint 14 TASK-14.2 introduced per-tile scroll: the
+	// operator can press `PgUp` / `PgDn` while the tile is focused
+	// to walk through the buffered tail without disturbing the rest
+	// of the cockpit. 0 = newest line is the bottom-most visible
+	// row (default); positive offsets reveal older history.
+	scrollOffset int
 }
 
 // NewMicroLogsTile renders the bottom-centre live-tail tile populated
@@ -732,11 +786,52 @@ func (t *microLogsTile) WithWidth(w int) BentoTile {
 	return &clone
 }
 
+// WithScrollOffset returns a copy of the tile with the supplied
+// offset. The cockpit calls it once per frame, after constructing
+// the tile from the current ring buffer snapshot, to inject the
+// model-owned offset before rendering.
+func (t *microLogsTile) WithScrollOffset(offset int) BentoTile {
+	clone := *t
+	clone.scrollOffset = clampNonNegative(offset, t.maxScrollOffset())
+	return &clone
+}
+
 // ID satisfies [BentoTile].
 func (t *microLogsTile) ID() string { return "live-logs" }
 
 // Slot satisfies [BentoTile].
 func (t *microLogsTile) Slot() Slot { return SlotLogs }
+
+// Scroll returns a clone of the tile with the offset advanced by
+// `delta` (clamped to [0, max]). Sprint 14 TASK-14.2 satisfies
+// [ScrollableTile]; tests and debug tooling can call this to verify
+// clamp behaviour without going through the full Update pipeline.
+func (t *microLogsTile) Scroll(delta int) ScrollableTile {
+	clone := *t
+	clone.scrollOffset = clampNonNegative(t.scrollOffset+delta, t.maxScrollOffset())
+	return &clone
+}
+
+// ScrollOffset satisfies [ScrollableTile].
+func (t *microLogsTile) ScrollOffset() int { return t.scrollOffset }
+
+// maxScrollOffset is the largest offset that still keeps at least
+// one body row visible. The renderer reserves
+// [microLogsMinVisibleRows] rows so the operator never lands on an
+// empty tile.
+func (t *microLogsTile) maxScrollOffset() int {
+	maxOffset := len(t.lines) - microLogsMinVisibleRows
+	if maxOffset < 0 {
+		return 0
+	}
+	return maxOffset
+}
+
+// microLogsMinVisibleRows is the smallest number of lines we keep
+// visible inside the live-log tile. Below this the operator would
+// only see the chrome border, which is worse than not scrolling at
+// all.
+const microLogsMinVisibleRows = 1
 
 // Render satisfies [BentoTile].
 func (t *microLogsTile) Render(mode Mode, focused bool) string {
@@ -751,8 +846,16 @@ func (t *microLogsTile) Render(mode Mode, focused bool) string {
 			MinWidth: t.width,
 		})
 	}
-	rows := make([]string, 0, len(t.lines))
-	for _, line := range t.lines {
+	visible := t.lines
+	if t.scrollOffset > 0 {
+		end := len(visible) - t.scrollOffset
+		if end < microLogsMinVisibleRows {
+			end = microLogsMinVisibleRows
+		}
+		visible = visible[:end]
+	}
+	rows := make([]string, 0, len(visible))
+	for _, line := range visible {
 		rows = append(rows, renderLogLine(line, tokens))
 	}
 	return renderTilePanel(tilePanelOptions{
@@ -763,6 +866,26 @@ func (t *microLogsTile) Render(mode Mode, focused bool) string {
 		Accent:   AccentPrimary,
 		MinWidth: t.width,
 	})
+}
+
+// clampNonNegative restricts v to the inclusive [0, hi] range.
+// Every caller in the bento package clamps to a non-negative
+// upper bound, so we hard-code the lower edge at 0 and keep the
+// signature free of dead parameters (the previous three-arg
+// version flagged `unparam` on the always-zero `lo` argument).
+//
+// Kept package-local so the bento layer stays free of stdlib
+// `math/cmp` / `slices` imports — the function is invoked on the
+// hot Render path and any external dependency would risk an
+// unwanted allocation.
+func clampNonNegative(v, hi int) int {
+	if v < 0 {
+		return 0
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }
 
 // renderLogLine formats one log entry as

@@ -71,64 +71,33 @@ func (m Model) View() string {
 }
 
 // surfaceCrumb is the per-state breadcrumb the status bar shows
-// before the live clock. Dashboard renders no crumb (the bento engine
-// already prints the cockpit brand), wizards/preview/detail surfaces
-// get a descriptive label so the operator never wonders what screen
-// they are on.
+// before the live clock. Each surface owns the answer via its
+// [surface.Surface.Crumb] method (Sprint 14 TASK-14.1 finished the
+// migration); we delegate here so adding a new surface stays a
+// single-file change.
 func (m Model) surfaceCrumb() string {
-	switch m.state {
-	case StateInitWizard:
-		return "Init Wizard"
-	case StateProjectDetail:
-		if m.activeTab == TabLogs {
-			return "Live Logs"
-		}
-		return "Project Detail"
-	case StateProjectWizard:
-		return "Project Wizard"
-	case StateResumeWizard:
-		return "Resume Wizard"
-	case StateImportPreview:
-		return "Import Preview"
-	default:
-		return ""
+	if s := m.surfaceFor(); s != nil {
+		return s.Crumb(surface.Context{Screen: m.screen()})
 	}
+	return ""
 }
 
 // renderRootBody returns the active screen's body (no chrome). Per
 // the Sprint 13 chrome contract, top/bottom strips are composed by
 // [View]; surfaces only describe their scrollable content.
 //
-// As of the Sprint 13 surface-foundation pass, the function first
-// asks `m.surfaceFor()` whether a [surface.Surface] adapter exists
-// for the current state. Migrated states (today: `dashboard`) flow
-// through the surface contract; everything else falls back to the
-// legacy switch below until Sprint 14 finishes the migration. This
-// gives us a single seam to walk states off the god-package without
-// a flag-day refactor.
+// As of Sprint 14 TASK-14.1 every production state has a
+// [surface.Surface] adapter (dashboard, init wizard, project detail,
+// project wizard, resume wizard, import preview). The default branch
+// remains as a defensive guard: if a future contributor adds a new
+// `State` constant without registering a surface in `surfaceFor`,
+// the cockpit surfaces a self-explanatory placeholder instead of
+// silently rendering an empty body.
 func (m Model) renderRootBody(screen views.Screen) string {
 	if s := m.surfaceFor(); s != nil {
 		return s.Body(surface.Context{Screen: screen})
 	}
-	switch m.state {
-	case StateInitWizard:
-		return views.RenderInitWizard(screen)
-	case StateDashboard:
-		return m.renderDashboardBody(screen)
-	case StateProjectDetail:
-		if m.activeTab == TabLogs {
-			return views.RenderLiveLogs(screen)
-		}
-		return views.RenderProjectDetail(screen)
-	case StateProjectWizard:
-		return views.RenderProjectWizard(screen)
-	case StateResumeWizard:
-		return views.RenderResumeWizard(screen)
-	case StateImportPreview:
-		return views.RenderImportPreview(screen)
-	default:
-		return m.styles.Panel.Render(fmt.Sprintf("%s is not enabled", m.state))
-	}
+	return m.styles.Panel.Render(fmt.Sprintf("%s is not enabled", m.state))
 }
 
 // renderChromeTop builds the persistent top-of-frame status bar.
@@ -146,10 +115,18 @@ func (m Model) renderChromeTop(screen views.Screen, crumb string) string {
 // overflows the viewport the footer surfaces the scroll affordance
 // inline so the operator does not have to memorise the keymap or
 // guess that there is more content below the fold.
+//
+// Sprint 14 TASK-14.2 — when a tile is focused the footer swaps
+// the global "scroll body" hint for a tile-scoped one so the
+// operator can tell at a glance that PgUp/PgDn now route inside
+// the panel and that Esc releases focus.
 func (m Model) renderChromeBottom(width, total, available, offset int) string {
 	tokens := theme.Default()
 	hints := "  [q] quit · [?] help · [/] command palette · [Tab] cycle panels"
-	if total > available && available > 0 {
+	if m.focusedTile != nil {
+		hints += fmt.Sprintf("  ·  focus: %s · [PgUp/PgDn] scroll panel · [Esc] release",
+			slotLabel(*m.focusedTile))
+	} else if total > available && available > 0 {
 		maxOffset := total - available
 		hints += fmt.Sprintf("  ·  ↕ scroll: PgUp/PgDn (%d/%d)", offset, maxOffset)
 	}
@@ -157,6 +134,28 @@ func (m Model) renderChromeBottom(width, total, available, offset int) string {
 		Foreground(lipgloss.Color(tokens.TextDim)).
 		Width(width).
 		Render(hints)
+}
+
+// slotLabel maps a [bento.Slot] to a short, human-readable label
+// for the footer hint. Kept terse so it fits inside the existing
+// chrome budget on the 100×30 Standard cockpit fallback.
+func slotLabel(slot bento.Slot) string {
+	switch slot {
+	case bento.SlotProjects:
+		return "projects"
+	case bento.SlotOverview:
+		return "overview"
+	case bento.SlotMetrics:
+		return "metrics"
+	case bento.SlotCICD:
+		return "CI/CD"
+	case bento.SlotLogs:
+		return "logs"
+	case bento.SlotTopology:
+		return "topology"
+	default:
+		return "panel"
+	}
 }
 
 // renderViewport returns the visible slice of rendered for the current
@@ -234,9 +233,13 @@ func (m Model) renderDashboardBody(screen views.Screen) string {
 			RenderMode(screen.Width, screen.Height, mode)
 	default:
 		statusBar := components.RenderStatusBar(m.dashboardStatusBar(screen.Width))
-		base = bento.NewEngine("Webox Cockpit v0.1", m.dashboardBentoTiles()).
+		engine := bento.NewEngine("Webox Cockpit v0.1", m.dashboardBentoTiles()).
 			WithStatusBar(statusBar).
-			RenderMode(screen.Width, screen.Height, mode)
+			WithTileScrollOffsets(m.tileScrollOffsets)
+		if m.focusedTile != nil {
+			engine = engine.WithFocus(*m.focusedTile)
+		}
+		base = engine.RenderMode(screen.Width, screen.Height, mode)
 	}
 	// Host-key modal takes precedence: the cockpit is unsafe to
 	// continue while an SSH dial is being refused; we paint it over
