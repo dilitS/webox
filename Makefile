@@ -151,12 +151,18 @@ doctor-security: build ## Run `webox doctor security` (post-MVP).
 	$(BIN_DIR)/webox doctor security
 
 .PHONY: smoke-test
-smoke-test: build ## Drive ./bin/webox --mock through Sprint 20 scenarios via tuistory PTY (requires Node 24+ and one-time `npm --prefix scripts/manual-test install`).
+smoke-test: ## Drive ./bin/webox --mock through Sprint 20 scenarios via tuistory PTY (requires Node 24+ and one-time `npm --prefix scripts/manual-test install`).
 	@if [ ! -d scripts/manual-test/node_modules ]; then \
 		printf "$(COLOR_RED)✗ scripts/manual-test/node_modules missing.$(COLOR_RESET) Run: npm --prefix scripts/manual-test install\n"; \
 		exit 1; \
 	fi
 	@node --version | awk -F'.' '{ if ($$1 < "v24") { print "✗ Node "$$0" too old; need v24+"; exit 1 } }'
+	@# Pin VERSION via sub-make so the manual/*.txt snapshots stay deterministic
+	@# across commits (LDFLAGS uses := and would otherwise capture the live
+	@# `git describe --dirty` value at parse time, churning every line of every
+	@# snapshot on each HEAD bump). The pinned token also makes it obvious in
+	@# screenshots that the binary came from the smoke harness.
+	@$(MAKE) --no-print-directory build VERSION=smoke-test
 	cd scripts/manual-test && node --experimental-strip-types --no-warnings smoke.ts
 
 # ── Modules / Tools ────────────────────────────────────────────────────

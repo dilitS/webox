@@ -1,5 +1,5 @@
 
-WEBOX v0.1.0-rc1-13-g48a5379-dirty  LIVE  Project Detail │ 14:32:01 │ us-east-1 │ Uptime: 24d 11h │ Load: 0.12, 0.28, 0.
+WEBOX smoke-test  LIVE  Project Detail │ 14:32:01 │ us-east-1 │ Uptime: 24d 11h │ Load: 0.12, 0.28, 0.31 │ RAM: 3.4/8.0
 ╔═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 ║ 🖥 [Project Detail: ShopEase-Web]
 ║

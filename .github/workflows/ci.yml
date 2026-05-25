@@ -220,6 +220,63 @@ jobs:
             exit 1
           fi
 
+  # Sprint 20 added a tuistory-based PTY smoke harness that drives the actual
+  # binary (no teatest mocking, no diff-rendering surprises). It is not a
+  # required gate yet — we want a couple of weeks of green runs before
+  # promoting it into ci-summary. Until then it stays advisory and uploads its
+  # report + text snapshots for PR reviewers.
+  smoke-tui:
+    name: Smoke TUI (tuistory PTY)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+
+      # tuistory ships TS sources executed via Node's --experimental-strip-types.
+      # That flag is stable from Node 24+, so we pin to the latest 24.x LTS.
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+
+      # scripts/manual-test/.gitignore drops lock files on purpose (Sprint 20
+      # carry-over: keep the harness self-contained). That means we cannot use
+      # setup-node's npm cache here; the install is fast enough (~10s) without.
+      - name: Install tuistory deps
+        working-directory: scripts/manual-test
+        run: npm install --no-audit --no-fund
+
+      - name: Build webox binary (mock-friendly)
+        env:
+          CGO_ENABLED: "0"
+        run: make build
+
+      - name: Run smoke suite
+        run: make smoke-test
+
+      - name: Upload smoke report + snapshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: smoke-tui-${{ github.sha }}
+          path: docs/screenshots/sprint-20/manual/
+          if-no-files-found: warn
+          retention-days: 14
+
   ci-summary:
     name: CI summary
     runs-on: ubuntu-latest
