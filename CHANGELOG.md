@@ -15,6 +15,14 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ## [Unreleased]
 
+_(no entries yet — `v0.1.0` GA promotion lands here after the manual checklist in `.cursor/skills/release-check/SKILL.md` is ticked)_
+
+---
+
+## [v0.1.0-rc1] — 2026-05-25
+
+> **Release candidate** for the first public release. CI green, coverage 80.4 %, lint clean, `govulncheck` clean, bench within 5 ms budget. Operator-only validation pending: real-account integration tests, fresh-install on Linux, asciinema recording, cosign signature pipeline. Promote to `v0.1.0` GA from the **same commit** once `.cursor/skills/release-check/SKILL.md` checklist is fully ticked — no code changes expected between RC1 and GA.
+
 ### Fixed
 
 - **CLI help text disambiguates `--preset` form (post-verification fix, 2026-05-25).** `webox --help` and the `provider new` error messages now consistently show `--preset=PRESET` (the equals-form, which is what the parser actually accepts). Discovered during the Sprint 15 pre-release smoke test: the previous help text rendered `[--preset P]` which most users would type as `--preset cpanel-uapi` (space-separated) and hit a `unknown argument "--preset"` error. The parser is unchanged — all existing tests still pass — only the docstrings + error messages were tightened. Space-form support is a v0.2 candidate; not blocking v0.1.0.
@@ -1121,4 +1129,5 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
   Docs-only PRs (typos, formatting) can skip too. When in doubt, add
   an entry — better noisy than missing context months later.
 
-[Unreleased]: https://github.com/dilitS/webox/compare/v0.0.0-bootstrap...HEAD
+[Unreleased]: https://github.com/dilitS/webox/compare/v0.1.0-rc1...HEAD
+[v0.1.0-rc1]: https://github.com/dilitS/webox/releases/tag/v0.1.0-rc1
