@@ -21,28 +21,41 @@ type Surface struct{}
 
 // Body picks the renderer based on the active tab.
 //
-//   - `Overview`  → [views.RenderProjectDetail].
-//   - `Logs`      → [views.RenderLiveLogs] (Sprint 09 live-log tail).
+//   - `Overview` → [views.RenderProjectDetail].
+//   - `Env Diff` → [views.RenderEnvDiff] (read-only secrets list).
+//   - `Database` → [views.RenderDatabase] (stack-aware cheatsheet).
+//   - `Logs`     → [views.RenderLiveLogs] (Sprint 09 live tail).
 //
 // Any other value falls back to the Overview renderer; the model
-// guarantees `ActiveTab` is one of the two enabled tabs (`TabOverview`
-// or `TabLogs`) so the fallback only triggers on a future contract
-// regression and keeps the surface from rendering an empty body.
+// guarantees `ActiveTab` is one of the four enabled tabs so the
+// fallback only triggers on a future contract regression and keeps
+// the surface from rendering an empty body.
 func (Surface) Body(ctx surface.Context) string {
-	if ctx.Screen.ActiveTab == tabLogs {
+	switch ctx.Screen.ActiveTab {
+	case tabLogs:
 		return views.RenderLiveLogs(ctx.Screen)
+	case tabEnvDiff:
+		return views.RenderEnvDiff(ctx.Screen)
+	case tabDatabase:
+		return views.RenderDatabase(ctx.Screen)
+	default:
+		return views.RenderProjectDetail(ctx.Screen)
 	}
-	return views.RenderProjectDetail(ctx.Screen)
 }
 
-// Crumb labels the surface as either "Live Logs" (when the operator
-// has switched to the log tail) or "Project Detail" (default).
-// Matches the Sprint 13 chrome contract — `docs/UX.md §4.2`.
+// Crumb labels the surface based on the active tab. Sprint 13
+// chrome contract — `docs/UX.md §4.2`.
 func (Surface) Crumb(ctx surface.Context) string {
-	if ctx.Screen.ActiveTab == tabLogs {
+	switch ctx.Screen.ActiveTab {
+	case tabLogs:
 		return "Live Logs"
+	case tabEnvDiff:
+		return "Env Diff"
+	case tabDatabase:
+		return "Database"
+	default:
+		return "Project Detail"
 	}
-	return "Project Detail"
 }
 
 // Footer returns the global cockpit legend. Per-tab hints
@@ -73,16 +86,17 @@ func (Surface) Footer(_ surface.Context) surface.FooterHint {
 func (Surface) AcceptsScroll(_ surface.Context) bool { return true }
 
 const (
-	// tabLogs mirrors `tui.TabLogs.String()`. We compare against
-	// the string so this leaf package does not import `tui` (would
-	// be a cycle: `tui` imports the surface package).
-	tabLogs = "Logs"
+	// tab* string constants mirror `tui.DetailTab.String()`. We
+	// compare against the string so this leaf package does not
+	// import `tui` (would be a cycle: `tui` imports the surface
+	// package).
+	tabLogs     = "Logs"
+	tabEnvDiff  = "Env Diff"
+	tabDatabase = "Database"
 
 	// defaultFooterHint surfaces the keys that actually do something
-	// on the project-detail surface: tab back to the dashboard, the
-	// two implemented tabs (1 / 4), and the three project actions
-	// (restart / SSL renew / log tail). The dishonest
-	// `[/] command palette` reference is gone (no palette ships in
-	// v0.1).
-	defaultFooterHint = "  [q] quit · [?] help · [Esc/Tab] back · [1] overview · [4] logs · [r] restart · [s] ssl · [v] tail"
+	// on the project-detail surface: back to dashboard, the four
+	// tabs (1 / 2 / 3 / 4), and the three project actions
+	// (restart / SSL renew / log tail).
+	defaultFooterHint = "  [q] quit · [?] help · [Esc/Tab] back · [1] overview · [2] env · [3] db · [4] logs · [r] restart · [s] ssl · [v] tail"
 )

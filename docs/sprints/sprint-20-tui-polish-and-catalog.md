@@ -2,7 +2,7 @@
 
 > **Daty:** 2026-05-25 → 2026-06-08 (2 tygodnie) · **Cel:** Dokończyć cooldown po-MVP TUI: dostarczyć Provider Catalog screen (carry-over z 19.4) i naprawić długoletnie UX-bugi (klikanie, scroll, scaling, dishonest hints).
 >
-> **Status:** 📝 Planned · **Properties:** code-heavy, low operator-time, no external blockers.
+> **Status:** ✅ Done (2026-05-25, all 6 tasks closed in one autonomous session) · **Properties:** code-heavy, low operator-time, no external blockers.
 
 ## Kontekst
 
@@ -151,10 +151,29 @@ Czego **nie** umiemy: cPanel adapter (Sprint 21+), CI/CD step click-through (car
 | `services/envdiff` reads project files via SSH cache TTL — race with restart | Read on-demand only when tab opens; no background polling. |
 | `Help` overlay keybinding (`?`) conflicts with existing surface that also wants `?` | Help is global at `Update`-router level; surfaces can't claim `?`. Document in `docs/conventions.md`. |
 
-## Outcome (wypełnij po sprincie)
+## Outcome (2026-05-25, sprint zamknięty wcześniej niż planowano)
 
-- ✅ Done: TASK-20.X
-- ⏭️ Carry-over: TASK-20.X → Sprint XX (powód: …)
-- 📌 Decyzje: <ADR jeśli powstał>
-- 🧠 Surprises: <co się okazało inne niż w docs>
-- 📊 Metrics: bench `BenchmarkRenderMode/ultra-120x35` ns/op, coverage delta, e2e count delta.
+- ✅ **Done (6/6 taski):**
+  - TASK-20.1 — `bento.LayoutMap` + click hit-testing (focus scrollable tile / drill non-scrollable / status-bar no-op).
+  - TASK-20.2 — Provider Catalog screen pod `[p]`, kursor `↑/↓`, detail toggle `Enter`, copy-briefing `c` (clipboard via `pbcopy`/`xsel`/`xclip`/`wl-copy`/`clip.exe` z graceful fallback hintem).
+  - TASK-20.3 — Standard mode redesign na proper mini-bento (top: projects + server, bottom: CI/CD strip + Live Log strip), 5 nowych regression testów dla budgetu wiersza/clippingu.
+  - TASK-20.4 — Project Detail tabs `[2] Env Diff` i `[3] Database` jako read-only views; Env Diff czyta `SecretsMeta` (z badge stale), Database to stack-aware cheatsheet z naming convention z domeny.
+  - TASK-20.5 — Help overlay (`?`) jako fullscreen centered modal nad każdym ekranem, surface keys parsowane z `Footer().Text` (live, never drifts), strict-block routing kluczy (tylko `?`/`Esc`/`Enter`/`q`/`Ctrl+C` reach the model). Refactor `updateKey` → `handleOverlayKey` zbił cyclomatic complexity poniżej lint gate.
+  - TASK-20.6 — CHANGELOG `[Unreleased]` z 4 wpisami Added (catalog, help, screenshot tool, mouse semantics) + 1 Changed; 14 screenshotów w `docs/screenshots/sprint-20/`; retrospective w `docs/retros/2026-05-25-sprint-20.md`.
+- ⏭️ Carry-over: brak — wszystkie taski zamknięte w jednej sesji.
+- 📌 **Decyzje (bez nowych ADR):**
+  - Help overlay zastępuje cały `View()` zamiast composite-paint-on-top — uniknęliśmy double-border artefaktów z bento engine i nie musieliśmy modyfikować layout viewport math. Decyzja udokumentowana w komentarzu `helpOverlayFullscreen`.
+  - Clipboard via `os/exec` + per-OS allowlist (`pbcopy` macOS, `xsel`/`xclip`/`wl-copy` Linux/Wayland, `clip.exe` Windows) zamiast nowej `go.mod` zależności (`atotto/clipboard`) — uniknęliśmy procedury sign-off maintainera.
+  - `cmd/screenshot` jako stable dev tool zamiast ad-hoc `probe.go` — przyszłe sprinty mają deterministyczny generator captures.
+  - Provider Catalog briefing format ("Webox Provider Briefing — …") jako stabilny plain-text grammar (sectioned, line-oriented) — operator może wkleić do Slack/post-mortem/onboarding doc bez markdown noise.
+- 🧠 **Surprises:**
+  - `gofumpt 0.10` na go1.26 ma issue z multi-arg `append(slice, "literal", style.Render(…))` — wymusiło konwersję do `slice = append(slice, group...)` w trzech miejscach. Małe, ale notable bo łatwo regenerable.
+  - `bento.Engine` differential rendering optymalizuje znikające linie statusa, więc e2e `teatest.WaitFor` na "[Active Projects]" hangował po Esc; przerzuciliśmy needle na `[Right/Enter] open` (footer-only) — fixed.
+  - Help overlay `tea.MsgKey` `q` przy otwartym modal MUSI quitować (operator-safety), więc strict-block w `handleOverlayKey` ma explicit `case "q"`.
+- 📊 **Metrics:**
+  - `make test`: 100% pass · coverage **80.1% ≥ 70%** (`+0.4pp` vs Sprint 19 close).
+  - `make bench-check`: worst `BenchmarkRenderMode/ultraplus-160x45` = **199µs ≤ 5ms budget** (40× margines).
+  - `make vulncheck`: 0 vulnerabilities.
+  - `make lint`: 0 issues po naprawie 9 (mnd, gosec G204 false-positive, gocyclo, prealloc, unconvert).
+  - 36 nowych unit testów (catalog model 7, catalog views 5, catalog surface 2, help overlay 6, env diff 5, database 4, mini-bento 5, layout map 2).
+  - 14 screenshotów w `docs/screenshots/sprint-20/` (od `01-dashboard-tiny-60x18.txt` do `14-help-overlay-detail-120x35.txt`).

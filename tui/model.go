@@ -152,6 +152,32 @@ type Model struct {
 	layoutOverride  string
 	nowFn           func() time.Time
 	trace           telemetry.Sink
+
+	// Sprint 20 TASK-20.2 Provider Catalog state. Lives on the
+	// model so the catalog screen can keep cursor + detail
+	// expansion across re-renders without owning a separate
+	// state machine.
+	catalog providerCatalogState
+}
+
+// providerCatalogState is the view-level state for the
+// StateProviderCatalog screen. The model owns it (rather than
+// the surface adapter) because the cursor must survive across
+// `Update` calls — Bubble Tea returns a fresh value-typed
+// adapter every frame.
+type providerCatalogState struct {
+	// SelectedID tracks the cursor row. Empty value selects no
+	// row (initial state); the renderer falls back to the first
+	// catalog entry when the operator hits arrow keys.
+	SelectedID string
+	// ShowDetail toggles the deep-dive bottom strip. Defaults
+	// to false so the catalog opens in "list mode" — pressing
+	// Enter expands.
+	ShowDetail bool
+	// CopyHint surfaces the most recent clipboard ack ("briefing
+	// copied to clipboard") or failure ("clipboard unavailable").
+	// Cleared on the next keypress.
+	CopyHint string
 }
 
 // liveLogsForm captures the per-session state of the Sprint 09 live-log

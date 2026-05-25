@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -39,6 +40,16 @@ import (
 // stays self-contained.
 func (m Model) View() string {
 	screen := m.screen()
+	// Sprint 20 TASK-20.5 — Help overlay is a top-of-stack
+	// surface: the operator pressed `?` to ask what they can
+	// do *now*, so we replace the entire body with a centered
+	// modal. Rendering at View() level (rather than per-state)
+	// guarantees the overlay shows up on every state — wizards,
+	// catalog, project detail — without each surface needing to
+	// opt in.
+	if m.helpVisible {
+		return helpOverlayFullscreen(m, screen)
+	}
 	mode := bento.DetectMode(screen.Width, screen.Height)
 	if mode == bento.ModeTiny {
 		return m.renderRootBody(screen)
@@ -666,6 +677,137 @@ func (m Model) screen() views.Screen {
 		ImportForm:    importFormSnapshot(m),
 		LiveLogs:      liveLogsSnapshot(m),
 		Connections:   dashboardConnectionsSnapshot(m),
+		CICDMini:      cicdMiniSnapshot(m),
+		Secrets:       secretsSnapshot(m),
+		Catalog:       catalogSnapshot(m),
+	}
+}
+
+// secretsSnapshot turns the [config.Project.SecretsMeta] of the
+// currently selected project into the view-layer projection
+// consumed by [views.RenderEnvDiff]. Returns nil when no project
+// is selected (the Env Diff tab paints a friendly placeholder).
+//
+// Stale flagging compares `now - LastRotated` against
+// `RotationReminderDays`, mirroring the heuristic Webox doctor
+// uses on the CLI side. Zero reminder days → never stale.
+func secretsSnapshot(m Model) []views.SecretMetaSnapshot {
+	project, ok := m.selectedProject()
+	if !ok {
+		return nil
+	}
+	if len(project.SecretsMeta) == 0 {
+		return nil
+	}
+	now := m.nowFn()
+	const dateLayout = "2006-01-02"
+	out := make([]views.SecretMetaSnapshot, 0, len(project.SecretsMeta))
+	for _, meta := range project.SecretsMeta {
+		snap := views.SecretMetaSnapshot{
+			Key:                  meta.Key,
+			Source:               string(meta.Source),
+			RotationReminderDays: meta.RotationReminderDays,
+		}
+		if !meta.CreatedAt.IsZero() {
+			snap.CreatedAt = meta.CreatedAt.Format(dateLayout)
+		}
+		if meta.LastRotated != nil && !meta.LastRotated.IsZero() {
+			snap.LastRotated = meta.LastRotated.Format(dateLayout)
+			if meta.RotationReminderDays > 0 {
+				const hoursPerDay = 24
+				if int(now.Sub(*meta.LastRotated).Hours()/hoursPerDay) > meta.RotationReminderDays {
+					snap.Stale = true
+				}
+			}
+		}
+		if meta.LastSyncedGitHub != nil && !meta.LastSyncedGitHub.IsZero() {
+			snap.LastSyncedGitHub = meta.LastSyncedGitHub.Format(dateLayout)
+		}
+		if meta.LastSyncedServer != nil && !meta.LastSyncedServer.IsZero() {
+			snap.LastSyncedServer = meta.LastSyncedServer.Format(dateLayout)
+		}
+		out = append(out, snap)
+	}
+	return out
+}
+
+// cicdMiniSnapshot returns the compact CI/CD projection consumed by
+// the Standard cockpit mini-bento strip. Empty when the operator
+// has no project selected, no CI run has been observed yet, or
+// the snapshot map is uninitialised — the renderer paints the
+// `[CI/CD] (no run yet)` placeholder for those branches.
+func cicdMiniSnapshot(m Model) views.CICDMiniSnapshot {
+	project, ok := m.selectedProject()
+	if !ok {
+		return views.CICDMiniSnapshot{}
+	}
+	entry, has := m.cicdSnapshots[project.ID]
+	if !has || entry.Run == nil {
+		return views.CICDMiniSnapshot{}
+	}
+	snap := views.CICDMiniSnapshot{
+		HasRun:    true,
+		Status:    cicdStatusVerb(entry.Run.Status, entry.Run.Conclusion),
+		JobName:   entry.Run.Name,
+		RunNumber: int64(entry.Run.RunNumber),
+	}
+	if !entry.Run.HeaderTime.IsZero() {
+		snap.UpdatedAt = relativeTime(m.nowFn(), entry.Run.HeaderTime)
+	}
+	for _, step := range entry.Steps {
+		if step.Conclusion == "failure" {
+			snap.FailedStep = step.Name
+			break
+		}
+	}
+	return snap
+}
+
+// cicdStatusVerb maps the GitHub status/conclusion enum pair to the
+// upper-case verb the mini-bento ribbon renders. Mirrors
+// [bento.CICDStatus] but lives here because the views package
+// cannot import bento (cycle).
+func cicdStatusVerb(status, conclusion string) string {
+	if conclusion != "" {
+		switch strings.ToLower(conclusion) {
+		case "success":
+			return "SUCCESS"
+		case "failure":
+			return "FAILED"
+		case "cancelled":
+			return "CANCELLED"
+		case "skipped":
+			return "SKIPPED"
+		}
+	}
+	switch strings.ToLower(status) {
+	case "in_progress":
+		return "IN_PROGRESS"
+	case "queued":
+		return "QUEUED"
+	case "completed":
+		return "DONE"
+	}
+	return "UNKNOWN"
+}
+
+// relativeTime formats `t` as a human-readable "Nh ago" / "Nm ago"
+// string, capped at "1d ago" granularity so the strip stays narrow.
+// Future times (clock skew, mock data) collapse to "just now".
+func relativeTime(now, t time.Time) string {
+	const hoursPerDay = 24
+	d := now.Sub(t)
+	switch {
+	case d < 0:
+		return "just now"
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < hoursPerDay*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/hoursPerDay))
 	}
 }
 

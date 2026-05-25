@@ -138,35 +138,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:gocyclo // To
 const mouseWheelStep = 3
 
 // updateMouse handles mouse events surfaced by Bubble Tea's
-// `tea.WithMouseCellMotion` opt-in. As of Sprint 20 the cockpit
-// understands two button families:
+// `tea.WithMouseCellMotion` opt-in. The cockpit understands two
+// button families:
 //
 //   - **Wheel up / wheel down** — scrolls the focused tile (when one
 //     is Tab-focused) or the global body viewport (otherwise),
 //     mirroring `PgUp`/`PgDn` / `Home`/`End`. Step size is
 //     [mouseWheelStep] lines.
-//   - **Left button press** — a coarse "click-to-drill /
-//     click-to-back" affordance: clicking on the dashboard opens
-//     the currently-selected project's detail surface (`Enter`
-//     equivalent); clicking on the project detail returns to the
-//     dashboard (`Esc` equivalent). Other surfaces (wizards,
-//     resume, import, modals) ignore the click because they have
-//     their own keyboard-driven flow and a stray click would risk
-//     derailing it. While a tile is Tab-focused the click is also a
-//     no-op so the operator does not lose scroll context.
+//   - **Left button press** — layout-aware hit testing routes the
+//     click into one of three behaviours:
+//   - clicking the row Y of the Projects tile sets selectedIndex
+//     to that row AND drills into project detail.
+//   - clicking on a non-scrollable tile (Overview, Topology,
+//     Metrics) drills into project detail (mirrors Enter).
+//   - clicking on a scrollable tile (Logs, CI/CD) focuses that
+//     tile so wheel events scroll its body instead of the
+//     viewport.
+//   - clicking the project detail body returns to the dashboard.
+//   - clicking on the status bar or any region outside a slot
+//     is a no-op (chrome should be informational only).
+//   - while a tile is already Tab-focused, left-click is a no-op
+//     so the operator does not lose scroll context — Esc is the
+//     explicit release path.
 //
 // Bubble Tea v1.3+ split `MouseMsg.Type` into the orthogonal
 // `MouseAction` (press/release/motion) + `MouseButton`
 // (left/middle/wheel-up/wheel-down/…) pair. We only react to *press*
 // actions so a long mouse drag does not fire repeated jumps.
-//
-// Per-tile hit testing (clicking on a specific tile to focus it,
-// clicking on a CI/CD step to expand, etc.) is deferred to the
-// Sprint 20+ Provider Catalog work; it requires the bento engine
-// to publish a layout map keyed by slot, which is a separate
-// design problem. The current contract gives clicks meaningful
-// behaviour for the most common operator gesture without that
-// dependency.
 func (m Model) updateMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if msg.Action != tea.MouseActionPress {
 		return m, nil
@@ -188,26 +186,33 @@ func (m Model) updateMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		m.scrollViewportBy(mouseWheelStep)
 		return m, nil
 	case tea.MouseButtonLeft:
-		return m.handleLeftClick(), nil
+		return m.handleLeftClick(msg.X, msg.Y), nil
 	}
 	return m, nil
 }
 
-// handleLeftClick implements the coarse "click-to-drill /
-// click-to-back" affordance documented on [updateMouse]. It is a
-// pure model transform; all I/O stays in commands.
-func (m Model) handleLeftClick() Model {
+// handleLeftClick implements the layout-aware click router
+// documented on [updateMouse]. It is a pure model transform; all
+// I/O stays in commands.
+//
+// The dashboard branch resolves the click coordinate against
+// [Model.dashboardLayout] so the slot under the cursor decides
+// whether the cockpit drills, focuses, or stays put. Non-dashboard
+// states use coarse semantics: project detail clicks return to
+// the dashboard; wizards and modals ignore clicks because their
+// keyboard-driven flow would be derailed by stray pointer events.
+func (m Model) handleLeftClick(x, y int) Model {
 	switch m.state {
 	case StateDashboard:
 		if m.cicdModal.Open || m.hostKeyModal.Open {
 			return m
 		}
-		if len(cfgProjects(m.cfg)) == 0 {
+		layout := m.dashboardLayout()
+		slot, ok := layout.SlotAt(x, y)
+		if !ok {
 			return m
 		}
-		m.state = StateProjectDetail
-		m.activeTab = TabOverview
-		return m
+		return m.routeDashboardClick(slot, x, y, layout)
 	case StateProjectDetail:
 		if m.activeTab == TabLogs {
 			return m
@@ -218,29 +223,139 @@ func (m Model) handleLeftClick() Model {
 	return m
 }
 
-func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Host-key modal is a strict-block overlay: while it is open we
-	// only accept `Esc` (close) and `q`/`Ctrl+C` (quit). Any other
-	// key would silently route to the underlying state — confusing
-	// at best, security-relevant at worst (e.g. accidentally
-	// triggering a wizard step while a MITM warning is on screen).
+// routeDashboardClick decides what to do once the layout map has
+// resolved a click into a [bento.Slot]. Split out from
+// [handleLeftClick] so the router stays narratable: each slot has
+// its own one-line case.
+func (m Model) routeDashboardClick(slot bento.Slot, _, y int, layout bento.LayoutMap) Model {
+	switch slot {
+	case bento.SlotProjects:
+		projects := cfgProjects(m.cfg)
+		if len(projects) == 0 {
+			return m
+		}
+		// Inside the Projects tile: skip the top border + tile
+		// header (2 chrome rows) to get the body offset, then
+		// each subsequent row maps to one project. The clamp
+		// prevents an out-of-range index when the click lands on
+		// the bottom border or the empty padding area.
+		const chromeRows = 2
+		rowOffset := y - layout.Slots[slot].Y - chromeRows
+		if rowOffset < 0 {
+			rowOffset = 0
+		}
+		if rowOffset >= len(projects) {
+			rowOffset = len(projects) - 1
+		}
+		m.selectedIndex = rowOffset
+		m.state = StateProjectDetail
+		m.activeTab = TabOverview
+		return m
+	case bento.SlotLogs, bento.SlotCICD:
+		// Scrollable tile → focus it directly. Tab cycle still
+		// works; this is the click shortcut that lets the
+		// operator pick a panel without remembering its position
+		// in the rotation.
+		if !m.slotIsScrollableInDashboard(slot) {
+			// Defensive guard: in case a future engine change
+			// reuses these slot ids for non-scrollable tiles,
+			// fall back to the drill behaviour rather than
+			// silently breaking.
+			return m.drillIntoSelectedProject()
+		}
+		focus := slot
+		m.focusedTile = &focus
+		return m
+	case bento.SlotOverview, bento.SlotTopology, bento.SlotMetrics:
+		return m.drillIntoSelectedProject()
+	}
+	return m
+}
+
+// drillIntoSelectedProject is the shared "click drilled, no row
+// selection" path. The current selectedIndex is preserved.
+func (m Model) drillIntoSelectedProject() Model {
+	if len(cfgProjects(m.cfg)) == 0 {
+		return m
+	}
+	m.state = StateProjectDetail
+	m.activeTab = TabOverview
+	return m
+}
+
+// slotIsScrollableInDashboard reports whether the dashboard frame
+// would expose `slot` as Tab-focusable (i.e. the underlying tile
+// implements [bento.ScrollableTile]). Used by
+// [routeDashboardClick] so a click on a scrollable tile lands
+// directly on focus regardless of the current Tab cycle position.
+func (m Model) slotIsScrollableInDashboard(slot bento.Slot) bool {
+	for _, tile := range m.dashboardBentoTiles() {
+		if tile.Slot() != slot {
+			continue
+		}
+		_, ok := tile.(bento.ScrollableTile)
+		return ok
+	}
+	return false
+}
+
+// dashboardLayout returns the [bento.LayoutMap] for the current
+// viewport. Computed deterministically from `m.width`, `m.height`,
+// and the active [bento.Mode] so the result tracks whatever
+// [Engine.RenderMode] would actually paint. Centralised here so
+// both the click router and any future test helper can ask for
+// the same answer without reaching into the engine themselves.
+func (m Model) dashboardLayout() bento.LayoutMap {
+	return bento.NewEngine("Webox Cockpit v0.1", nil).
+		ComputeLayout(m.width, m.height, m.BentoMode())
+}
+
+// handleOverlayKey routes keystrokes when a strict-block overlay
+// is on screen (host-key warning or help). Returns
+// `handled=true` when the overlay consumed the key. The split
+// keeps `updateKey` below the `gocyclo` threshold and makes the
+// modal contracts trivial to audit in isolation.
+//
+// Contracts:
+//
+//   - Host-key modal: only `Esc` / `Enter` (dismiss) and `q` /
+//     `Ctrl+C` (force quit) reach the model. Every other key is
+//     silently ignored so a stray paste cannot accept the host
+//     key by accident.
+//   - Help overlay: same dismiss-or-quit contract, but with `?`
+//     also acting as a toggle so the operator can press the
+//     same key to open and close the panel.
+func (m Model) handleOverlayKey(msg tea.KeyMsg) (bool, tea.Model, tea.Cmd) {
 	if m.hostKeyModal.Open {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			m.cancel()
-			return m, tea.Quit
+			return true, m, tea.Quit
 		case "esc", "enter":
-			// Inline mutation rather than calling a pointer-
-			// receiver helper: Bubble Tea's MVU contract returns
-			// a value copy; we want the dismissal visible in
-			// the returned Model regardless of how Go handles
-			// the implicit address-of in the method call. Keeps
-			// the data-flow obvious to readers.
 			m.hostKeyModal = hostKeyModalForm{}
-			return m, nil
+			return true, m, nil
 		default:
-			return m, nil
+			return true, m, nil
 		}
+	}
+	if m.helpVisible {
+		switch msg.String() {
+		case "q", "ctrl+c":
+			m.cancel()
+			return true, m, tea.Quit
+		case "?", "esc", "enter":
+			m.helpVisible = false
+			return true, m, nil
+		default:
+			return true, m, nil
+		}
+	}
+	return false, m, nil
+}
+
+func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if handled, model, cmd := m.handleOverlayKey(msg); handled {
+		return model, cmd
 	}
 
 	switch msg.String() {
@@ -248,7 +363,7 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.cancel()
 		return m, tea.Quit
 	case "?":
-		m.helpVisible = !m.helpVisible
+		m.helpVisible = true
 		m.viewportOffsetY = 0
 		return m, nil
 	}
@@ -294,6 +409,8 @@ func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateResumeWizardKey(msg)
 	case StateImportPreview:
 		return m.updateImportPreviewKey(msg)
+	case StateProviderCatalog:
+		return m.updateProviderCatalogKey(msg)
 	default:
 		return m, nil
 	}
@@ -467,6 +584,78 @@ func (m *Model) scrollViewportBy(delta int) {
 	m.viewportOffsetY = clampViewportOffset(m.viewportOffsetY, available, len(viewportLines(body)))
 }
 
+// updateProviderCatalogKey routes keys on the Sprint 20
+// TASK-20.2 catalog screen.
+//
+//   - `up` / `down` / `k` / `j` walk the row cursor across the
+//     flattened catalog (groups are joined preserving region
+//     order). The cursor wraps at top / bottom.
+//   - `enter` / `right` toggle the deep-dive detail strip.
+//   - `c` (or `C`) copies the selected preset's plain-text
+//     briefing to the OS clipboard via [clipboardCopy]. On
+//     success the model surfaces a green ack inside the catalog
+//     body; on failure (clipboard unavailable in the host
+//     environment) the model surfaces a dim error so operators
+//     can fall back to copying from the deep-dive panel.
+//   - `esc` / `left` / `q` returns to the dashboard.
+func (m Model) updateProviderCatalogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	snap := catalogSnapshot(m)
+	rows := catalogRows(snap)
+	switch msg.String() {
+	case "esc", "left":
+		m.state = StateDashboard
+		m.catalog.CopyHint = ""
+		return m, nil
+	case "up", "k":
+		m.catalog.CopyHint = ""
+		if len(rows) == 0 {
+			return m, nil
+		}
+		idx := catalogRowIndex(rows, snap.SelectedID)
+		if idx <= 0 {
+			idx = len(rows)
+		}
+		m.catalog.SelectedID = rows[idx-1].ID
+		return m, nil
+	case "down", "j":
+		m.catalog.CopyHint = ""
+		if len(rows) == 0 {
+			return m, nil
+		}
+		idx := catalogRowIndex(rows, snap.SelectedID)
+		next := (idx + 1) % len(rows)
+		if idx < 0 {
+			next = 0
+		}
+		m.catalog.SelectedID = rows[next].ID
+		return m, nil
+	case "enter", "right":
+		m.catalog.CopyHint = ""
+		m.catalog.ShowDetail = !m.catalog.ShowDetail
+		if m.catalog.SelectedID == "" && len(rows) > 0 {
+			m.catalog.SelectedID = rows[0].ID
+		}
+		return m, nil
+	case "c", "C":
+		// Force the detail snapshot so the briefing carries
+		// the latest fields even when the operator hasn't
+		// pressed Enter yet.
+		m.catalog.ShowDetail = true
+		fresh := catalogSnapshot(m)
+		if fresh.Detail.BriefingPlainText == "" {
+			m.catalog.CopyHint = "select a preset first"
+			return m, nil
+		}
+		if err := clipboardCopy(fresh.Detail.BriefingPlainText); err != nil {
+			m.catalog.CopyHint = "clipboard unavailable: " + err.Error()
+			return m, nil
+		}
+		m.catalog.CopyHint = "briefing copied to clipboard"
+		return m, nil
+	}
+	return m, nil
+}
+
 func (m Model) updateImportPreviewKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.importForm.Loading || m.importForm.Saving {
 		return m, nil
@@ -618,6 +807,13 @@ func (m Model) updateDashboardKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.wizardStack = newStackSlot()
 	case "i":
 		return m.beginImportScan()
+	case "p":
+		// Sprint 20 TASK-20.2 — provider catalog screen.
+		// Operator drills into the embedded preset registry
+		// without leaving the cockpit.
+		m.state = StateProviderCatalog
+		m.catalog.CopyHint = ""
+		return m, nil
 	case "f8":
 		return m.openCICDLogsModal()
 	}
@@ -794,14 +990,24 @@ func (m Model) updateProjectDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "1":
 		m.activeTab = TabOverview
 		return m, nil
+	case "2":
+		// Sprint 20 TASK-20.4 — Env Diff is now a read-only
+		// view of `project.SecretsMeta`. No provider I/O.
+		m.activeTab = TabEnvDiff
+		return m, nil
+	case "3":
+		// Sprint 20 TASK-20.4 — Database is now a stack-aware
+		// connection cheatsheet. Like Env Diff, it consumes
+		// only cached data; live DB queries belong to
+		// `webox doctor db creds` (Sprint 21+).
+		m.activeTab = TabDatabase
+		return m, nil
 	case "4":
 		return m.enterLiveLogsTab()
-	case "2", "3", "h", "l":
-		// Sprint 20 — silent ignore. The tab labels themselves
-		// already render `[2] Env Diff - unlocked in v0.2` /
-		// `[3] Database - unlocked in v0.2`, so the previous
-		// "tab available in v0.2" alert was redundant noise that
-		// new operators mistook for a routing bug.
+	case "h", "l":
+		// Vim-style horizontal nav lives in the wizard router,
+		// not on the project detail surface. Silently ignore
+		// here so muscle memory does not surface stale alerts.
 		return m, nil
 	case "r":
 		return m.dispatchProjectAction(ProjectActionRestart)

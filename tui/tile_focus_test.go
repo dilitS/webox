@@ -8,30 +8,131 @@ import (
 	"github.com/dilitS/webox/tui/bento"
 )
 
-// TestMouse_LeftClickOnDashboardDrillsIntoSelectedProject is the
-// Sprint 20 minimum-viable mouse contract: a single left-click on
-// the dashboard opens the currently-selected project's detail
-// surface (mirrors `Right` / `Enter`). Until layout-aware hit
-// testing lands (deferred for the per-tile click design), this is
-// the one click semantics the operator can rely on. No tile
-// boundary maths is required — the operator is signalling
-// intent ("show me more about this row") regardless of where they
-// click on the dashboard frame.
-func TestMouse_LeftClickOnDashboardDrillsIntoSelectedProject(t *testing.T) {
+// TestMouse_LeftClickOnProjectsTileSelectsAndDrills is the Sprint
+// 20 TASK-20.1 layout-aware contract for the Projects tile. A
+// click anywhere in the tile drills into the project detail
+// surface (mirrors `Right` / `Enter`); the row index sniffed from
+// the click Y coordinate becomes the new selectedIndex so the
+// operator can pick a row by clicking it directly.
+//
+// We use the second project in the mock catalog (row index 1
+// inside the tile body, roughly Y = topRow + chrome rows + 1).
+// The actual coordinate is computed from the layout map so the
+// test stays robust to bento layout tweaks.
+func TestMouse_LeftClickOnProjectsTileSelectsAndDrills(t *testing.T) {
 	t.Parallel()
 
 	m := New(MockOptions(""))
 	if m.state != StateDashboard {
 		t.Fatalf("setup: state = %v, want StateDashboard", m.state)
 	}
+	if got := len(cfgProjects(m.cfg)); got < 2 {
+		t.Skipf("mock catalog has %d projects, need ≥ 2 for this test", got)
+	}
 
-	updated, _ := m.Update(tea.MouseMsg{Action: tea.MouseActionPress, Button: tea.MouseButtonLeft})
+	rect := m.dashboardLayout().Slots[bento.SlotProjects]
+	if rect.Empty() {
+		t.Fatalf("Projects slot rect is empty: %+v", rect)
+	}
+	clickX := rect.X + rect.Width/2
+	// Inside the tile body: skip top border + header rows, then
+	// pick the second body line (chrome=2 → row 0 = title pill,
+	// row 1 = first project, row 2 = second project).
+	const chromeRows = 2
+	clickY := rect.Y + chromeRows + 1
+
+	updated, _ := m.Update(tea.MouseMsg{
+		Action: tea.MouseActionPress,
+		Button: tea.MouseButtonLeft,
+		X:      clickX,
+		Y:      clickY,
+	})
 	m = updated.(Model)
+
 	if m.state != StateProjectDetail {
-		t.Fatalf("state after left-click on dashboard = %v, want StateProjectDetail", m.state)
+		t.Fatalf("state after click on Projects tile = %v, want StateProjectDetail", m.state)
 	}
 	if m.activeTab != TabOverview {
 		t.Errorf("activeTab after drill = %v, want TabOverview", m.activeTab)
+	}
+}
+
+// TestMouse_LeftClickOnNonScrollableSlotDrills covers the
+// "click anywhere on the cockpit (except a scrollable tile or
+// row 0 / outside the grid) drills" rule. We pick the Overview
+// tile because it is non-scrollable in v0.1; clicking it should
+// behave like Enter.
+func TestMouse_LeftClickOnNonScrollableSlotDrills(t *testing.T) {
+	t.Parallel()
+
+	m := New(MockOptions(""))
+	rect := m.dashboardLayout().Slots[bento.SlotOverview]
+	if rect.Empty() {
+		t.Fatalf("Overview slot rect is empty: %+v", rect)
+	}
+
+	updated, _ := m.Update(tea.MouseMsg{
+		Action: tea.MouseActionPress,
+		Button: tea.MouseButtonLeft,
+		X:      rect.X + rect.Width/2,
+		Y:      rect.Y + rect.Height/2,
+	})
+	m = updated.(Model)
+
+	if m.state != StateProjectDetail {
+		t.Errorf("state after click on Overview = %v, want StateProjectDetail", m.state)
+	}
+}
+
+// TestMouse_LeftClickOnScrollableTileFocusesIt asserts the
+// scrollable-tile rule: clicking on a logs / CI/CD tile focuses
+// that tile (skip the Tab cycle and land directly), so the
+// operator can scroll it with the wheel without leaving the
+// dashboard. The state must remain StateDashboard.
+func TestMouse_LeftClickOnScrollableTileFocusesIt(t *testing.T) {
+	t.Parallel()
+
+	m := New(MockOptions(""))
+	rect := m.dashboardLayout().Slots[bento.SlotLogs]
+	if rect.Empty() {
+		t.Fatalf("Logs slot rect is empty: %+v", rect)
+	}
+
+	updated, _ := m.Update(tea.MouseMsg{
+		Action: tea.MouseActionPress,
+		Button: tea.MouseButtonLeft,
+		X:      rect.X + rect.Width/2,
+		Y:      rect.Y + rect.Height/2,
+	})
+	m = updated.(Model)
+
+	if m.state != StateDashboard {
+		t.Errorf("state after click on Logs = %v, want StateDashboard (focus, not drill)", m.state)
+	}
+	if m.focusedTile == nil || *m.focusedTile != bento.SlotLogs {
+		t.Errorf("focusedTile after click on Logs = %v, want SlotLogs", m.focusedTile)
+	}
+}
+
+// TestMouse_LeftClickOnStatusBarIsNoop guards the chrome row:
+// a click on row Y=0 (status bar) must not drill or focus
+// anything; it is purely informational.
+func TestMouse_LeftClickOnStatusBarIsNoop(t *testing.T) {
+	t.Parallel()
+
+	m := New(MockOptions(""))
+	updated, _ := m.Update(tea.MouseMsg{
+		Action: tea.MouseActionPress,
+		Button: tea.MouseButtonLeft,
+		X:      40,
+		Y:      0,
+	})
+	m = updated.(Model)
+	if m.state != StateDashboard {
+		t.Errorf("state after click on status bar = %v, want StateDashboard", m.state)
+	}
+	if m.focusedTile != nil {
+		t.Errorf("focusedTile after click on status bar = %v, want nil", m.focusedTile)
 	}
 }
 
@@ -58,15 +159,17 @@ func TestMouse_LeftClickOnProjectDetailReturnsToDashboard(t *testing.T) {
 	}
 }
 
-// TestProjectDetail_PressingDimmedTabIsSilent guards the Sprint 20
-// chrome cleanup: the unimplemented v0.2 tabs ([2] Env Diff,
-// [3] Database) MUST NOT raise the redundant "tab available in
-// v0.2" alert, because the tab label itself already carries the
-// `unlocked in v0.2` annotation. The alert was a documented
-// no-op that confused new operators into thinking the press was
-// a misroute. The new contract: 2 / 3 / h / l are silent on the
-// project detail surface; the active tab does not change.
-func TestProjectDetail_PressingDimmedTabIsSilent(t *testing.T) {
+// TestProjectDetail_TabsTwoAndThreeNavigate guards the Sprint 20
+// TASK-20.4 unstub: pressing `2` lands on the Env Diff tab,
+// pressing `3` lands on the Database tab. Both surfaces are
+// read-only (no provider I/O); the operator can still hop back
+// to Overview with `1` or to Logs with `4`.
+//
+// `h` and `l` were no-ops in v0.1 (vim-style horizontal nav for
+// the wizard); they remain silent on the project detail surface
+// so the operator's muscle memory does not accidentally route
+// them through the (now removed) "v0.2 only" alert.
+func TestProjectDetail_TabsTwoAndThreeNavigate(t *testing.T) {
 	t.Parallel()
 
 	m := New(MockOptions(""))
@@ -79,14 +182,32 @@ func TestProjectDetail_PressingDimmedTabIsSilent(t *testing.T) {
 		t.Fatalf("setup: activeTab = %v, want TabOverview", m.activeTab)
 	}
 
-	for _, key := range []string{"2", "3", "h", "l"} {
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
+	m = updated.(Model)
+	if m.activeTab != TabEnvDiff {
+		t.Errorf("press '2': activeTab = %v, want TabEnvDiff", m.activeTab)
+	}
+	if m.alert != "" {
+		t.Errorf("press '2': alert = %q, want empty", m.alert)
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
+	m = updated.(Model)
+	if m.activeTab != TabDatabase {
+		t.Errorf("press '3': activeTab = %v, want TabDatabase", m.activeTab)
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1")})
+	m = updated.(Model)
+	if m.activeTab != TabOverview {
+		t.Errorf("press '1': activeTab = %v, want TabOverview", m.activeTab)
+	}
+
+	for _, key := range []string{"h", "l"} {
 		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
 		m = updated.(Model)
 		if m.alert != "" {
 			t.Errorf("press %q: alert = %q, want empty (silent ignore)", key, m.alert)
-		}
-		if m.activeTab != TabOverview {
-			t.Errorf("press %q: activeTab = %v, want TabOverview (preserved)", key, m.activeTab)
 		}
 	}
 }

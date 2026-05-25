@@ -1,30 +1,30 @@
-WEBOX v0.0.0-dev  LIVE  14:32:01 │ us-east-1 │ Uptime: 24d 11h │ Load: 0.12, 0.28, 0.31 │ RAM: 3.4/8.0 GB (42%) │ Ping: 18ms (SF01)
-╔══════════════════════════════════════════╗  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                               
-║ 📂 [Active Projects]                     ║  ┃ 🖥  [SERVER: ShopEase-Web]                                                          
-║                                          ║  ┃                                                                                    
-║ ╭──────────────╮                         ║  ┃  ONLINE                                                                            
-║ │ ShopEase-Web │ ●                       ║  ┃                                                                                    
-║ ╰──────────────╯                         ║  ┃ HTTP Health:   200 OK                                                              
-║   API-Gateway ●                          ║  ┃ SSL:           114 days remaining                                                  
-║   Auth-Service ●                         ║  ┃ Node:          v20.11.0                                                            
-║   Dashboard ●                            ║  ┃ Repo:          dilitS-demo/shopease-web                                            
-║   Dashboard-Admin ●                      ║  ┃ Last Deploy:   2h ago · success                                                    
-║   Payment-UI ●                           ║  ┃                                                                                    
-║                                          ║  ┃ Connections:                                                                       
-║                                          ║  ┃ GitHub → Server : ✓ Active (2h ago · success, succes                               
-║                                          ║  ┃ Server → App    : ✓ Active (200 OK)                                                
-║                                          ║  ┃                                                                                    
-║                                          ║  ┃ [r] Restart  [s] SSL Renew  [v] Tail Logs                                          
-║                                          ║  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                               
-║                                          ║                                                                                       
-║                                          ║                                                                                       
-║                                          ║                                                                                       
-║                                          ║                                                                                       
-║                                          ║                                                                                       
-║                                          ║                                                                                       
-║                                          ║                                                                                       
-║                                          ║                                                                                       
-║                                          ║                                                                                       
-║                                          ║                                                                                       
-╚══════════════════════════════════════════╝                                                                                       
-  [q] quit · [?] help · [Tab] cycle panels · [Right/Enter] open · [n] new · [i] import                                             
+WEBOX v0.0.0-dev  PENDING                                                            05:27:43 │ main
+╔══════════════════════════════════════════╗  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+║ 📂 [Active Projects]                     ║  ┃ 🖥  [SERVER: sui.demo.smallhost.pl]                  
+║                                          ║  ┃                                                     
+║ ╭───────────────────────╮                ║  ┃  ONLINE                                             
+║ │ sui.demo.smallhost.pl │ ●              ║  ┃                                                     
+║ ╰───────────────────────╯                ║  ┃ HTTP Health:   200 OK                               
+║   legacy.demo.smallhost.pl ●             ║  ┃ SSL:           27 days remaining                    
+║                                          ║  ┃ Node:          v24.15.0                             
+║                                          ║  ┃ Repo:          dilitS/sui                           
+║                                          ║  ┃ Last Deploy:   2h ago                               
+║                                          ║  ┃                                                     
+║                                          ║  ┃ Connections:                                        
+║                                          ║  ┃ GitHub → Server : ? Pending (2h ago)                
+║                                          ║  ┃ Server → App    : ✓ Active (200 OK)                 
+║                                          ║  ┃                                                     
+║                                          ║  ┃ [r] Restart  [s] SSL Renew  [v] Tail Logs           
+║                                          ║  ┃                                                     
+║                                          ║  ┃                                                     
+╚══════════════════════════════════════════╝  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ⚡ [CI/CD]                                                                                       │
+│ (no run yet — connect a GitHub Actions workflow to populate this strip)                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ 📜 [Live Logs]                                                                                   │
+│ Waiting for the first log line… (no logs streamed yet)                                           │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+  [q] quit · [?] help · [Tab] cycle panels · [Right/Enter] open · [n] new · [i] import              
