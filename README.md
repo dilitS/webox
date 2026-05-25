@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="Webox — shared hosting terminal cockpit" src="docs/assets/webox-readme-hero.svg" width="860">
+  <img alt="Webox — terminal cockpit for shared hosting" src="https://raw.githubusercontent.com/dilitS/webox/main/docs/assets/webox-readme-hero.svg" width="860">
 </p>
 
 <p align="center">
@@ -9,497 +9,129 @@
 <p align="center">
   <a href="https://github.com/dilitS/webox/actions/workflows/ci.yml"><img src="https://github.com/dilitS/webox/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
   <a href="https://github.com/dilitS/webox/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-7d56f4" alt="License: Apache-2.0"></a>
-  <a href="docs/ROADMAP.md"><img src="https://img.shields.io/badge/status-docs--first%20pre--MVP-d846ef" alt="Stage: docs-first pre-MVP"></a>
+  <a href="https://github.com/dilitS/webox/blob/main/docs/ROADMAP.md"><img src="https://img.shields.io/badge/v0.1-RC-d846ef" alt="v0.1 release candidate"></a>
   <a href="https://pkg.go.dev/github.com/dilitS/webox"><img src="https://img.shields.io/badge/go-1.25%2B-00ADD8?logo=go" alt="Go 1.25+"></a>
-  <a href="docs/ROADMAP.md"><img src="https://img.shields.io/badge/v0.1-in--design-ffb800" alt="v0.1 in design"></a>
+  <a href="https://github.com/dilitS/webox/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-04b575" alt="PRs welcome"></a>
+</p>
+
+<p align="center">
+  <em>
+    A 45-second scripted <code>--mock</code> cockpit tour ships with v0.1.0:<br/>
+    <a href="https://github.com/dilitS/webox/blob/main/assets/demo/README.md"><code>assets/demo/</code></a> · <a href="https://github.com/dilitS/webox/blob/main/scripts/record-demo.sh"><code>scripts/record-demo.sh</code></a> · <a href="https://github.com/dilitS/webox/blob/main/assets/screenshots/README.md"><code>assets/screenshots/</code></a>
+  </em>
 </p>
 
 ---
 
-Webox is a **terminal operator cockpit** for developers running projects on shared hosting.
-One screen instead of bouncing between a hosting panel, SSH, GitHub, SSL settings, log files, and private shell scripts.
+## Why Webox
 
-> **Current phase:** docs-first / pre-MVP. The implementation starts after the audit gates are accepted. No production binary is published yet.
+If you ship Node.js projects on **shared hosting** — small.pl today, **cPanel** and **DirectAdmin** next — you already know the loop: SSH in, run a panel CLI command, click around the web panel, copy a deploy key into GitHub, hand-write a workflow, hope the SSL renews on time. Webox folds every one of those steps into a single **terminal cockpit** with strict guardrails, transactional rollback, and zero remote telemetry. You stay on the hosting you already pay for; you stop tab-juggling between five surfaces; and when an incident hits you triage from a dashboard, not from a tail of grep'd logs.
 
-```text
- ╭─ Webox Cockpit ───────────────────────────────────────────────────────────────────╮
- │ [Profile: main · s1.small.pl · 14ms]                                    [/] 20:17 │
- │                                                                                   │
- │  ╭─ Projects ──────────────────────╮ ╭─ sui.biuromody.smallhost.pl ────────────╮  │
- │  │  ▶ sui.biuromody           🟢   │ │  Status  │ 🟢 ONLINE                    │  │
- │  │    makspomoc               🟢   │ │  Node    │ v24.15.0                     │  │
- │  │    si                🟡 BUILD   │ │  SSL     │ 🔐 27 days left              │  │
- │  │    legacy              STALE   │ │  Deploy  │ ✓ 2h ago (3fdc34d)           │  │
- │  │                                │ │                                          │  │
- │  │  [n] New  [i] Import           │ │  [r] Restart  [s] SSL  [v] Logs         │  │
- │  ╰────────────────────────────────╯ ╰──────────────────────────────────────────╯  │
- │                                                                                   │
- │  q:quit  ↑↓:navigate  →:details  n:new  /:command  ?:help                         │
- ╰───────────────────────────────────────────────────────────────────────────────────╯
-```
+This is the tool for the operator who is *one* person responsible for 5–30 small projects, not for the team that already left shared hosting behind.
 
-## Install
+---
 
-Webox is not released yet. The repository is currently in the **pre-MVP, docs-first** phase: architecture, security posture, testing strategy, and development guardrails are being locked before production code starts.
-
-Planned install paths for `v0.1`:
+## Try it in 30 seconds
 
 ```bash
-brew install webox/tap/webox   # planned
-go install github.com/dilitS/webox/cmd/webox@latest   # planned
+git clone https://github.com/dilitS/webox.git
+cd webox
+make build
+./bin/webox --mock
 ```
 
-Track release readiness in [`docs/ROADMAP.md`](docs/ROADMAP.md) and the pre-implementation audit in [`docs/AUDIT.md`](docs/AUDIT.md).
+No SSH, no GitHub token, no config — `--mock` boots the full Bento Ultra cockpit with deterministic synthetic data (`shop-ease.io`, fake commits, fake build numbers) so you can poke around before connecting a real profile. Toggle the same mode with `WEBOX_MOCK=1 ./bin/webox`.
 
-### Try it offline (no server required)
+> **Requirements:** Go 1.25+, a POSIX shell. Tested on macOS (arm64/amd64) and Linux (amd64).
 
-The repository ships a **mock-data mode** that boots the full cockpit with deterministic demo content — six demo projects, a SUCCESS pipeline, live-log fixtures — without making a single SSH/HTTP/GitHub call. Use it for screenshots, UX iteration, or just to feel the UI before you connect a real profile.
+---
+
+## What you can do today (v0.1)
+
+One verified provider (**small.pl / Devil**), more coming. Everything below is implemented and covered by tests.
+
+- **Project wizard** — 5 steps from empty subdomain to deployed app (subdomain → database → SSL → GitHub repo + workflow → first deploy). LIFO rollback cleans up on any failure.
+- **Cockpit dashboard** — Bento Ultra layout (`120×35`) with live tiles: project list, detail panel, CI/CD pipeline, server topology, live log stream, header metrics.
+- **One-key operations** — restart Node app, renew SSL, tail logs, open last GitHub Actions run, all from the dashboard.
+- **Import existing projects** — read-only preview detects subdomain, SSL, Node version, deploy paths, and flags drift between what the panel says and what `webox` expects.
+- **Stale detection** — surfaces projects whose config disagrees with reality on the server (subdomain removed, app stopped, SSL expired).
+- **Secrets done right** — system keyring (Keychain / Secret Service / Credential Manager) with AES-256-GCM + Argon2id fallback for headless boxes. Zero plaintext secrets in `config.json`. Ever.
+- **Defensive parsing** — every `devil`/`uapi` output is strict-regex parsed; no `eval`, no blind shell, no host key auto-accept.
+- **`webox doctor`** — self-diagnostics + GitHub integration check, JSON output for scripting.
+
+---
+
+## Add your hosting in 4 hours
+
+The most useful PR you can send is **a new provider adapter**. Webox is built around a single `HostingProvider` interface — every panel is a swappable implementation. No business logic, no TUI code, no security code needs to change.
 
 ```bash
-make build                        # produces ./bin/webox
-./bin/webox --mock                # boots the Bento Ultra dashboard offline
-WEBOX_MOCK=1 ./bin/webox          # equivalent env-var toggle
+./bin/webox provider new my_panel --preset cpanel-uapi
+# scaffolds providers/my_panel/ — skeleton, parsers, tests, fixture README
+# patches cmd/webox/providers.go blank-import block (sorted, idempotent)
+# prints next-step walkthrough
 ```
 
-The mock fixtures live in [`tui/mockdata.go`](tui/mockdata.go) and contain only synthetic data (`shop-ease.io`, fake commit SHAs, fake build numbers). Nothing here resembles a real secret, so the redactor regression corpus stays intact.
+Four presets ship today: `blank`, `cpanel-uapi`, `directadmin`, `cyberpanel`. Each preset seeds the generated package with vendor-specific scaffolding and a working `go build` straight out of the box. Then walk through [`docs/contributing/PROVIDER.md`](https://github.com/dilitS/webox/blob/main/docs/contributing/PROVIDER.md) — a 4-hour guide covering preset vs. adapter trade-offs, fixture sourcing + sanitisation, TDD parsers, `sshmock` integration, the capability probe, and the PR template.
+
+> **Pair-review available.** Open an issue with the [`provider request` template](https://github.com/dilitS/webox/issues/new?template=provider_request.yml) or DM the maintainer before you start. You will not be left alone with the first PR.
 
 ---
 
-## 📐 Architecture
+## Architecture highlights
 
-Webox is a Go monolith built on **MVU (Model-View-Update)** via [Bubble Tea](https://github.com/charmbracelet/bubbletea) + [Lipgloss](https://github.com/charmbracelet/lipgloss). One binary, zero external runtimes.
+- **Provider Pattern.** Every hosting panel hides behind one interface (`providers.HostingProvider`). Adding cPanel, DirectAdmin, or CyberPanel means an adapter, not a refactor. See [ADR-0003](https://github.com/dilitS/webox/blob/main/docs/adr/0003-provider-pattern.md).
+- **MVU TUI via Bubble Tea.** Pure `Update()` and `View()` functions, all I/O routed through `tea.Cmd`. Testable via `teatest` golden files. See [DESIGN §12](https://github.com/dilitS/webox/blob/main/docs/DESIGN.md).
+- **SSH pool + SWR cache.** Multiplexed SSH connections with an inflight limiter; status data uses stale-while-revalidate semantics so the dashboard stays responsive under flaky networks.
+- **Keyring-first secrets + AES-GCM fallback.** Cross-platform system keyring, AES-256-GCM (`crypto/rand` nonce, never `time.Now()`) + Argon2id KDF for headless boxes. Strict SSH host-key block on mismatch — no auto-accept. See [`docs/SECURITY.md`](https://github.com/dilitS/webox/blob/main/docs/SECURITY.md).
+- **Atomic config + JSON Schema + ≥ 80 % coverage.** `config.json` writes go through `flock(2)` → tmp write → `fsync` → `rename` → `fsync(dir)`. Coverage gate is 80 % per package (70 % global floor) and enforced in CI alongside `golangci-lint v2`, `govulncheck`, and a 5 ms `bento` render perf budget.
 
-```mermaid
-flowchart TB
-    subgraph TUI["tui/ — Bubble Tea Layer"]
-        Model["TUI Model<br/>State + ActiveTab + Width"]
-        View["View()<br/>Pure Render"]
-        Update["Update()<br/>State Mutation"]
-        Cmd["tea.Cmd<br/>Async Side Effects"]
-    end
-
-    subgraph Core["Core Services"]
-        Providers["providers/<br/>HostingProvider Interface"]
-        SSH["ssh/<br/>Connection Pool<br/>SFTP + Exec"]
-        GitHub["services/<br/>GitHub REST API<br/>Actions + Secrets"]
-        Secrets["secrets/<br/>Keyring + AES-GCM Fallback"]
-    end
-
-    subgraph Storage["Local State"]
-        Config["~/.config/webox/config.json<br/>Atomic write + flock"]
-        Keyring["System Keyring<br/>Keychain / SecretService / CredMan"]
-        Known["known_hosts<br/>Dedicated SSH trust"]
-    end
-
-    User["User Keypress"] --> Update
-    Update --> Model
-    Model --> View
-    View --> Terminal["Stdout TTY"]
-
-    Cmd --> Providers
-    Cmd --> SSH
-    Cmd --> GitHub
-    Cmd --> Secrets
-
-    Providers --> SSH
-    SSH --> Host["Shared Hosting Server<br/>small.pl (v0.1)<br/>cPanel / DirectAdmin later"]
-    GitHub --> GHA["GitHub Actions<br/>CI/CD Pipeline"]
-
-    Secrets --> Keyring
-    Config --> Disk["Atomic fsync + rename"]
-
-    style TUI fill:#1a1b26,stroke:#7d56f4
-    style Core fill:#13141f,stroke:#04b575
-    style Storage fill:#13141f,stroke:#ffb800
-```
-
-### Provider Pattern
-
-Every hosting panel is hidden behind one contract. Adding a new panel means implementing the interface — nothing in the TUI or business logic changes.
-
-```mermaid
-classDiagram
-    class HostingProvider {
-        <<interface>>
-        +Name() string
-        +CreateSubdomain(ctx, domain, nodeVersion) error
-        +SetupSSL(ctx, domain) error
-        +CreateDatabase(ctx, dbType, dbName) (user, password, error)
-        +RestartNodeApp(ctx, domain) error
-        +GetDeployPath(domain) string
-        +GetLogPath(domain) string
-        +CheckStatus(ctx) (*ProviderStatus, error)
-        +ListSubdomains(ctx) ([]string, error)
-        +RemoveSubdomain(ctx, domain) error
-        +RemoveDatabase(ctx, dbName) error
-        +RemoveSSL(ctx, domain) error
-    }
-
-    class SmallHostProvider {
-        -user string
-        -host string
-        -sshClient *ssh.Client
-        +CreateSubdomain() error
-        +SetupSSL() error
-        +CreateDatabase() error
-        +RestartNodeApp() error
-    }
-
-    class CPanelProvider {
-        -uapiToken string
-        -cpanelHost string
-        +CreateSubdomain() error
-        +SetupSSL() error
-        +CreateDatabase() error
-    }
-
-    class DirectAdminProvider {
-        -apiKey string
-        +CreateSubdomain() error
-        +SetupSSL() error
-        +CreateDatabase() error
-    }
-
-    HostingProvider <|.. SmallHostProvider : small.pl / Devil
-    HostingProvider <|.. CPanelProvider : cPanel UAPI (v0.2)
-    HostingProvider <|.. DirectAdminProvider : DA JSON API (v0.3)
-
-    class Registry {
-        <<static>>
-        +Register(name, factory)
-        +Get(name, config) HostingProvider
-    }
-
-    Registry ..> HostingProvider : creates
-```
+Full architecture: [`docs/DESIGN.md`](https://github.com/dilitS/webox/blob/main/docs/DESIGN.md). All architecture decisions: [`docs/adr/`](https://github.com/dilitS/webox/tree/main/docs/adr).
 
 ---
 
-## 🚀 Project Creation — 5 Steps, Transactional
+## Status & roadmap
 
-Creating a new project means subdomain, SSL, database, GitHub repo, CI/CD wiring, and first deploy — all from one wizard. If anything fails mid-way, Webox rolls back cleanly. No orphaned resources.
-
-```mermaid
-flowchart LR
-    Step1["① Pre-flight<br/>Check git, gh, keyring"] --> Step2["② Subdomain<br/>Create + DNS probe"]
-    Step2 --> Step3["③ Database<br/>MySQL / PgSQL<br/><i>skipped for static</i>"]
-    Step3 --> Step4["④ SSL<br/>Let's Encrypt"]
-    Step4 --> Step5["⑤ Deploy<br/>GitHub repo + secrets<br/>Actions workflow + push"]
-
-    Step5 --> Success["✅ Dashboard"]
-
-    Step2 -.->|DNS not ready| Wait["DNS pending…<br/>retry in background"]
-    Step4 -.->|Rate limited| Retry["Retry after backoff"]
-    Step3 -.->|Name taken| Fix["User corrects name<br/>→ Resume"]
-
-    style Step1 fill:#24273a,stroke:#4e5a85
-    style Step2 fill:#24273a,stroke:#7d56f4
-    style Step3 fill:#24273a,stroke:#7d56f4
-    style Step4 fill:#24273a,stroke:#7d56f4
-    style Step5 fill:#24273a,stroke:#7d56f4
-    style Success fill:#1a3a2a,stroke:#04b575
-    style Retry fill:#3a2a1a,stroke:#ffb800
-    style Fix fill:#3a2a1a,stroke:#ffb800
-```
-
-### Deployment Pipeline
-
-Code always deploys through GitHub Actions. Webox generates the workflow, sets up per-project deploy keys, and monitors runs from the dashboard.
-
-```mermaid
-sequenceDiagram
-    actor Dev as Developer
-    participant Webox as Webox TUI
-    participant GH as GitHub API
-    participant Actions as GitHub Actions
-    participant Host as Hosting Server
-
-    Dev->>Webox: n (new project)
-    Webox->>Webox: Generate ed25519 deploy keypair
-    Webox->>GH: Create repository
-    Webox->>GH: Store SSH_PRIVATE_KEY as deploy secret
-    Webox->>GH: Store DEPLOY_PATH, DEPLOY_HOST
-    Webox->>GH: Push deploy.yml workflow template
-    Webox->>Host: Add deploy public key to authorized_keys
-    Webox->>Host: Create subdomain, database, SSL
-
-    Note over Dev,Host: Project is live
-
-    Dev->>Webox: git push
-    Webox->>Actions: Trigger workflow
-    Actions->>Actions: npm ci → build → rsync
-    Actions->>Host: Deploy built artifacts via SSH
-    Actions->>Host: Restart Node app
-    Actions-->>Webox: Status: ✅ success
-
-    Webox->>Host: HTTP health check → 200
-    Webox-->>Dev: Dashboard: 🟢 ONLINE
-```
-
----
-
-## ⚡ Features & Priorities
-
-| ID | Feature | v0.1 | v0.2 | v0.3 |
-|----|---------|:----:|:----:|:----:|
-| **F1** | Init wizard — first-run setup, keypair, GitHub auth | ✅ | · | · |
-| **F3** | Project creation wizard (subdomain → DB → SSL → deploy) | ✅ | · | · |
-| **F4** | Dashboard — project list + detail panel with live status | ✅ | · | · |
-| **F5** | Status check — HTTP ping, SSL cert info, Node version | ✅ | · | · |
-| **F6** | Restart application (one key from dashboard) | ✅ | · | · |
-| **F7** | SSL management — Let's Encrypt issue + renew | ✅ | · | · |
-| **F8** | Log viewer — tail last N lines | ✅ | · | · |
-| **F9** | Import existing projects (read-only, detects settings gaps) | ✅ | · | · |
-| **F10** | Transactional rollback — clean up on wizard failure | ✅ | · | · |
-| **F11** | Secure secret storage — system keyring + AES-GCM fallback | ✅ | · | · |
-| **F12** | Command Palette `/` — `/create`, `/import`, `/provider`, `/settings` | ✅ | · | · |
-| **F21** | Stack scaffolding — Vite+React, Express, Static | ✅ | · | · |
-| **F23** | Stale project detection — drift between config and reality | ✅ | · | · |
-| **F13** | Live dashboard auto-refresh | · | ✅ | · |
-| **F14** | Live log stream (`tail -f` via SSH) | · | ✅ | · |
-| **F15** | GitHub Actions deploy monitor — live workflow runs + logs | · | ✅ | · |
-| **F17** | SSL expiry warnings + OS notifications | · | ✅ | · |
-| **F18** | Multi-provider dashboard — aggregate projects across panels | · | ✅ | · |
-| **F12** | Full command palette — `/db`, `/env`, `/storage`, `/domain` | · | ✅ | · |
-| **F21** | Stack scaffolding — Next.js, Nuxt, more | · | ✅ | · |
-| **F22** | Non-interactive CLI flags for scripting | · | · | ✅ |
-| **F24** | In-app updater with cosign verification | · | · | ✅ |
-
----
-
-## 🛡️ Security Model
-
-Webox touches real infrastructure and credentials. Security is not an appendix.
-
-```mermaid
-flowchart TB
-    subgraph Local["Local Machine"]
-        Keyring["System Keyring<br/>macOS Keychain<br/>Linux Secret Service<br/>Windows Credential Manager"]
-        Fallback["AES-256-GCM<br/>Argon2id KDF<br/>secrets.enc"]
-        Config["config.json<br/>No secrets — never"]
-        Known["webox known_hosts<br/>Dedicated SSH trust"]
-    end
-
-    subgraph Network["Network"]
-        SSH["SSH — ed25519 host keys<br/>TOFU on first connect<br/>Strict block on mismatch"]
-        GHA["GitHub API — fine-grained PAT<br/>Surgical deploy keys per project<br/>Secrets write-only target"]
-    end
-
-    subgraph Server["Server"]
-        DeployKey["Per-project deploy key<br/>authorized_keys with comment"]
-        EnvFile[".env — 0600 permissions<br/>Outside web root<br/>Env drift detection later"]
-    end
-
-    Keyring --> SSH
-    Fallback --> SSH
-    Known --> SSH
-    SSH --> DeployKey
-    DeployKey --> EnvFile
-    GHA --> EnvFile
-
-    style Local fill:#1a1b26,stroke:#7d56f4
-    style Network fill:#13141f,stroke:#ffb800
-    style Server fill:#13141f,stroke:#04b575
-```
-
-| Principle | Implementation |
-|---|---|
-| **Zero plaintext secrets in config** | `config.json` contains metadata only. Tokens and passwords live in system keyring. |
-| **Headless fallback** | When keyring is unavailable (Linux server, WSL, Docker), AES-256-GCM encrypted file with Argon2id-derived key. |
-| **SSH host-key verification** | Dedicated `known_hosts`, TOFU on first connect, **strict block** on mismatch — never auto-accept. |
-| **Per-project deploy keys** | Webox generates fresh `ed25519` keypairs per project for GitHub Actions. Never reuses your personal SSH key. |
-| **GitHub token scope** | Fine-grained PAT with `Contents`, `Workflows`, `Actions`, `Secrets` — scoped per repository. |
-| **Zero remote telemetry** | All logging and metrics stay local. `webox doctor` for diagnostics. No data ever leaves your machine. |
-| **Defensive parsing** | All hosting panel CLI output is regex-parsed with strict validation. No `eval`, no blind `exec`. |
-
-Read the full threat model in [`docs/SECURITY.md`](docs/SECURITY.md).
-
----
-
-## 🗺️ Roadmap
-
-```mermaid
-timeline
-    title Webox Release Timeline
-    section v0.1 — MVP
-      Q2/Q3 2026 : small.pl / Devil only
-                 : Project wizard + dashboard
-                 : Import existing projects
-                 : Transactional rollback
-                 : Keyring-first secrets
-    section v0.2
-      Q3/Q4 2026 : Second provider (cPanel)
-                 : Live log stream
-                 : GHA deploy monitor
-                 : Full Command Palette
-                 : SSL expiry warnings
-    section v0.3+
-      Q1/Q2 2027 : Third provider (DirectAdmin)
-                 : CLI flags for scripting
-                 : In-app updater
-                 : Export/import config
-    section v1.0
-      2027+ : GA — 3 months stable
-            : Community provider shipped
-            : Coverage ≥ 80%
-            : Signed releases (cosign + SLSA)
-```
-
-| Milestone | Target | Key Deliverable |
+| Milestone | Target | Headline deliverable |
 |---|---|---|
-| **v0.1** | Q2/Q3 2026 | small.pl MVP: wizard, dashboard, import, rollback, secrets |
-| **v0.2** | Q3/Q4 2026 | Second provider (cPanel), live logs, GHA monitoring, full palette |
-| **v0.3** | Q1/Q2 2027 | Third provider, CLI scripting, in-app updater |
-| **v1.0 GA** | 2027 | 3+ months stable, community provider, ≥80% coverage, signed releases |
+| **v0.1** | Q2/Q3 2026 | small.pl / Devil — one verified provider end-to-end. |
+| **v0.2** | Q3/Q4 2026 | **cPanel adapter** + live log stream + GitHub Actions deploy monitor + full Command Palette. |
+| **v0.3** | Q1/Q2 2027 | **DirectAdmin adapter** + non-interactive CLI flags + in-app updater. |
+| **v1.0 GA** | 2027 | 3+ months stable, community-shipped provider, ≥ 80 % coverage, signed releases (cosign + SLSA). |
+
+Live roadmap, scope rules, and version gates: [`docs/ROADMAP.md`](https://github.com/dilitS/webox/blob/main/docs/ROADMAP.md). Active sprint board: [`docs/sprints/`](https://github.com/dilitS/webox/tree/main/docs/sprints).
 
 ---
 
-## 📦 Tech Stack
+## Contributing
 
-| Layer | Technology | Why |
-|---|---|---|
-| **Language** | Go 1.25+ | Single binary, zero runtime deps, excellent SSH/SFTP ecosystem |
-| **TUI Framework** | [Bubble Tea](https://github.com/charmbracelet/bubbletea) | MVU architecture, testable via `teatest`, active ecosystem |
-| **Styling** | [Lipgloss](https://github.com/charmbracelet/lipgloss) | Declarative terminal styling, OKLCH color space |
-| **SSH** | `golang.org/x/crypto/ssh` | Native Go SSH client — no external binary dependency |
-| **Keyring** | `github.com/zalando/go-keyring` | Cross-platform system credential store |
-| **Linting** | `golangci-lint` v2 | Comprehensive Go linting |
-| **CI/CD** | GitHub Actions | Matrix build (macOS + Linux, amd64 + arm64), vulncheck, coverage gates |
-| **Release** | GoReleaser + Cosign + SLSA | Signed, verifiable, reproducible builds |
+Welcome — pair-review is available and the first PR is the hardest. Three on-ramps:
 
----
+- **5-minute setup, branching, PR checklist:** [`CONTRIBUTING.md`](https://github.com/dilitS/webox/blob/main/CONTRIBUTING.md).
+- **Add a hosting-panel adapter (highest leverage):** [`docs/contributing/PROVIDER.md`](https://github.com/dilitS/webox/blob/main/docs/contributing/PROVIDER.md) + [`webox provider new`](https://github.com/dilitS/webox/blob/main/cmd/webox/provider_new.go).
+- **Bug fix / small feature:** browse the [`good-first-issue` list](https://github.com/dilitS/webox/issues?q=is%3Aopen+label%3Agood-first-issue) — every entry has a difficulty badge, an estimated time, and a maintainer who will pair on the first PR.
 
-## 🏗️ Project Structure
+What we will **not** merge: secrets in plaintext config / logs / errors, AES-GCM nonce from `time.Now()`, SSH host-key auto-accept, any form of telemetry / phone-home, hardcoded provider names in business logic, GitHub Actions pinned by tag. Full guardrail list: [`.cursor/rules/00-charter.mdc`](https://github.com/dilitS/webox/blob/main/.cursor/rules/00-charter.mdc) and [`AGENTS.md`](https://github.com/dilitS/webox/blob/main/AGENTS.md) §1.
 
-```
-webox/
-├── cmd/webox/          # Main entry point
-├── tui/                # Bubble Tea state machine, views, key bindings
-│   ├── views/          # Per-screen render functions
-│   └── states.go       # State enum + transitions
-├── providers/          # HostingProvider interface + adapters
-│   ├── provider.go     # Interface contract
-│   ├── registry.go     # Factory registry
-│   ├── smallhost.go    # small.pl / Devil adapter (MVP)
-│   └── mock.go         # Mock provider for tests
-├── ssh/                # Connection pool, SFTP, exec, host key verification
-├── services/           # GitHub REST API client, workflow monitoring
-├── config/             # config.json model, atomic write, migration
-├── secrets/            # Keyring integration, AES-GCM fallback, redactor
-├── status/             # Stale-while-revalidate cache, health checks
-├── wizard/             # LIFO rollback stack (DAG target architecture: v0.3+)
-├── env/                # (v0.2+) .env parsing, diff, merge engine
-├── sound/              # (stretch) optional terminal audio feedback
-├── translations/       # en.json + pl.json (extensible)
-├── testing/            # Mock SSH server, fixtures, golden files, cassettes
-├── docs/               # PRD, DESIGN, UX, SECURITY, TESTING, ROADMAP, ADRs
-└── assets/             # Embedded workflow templates
-```
+Code of Conduct: [`CODE_OF_CONDUCT.md`](https://github.com/dilitS/webox/blob/main/CODE_OF_CONDUCT.md). Security disclosure: [`SECURITY.md`](https://github.com/dilitS/webox/blob/main/SECURITY.md) (private GitHub Security Advisories — never a public issue).
 
 ---
 
-## 🔍 Compared to Alternatives
+## License & credits
 
-| Tool | What it does | Why it doesn't replace Webox |
-|---|---|---|
-| **Coolify / CapRover / Dokploy** | Self-hosted PaaS: deploy, DB, monitoring on VPS | Require VPS with Docker. Can't run on shared hosting where Docker is unavailable. |
-| **cPanel / DirectAdmin / Devil** | Web UI for hosting management | No Git integration, no CI/CD, no dashboard — everything is manual clicking. |
-| **`devil` CLI / `uapi`** | Single commands from SSH | No multi-project overview, no transactional rollback, no dashboard. |
-| **Vercel / Netlify** | One-click deploy from Git | Pay-per-usage model. Different market — you already paid for your shared hosting. |
-| **Handwritten shell scripts** | What most devs do today | Local, undocumented, no rollback, fragile across machines. |
-| **Laravel Forge / Ploi / RunCloud** | Server management + deploy | Focus on VPS provisioning. Webox targets shared hosting specifically — the "already paid for" niche. |
+[**Apache License 2.0**](https://github.com/dilitS/webox/blob/main/LICENSE) — open source from day one, with an explicit patent grant so adapters for commercial hosting panels (cPanel LLC, DirectAdmin Inc., CyberPanel/OpenLiteSpeed) ship without legal ambiguity.
 
----
+Built on top of work by:
 
-## 📚 Documentation
-
-Webox is **docs-first**. Every architectural decision is recorded before a single line of implementation code.
-
-| Document | Questions it answers |
-|---|---|
-| [**PRD**](docs/PRD.md) | What is this? Who is it for? What does it NOT do? |
-| [**DESIGN**](docs/DESIGN.md) | Architecture, contracts, state machine, caching, rollback |
-| [**UX**](docs/UX.md) | Layouts, key bindings, design system, visual components |
-| [**SECURITY**](docs/SECURITY.md) | Threat model, secret storage, SSH trust, supply chain |
-| [**TESTING**](docs/TESTING.md) | Test pyramid, mock SSH, fixtures, CI pipeline, release checklist |
-| [**ROADMAP**](docs/ROADMAP.md) | Version timeline, feature gates, GA criteria |
-| [**CONTRIBUTING**](docs/CONTRIBUTING.md) | Setup, conventions, adding a provider, translations, review |
-| [**ADRs**](docs/adr/) | Why TUI over CLI, why GHA for deploy, why keyring |
-| [**AUDIT**](docs/AUDIT.md) | Pre-implementation gap analysis — 39 findings |
-| [**AGENTS**](AGENTS.md) | Operator handbook for AI agents working on this repo |
-| [**RETROS**](docs/retros/) | Retrospectives from major audit / implementation phases |
-
----
-
-## ❓ FAQ
-
-<details>
-<summary><strong>Why a TUI instead of a regular CLI?</strong></summary>
-
-Because the core value isn't a single command — it's a **persistent dashboard** with fast switching between operations. A CLI means `webox list`, then `webox restart foo`, then `webox logs foo`. A TUI means one screen, one keypress per action.
-
-</details>
-
-<details>
-<summary><strong>Why shared hosting? Isn't everything on VPS/Kubernetes now?</strong></summary>
-
-Many real projects — client landing pages, small e-commerce, blogs, lightweight APIs — don't need Kubernetes. Shared hosting costs ~50–150 PLN/year for unlimited apps. The developer experience just happens to be terrible. Webox fixes the DX without changing the infrastructure.
-
-</details>
-
-<details>
-<summary><strong>Why GitHub Actions for deployment?</strong></summary>
-
-Reproducible builds, audit trail, and it prevents your laptop from being the "deploy machine." The runner builds and pushes the artifact. Your laptop stays a development machine. Webox generates and manages the workflow — you just `git push`.
-
-</details>
-
-<details>
-<summary><strong>Why only one provider in v0.1?</strong></summary>
-
-Multi-provider support is where many good tools die — they try to support everything and end up supporting nothing well. One real adapter (small.pl/Devil) done properly is more valuable than four speculative ones. The architecture supports N providers from day one — the product scope just stays narrow until v0.2.
-
-</details>
-
-<details>
-<summary><strong>When can I use this?</strong></summary>
-
-The project is in **pre-MVP / docs-first** phase. Design and architecture are being finalized now. Implementation will follow. Watch the repository or track [`docs/ROADMAP.md`](docs/ROADMAP.md) for timeline updates.
-
-</details>
-
-<details>
-<summary><strong>Does Webox send any data anywhere?</strong></summary>
-
-**No.** Zero remote telemetry. All logs, metrics, and crash reports stay on your machine. `webox doctor` can bundle diagnostics for manual sharing — but that's opt-in and manual only.
-
-</details>
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome — especially:
-
-- **Provider research** backed by real documentation and fixture captures
-- **UX review** from people who actually live in the terminal
-- **Security review** of secret handling and SSH trust flows
-- **Implementation PRs** that preserve the current design discipline
-
-Start with [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md).  
-Discussion will happen in GitHub Discussions and Issues once the public repository is opened.
-
----
-
-## 📄 License
-
-[Apache License 2.0](LICENSE) — open source from day one, with an explicit patent grant so adapters for commercial hosting panels (cPanel LLC, DirectAdmin Inc., CyberPanel/OpenLiteSpeed) ship without legal ambiguity.
+- [**Charmbracelet**](https://charm.sh/) — [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lipgloss](https://github.com/charmbracelet/lipgloss), [Bubbles](https://github.com/charmbracelet/bubbles), and the entire Charm ecosystem that made a modern TUI possible.
+- **The small.pl / Devil team** — for shipping a hosting platform that has a real CLI in 2026 and for being a generous launch partner for v0.1.
+- **The Go SSH and keyring maintainers** — [`golang.org/x/crypto/ssh`](https://pkg.go.dev/golang.org/x/crypto/ssh), [`github.com/zalando/go-keyring`](https://github.com/zalando/go-keyring), and the long tail of well-licensed Go libraries cataloged in [`docs/dependencies.md`](https://github.com/dilitS/webox/blob/main/docs/dependencies.md).
 
 ---
 
 <p align="center">
   <sub>
-    If you've ever written a private shell script because your hosting workflow was too clumsy —<br/>
+    If you have ever written a private shell script because your hosting workflow was too clumsy —<br/>
     <strong>this project is speaking directly to you.</strong>
   </sub>
 </p>
