@@ -159,15 +159,17 @@ func TestMouse_LeftClickOnProjectDetailReturnsToDashboard(t *testing.T) {
 	}
 }
 
-// TestProjectDetail_PressingDimmedTabIsSilent guards the Sprint 20
-// chrome cleanup: the unimplemented v0.2 tabs ([2] Env Diff,
-// [3] Database) MUST NOT raise the redundant "tab available in
-// v0.2" alert, because the tab label itself already carries the
-// `unlocked in v0.2` annotation. The alert was a documented
-// no-op that confused new operators into thinking the press was
-// a misroute. The new contract: 2 / 3 / h / l are silent on the
-// project detail surface; the active tab does not change.
-func TestProjectDetail_PressingDimmedTabIsSilent(t *testing.T) {
+// TestProjectDetail_TabsTwoAndThreeNavigate guards the Sprint 20
+// TASK-20.4 unstub: pressing `2` lands on the Env Diff tab,
+// pressing `3` lands on the Database tab. Both surfaces are
+// read-only (no provider I/O); the operator can still hop back
+// to Overview with `1` or to Logs with `4`.
+//
+// `h` and `l` were no-ops in v0.1 (vim-style horizontal nav for
+// the wizard); they remain silent on the project detail surface
+// so the operator's muscle memory does not accidentally route
+// them through the (now removed) "v0.2 only" alert.
+func TestProjectDetail_TabsTwoAndThreeNavigate(t *testing.T) {
 	t.Parallel()
 
 	m := New(MockOptions(""))
@@ -180,14 +182,32 @@ func TestProjectDetail_PressingDimmedTabIsSilent(t *testing.T) {
 		t.Fatalf("setup: activeTab = %v, want TabOverview", m.activeTab)
 	}
 
-	for _, key := range []string{"2", "3", "h", "l"} {
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
+	m = updated.(Model)
+	if m.activeTab != TabEnvDiff {
+		t.Errorf("press '2': activeTab = %v, want TabEnvDiff", m.activeTab)
+	}
+	if m.alert != "" {
+		t.Errorf("press '2': alert = %q, want empty", m.alert)
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
+	m = updated.(Model)
+	if m.activeTab != TabDatabase {
+		t.Errorf("press '3': activeTab = %v, want TabDatabase", m.activeTab)
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1")})
+	m = updated.(Model)
+	if m.activeTab != TabOverview {
+		t.Errorf("press '1': activeTab = %v, want TabOverview", m.activeTab)
+	}
+
+	for _, key := range []string{"h", "l"} {
 		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
 		m = updated.(Model)
 		if m.alert != "" {
 			t.Errorf("press %q: alert = %q, want empty (silent ignore)", key, m.alert)
-		}
-		if m.activeTab != TabOverview {
-			t.Errorf("press %q: activeTab = %v, want TabOverview (preserved)", key, m.activeTab)
 		}
 	}
 }

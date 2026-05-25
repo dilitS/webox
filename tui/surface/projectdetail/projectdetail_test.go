@@ -64,6 +64,46 @@ func TestSurface_LogsBodyMatchesLiveLogsRenderer(t *testing.T) {
 	}
 }
 
+// TestSurface_EnvDiffBodyDispatchesToRenderer guards the Sprint 20
+// TASK-20.4 dispatch contract: pressing `2` switches activeTab to
+// "Env Diff" which the surface routes to RenderEnvDiff.
+func TestSurface_EnvDiffBodyDispatchesToRenderer(t *testing.T) {
+	t.Parallel()
+
+	ctx := fixtureContext("Env Diff")
+	via := projectdetail.Surface{}.Body(ctx)
+	want := views.RenderEnvDiff(ctx.Screen)
+	if via != want {
+		t.Errorf("env diff surface body drift\n--- via surface ---\n%s\n--- via views ---\n%s", via, want)
+	}
+}
+
+// TestSurface_DatabaseBodyDispatchesToRenderer mirrors the Env Diff
+// dispatch test for the Database tab (key `3`).
+func TestSurface_DatabaseBodyDispatchesToRenderer(t *testing.T) {
+	t.Parallel()
+
+	ctx := fixtureContext("Database")
+	via := projectdetail.Surface{}.Body(ctx)
+	want := views.RenderDatabase(ctx.Screen)
+	if via != want {
+		t.Errorf("database surface body drift\n--- via surface ---\n%s\n--- via views ---\n%s", via, want)
+	}
+}
+
+// TestSurface_EnvDiffAndDatabaseCrumbs checks the crumb labels the
+// View pins above the body.
+func TestSurface_EnvDiffAndDatabaseCrumbs(t *testing.T) {
+	t.Parallel()
+
+	if got := (projectdetail.Surface{}).Crumb(fixtureContext("Env Diff")); got != "Env Diff" {
+		t.Errorf("Crumb(Env Diff) = %q, want %q", got, "Env Diff")
+	}
+	if got := (projectdetail.Surface{}).Crumb(fixtureContext("Database")); got != "Database" {
+		t.Errorf("Crumb(Database) = %q, want %q", got, "Database")
+	}
+}
+
 func TestSurface_OverviewFallbackForUnknownTab(t *testing.T) {
 	t.Parallel()
 
@@ -103,7 +143,7 @@ func TestSurface_FooterPublishesProjectDetailKeys(t *testing.T) {
 	if hint.ScrollHint {
 		t.Error("project detail footer must let View inject the scroll hint dynamically")
 	}
-	for _, needle := range []string{"[q] quit", "[Esc/Tab] back", "[1] overview", "[4] logs", "[r] restart", "[s] ssl", "[v] tail"} {
+	for _, needle := range []string{"[q] quit", "[Esc/Tab] back", "[1] overview", "[2] env", "[3] db", "[4] logs", "[r] restart", "[s] ssl", "[v] tail"} {
 		if !strings.Contains(hint.Text, needle) {
 			t.Errorf("footer missing %q in %q", needle, hint.Text)
 		}

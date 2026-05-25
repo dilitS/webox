@@ -88,7 +88,7 @@ func TestViewRendersInitWizardDashboardAndProjectDetail(t *testing.T) {
 			model: New(Options{InitialWidth: 120, InitialHeight: 35}).
 				withConfig(fixtureConfig()).
 				withState(StateProjectDetail),
-			needles: []string{"WEBOX", "Project Detail", "[Project Detail:", "Overview", "Env Diff", "unlocked in v0.2", "Restart", "SSL Renew", "Tail Logs"},
+			needles: []string{"WEBOX", "Project Detail", "[Project Detail:", "[1] Overview", "[2] Env Diff", "[3] Database", "[4] Logs", "Restart", "SSL Renew", "Tail Logs"},
 		},
 		{
 			name:    "project wizard chrome",

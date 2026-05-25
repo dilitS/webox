@@ -1,0 +1,25 @@
+╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║ 🖥 [Project Detail: shop.demo.smallhost.pl]                                                                             ║
+║                                                                                                                        ║
+║ [1] Overview  [2] Env Diff  [3] Database  [4] Logs                                                                     ║
+║                                                                                                                        ║
+║ 💾 [Database] · Stack: node-express                                                                                    ║
+║                                                                                                                        ║
+║ Webox does NOT store DB credentials in config.json. Credentials live in the OS keyring or secrets.enc.                 ║
+║                                                                                                                        ║
+║ Conventional database name (Devil panel format):                                                                       ║
+║   <devil_user>_shop                                                                                                    ║
+║                                                                                                                        ║
+║ Connect via:                                                                                                           ║
+║   # MySQL / MariaDB                                                                                                    ║
+║   mysql -h s1.small.pl -u <devil_user>_<dbuser> -p <devil_user>_shop                                                   ║
+║                                                                                                                        ║
+║   # PostgreSQL                                                                                                         ║
+║   psql -h s1.small.pl -U <devil_user>_<dbuser> <devil_user>_shop                                                       ║
+║                                                                                                                        ║
+║ Retrieve credentials (Sprint 21+):                                                                                     ║
+║   webox doctor db creds shop.demo.smallhost.pl                                                                         ║
+║                                                                                                                        ║
+║ Provider docs: https://small.pl/docs/db · GH: dilitS/webox/docs/providers/smallhost.md                                 ║
+║ [1] overview  [2] env  [4] logs  esc/tab: back                                                                         ║
+╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝

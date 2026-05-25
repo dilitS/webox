@@ -668,7 +668,56 @@ func (m Model) screen() views.Screen {
 		LiveLogs:      liveLogsSnapshot(m),
 		Connections:   dashboardConnectionsSnapshot(m),
 		CICDMini:      cicdMiniSnapshot(m),
+		Secrets:       secretsSnapshot(m),
 	}
+}
+
+// secretsSnapshot turns the [config.Project.SecretsMeta] of the
+// currently selected project into the view-layer projection
+// consumed by [views.RenderEnvDiff]. Returns nil when no project
+// is selected (the Env Diff tab paints a friendly placeholder).
+//
+// Stale flagging compares `now - LastRotated` against
+// `RotationReminderDays`, mirroring the heuristic Webox doctor
+// uses on the CLI side. Zero reminder days → never stale.
+func secretsSnapshot(m Model) []views.SecretMetaSnapshot {
+	project, ok := m.selectedProject()
+	if !ok {
+		return nil
+	}
+	if len(project.SecretsMeta) == 0 {
+		return nil
+	}
+	now := m.nowFn()
+	const dateLayout = "2006-01-02"
+	out := make([]views.SecretMetaSnapshot, 0, len(project.SecretsMeta))
+	for _, meta := range project.SecretsMeta {
+		snap := views.SecretMetaSnapshot{
+			Key:                  meta.Key,
+			Source:               string(meta.Source),
+			RotationReminderDays: meta.RotationReminderDays,
+		}
+		if !meta.CreatedAt.IsZero() {
+			snap.CreatedAt = meta.CreatedAt.Format(dateLayout)
+		}
+		if meta.LastRotated != nil && !meta.LastRotated.IsZero() {
+			snap.LastRotated = meta.LastRotated.Format(dateLayout)
+			if meta.RotationReminderDays > 0 {
+				const hoursPerDay = 24
+				if int(now.Sub(*meta.LastRotated).Hours()/hoursPerDay) > meta.RotationReminderDays {
+					snap.Stale = true
+				}
+			}
+		}
+		if meta.LastSyncedGitHub != nil && !meta.LastSyncedGitHub.IsZero() {
+			snap.LastSyncedGitHub = meta.LastSyncedGitHub.Format(dateLayout)
+		}
+		if meta.LastSyncedServer != nil && !meta.LastSyncedServer.IsZero() {
+			snap.LastSyncedServer = meta.LastSyncedServer.Format(dateLayout)
+		}
+		out = append(out, snap)
+	}
+	return out
 }
 
 // cicdMiniSnapshot returns the compact CI/CD projection consumed by

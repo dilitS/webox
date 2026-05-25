@@ -135,6 +135,34 @@ type LiveLogsSnapshot struct {
 	Err        string
 }
 
+// SecretMetaSnapshot is the view-layer projection of
+// [config.SecretMeta]. The view package cannot import `config`
+// without creating a cycle (config → views → renderers → ...),
+// so we mirror the operator-visible fields here. Plaintext
+// values NEVER cross this boundary — Webox keeps them in the
+// keyring or AES-GCM fallback (`docs/SECURITY.md §4`).
+type SecretMetaSnapshot struct {
+	// Key is the env var name (e.g. `DATABASE_URL`).
+	Key string
+	// Source is one of `managed`, `server_only`, `external`.
+	Source string
+	// CreatedAt / LastRotated / LastSyncedGitHub /
+	// LastSyncedServer formatted to "2006-01-02" so the
+	// renderer can compare against the rotation reminder
+	// without re-parsing.
+	CreatedAt        string
+	LastRotated      string
+	LastSyncedGitHub string
+	LastSyncedServer string
+	// RotationReminderDays mirrors `config.SecretMeta`. Zero
+	// means "no reminder configured".
+	RotationReminderDays int
+	// Stale reports whether `now - LastRotated >
+	// RotationReminderDays`. Pre-computed so the renderer does
+	// not need a clock dependency.
+	Stale bool
+}
+
 // CICDMiniSnapshot is the compact view-layer projection of the
 // CI/CD pipeline state, used by the Standard cockpit mini-bento
 // strip and any future at-a-glance summaries. It MUST stay smaller
@@ -178,4 +206,10 @@ type Screen struct {
 	LiveLogs      LiveLogsSnapshot
 	Connections   []string
 	CICDMini      CICDMiniSnapshot
+	// Secrets carries the per-project secret metadata Webox
+	// knows about (managed/server_only/external sources). It is
+	// the only data Webox can show on the Env Diff tab without
+	// reaching back to the provider — the sensitive values stay
+	// in the keyring / secrets.enc by design.
+	Secrets []SecretMetaSnapshot
 }

@@ -114,17 +114,22 @@ const (
 	ProjectStepDone
 )
 
-// DetailTab names the project-detail tabs. v0.1 enables TabOverview and
-// TabLogs (Sprint 09 live SSH tail). TabEnvDiff/TabDatabase remain
-// roadmap markers until v0.2.
+// DetailTab names the project-detail tabs.
+//
+// Sprint 20 TASK-20.4 — every tab is now enabled in MVP. The
+// previous v0.2 placeholders (Env Diff + Database) ship as
+// read-only views: Env Diff lists the project's `SecretsMeta`
+// rotation status; Database is a stack-aware connection
+// cheatsheet. Neither tab calls the provider — they consume
+// only data already cached in `config.Project`.
 type DetailTab int
 
 const (
 	// TabOverview shows the project health summary and action bar.
 	TabOverview DetailTab = iota
-	// TabEnvDiff is visible but disabled until v0.2.
+	// TabEnvDiff lists the project's secret metadata (no values).
 	TabEnvDiff
-	// TabDatabase is visible but disabled until v0.2.
+	// TabDatabase shows a per-stack DB connection cheatsheet.
 	TabDatabase
 	// TabLogs hosts the Sprint 09 live SSH tail (`tail -f` with
 	// redaction, ring buffer, ANSI parser).
@@ -147,8 +152,13 @@ func (t DetailTab) String() string {
 }
 
 // Enabled reports whether the tab can be opened in the current MVP surface.
+//
+// Sprint 20 TASK-20.4 — Env Diff + Database join Overview + Logs in
+// MVP as read-only views (no provider I/O). The method stays on
+// [DetailTab] so older tests / future contributors that compare
+// against `Enabled()` continue to find a single source of truth.
 func (t DetailTab) Enabled() bool {
-	return t == TabOverview || t == TabLogs
+	return t == TabOverview || t == TabEnvDiff || t == TabDatabase || t == TabLogs
 }
 
 // liveLogsCapacity is the default ring buffer capacity for the Sprint 09

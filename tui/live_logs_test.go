@@ -131,21 +131,26 @@ func TestLiveLogsViewRendersTabAndBuffer(t *testing.T) {
 	}
 }
 
-// TestProjectDetailKeyHandlerSilentlyIgnoresDimmedTabs replaces the
-// pre-Sprint-20 contract that raised a redundant "tab available in
-// v0.2" alert. The tab label itself ("[2] Env Diff - unlocked in
-// v0.2") already carries that information; the alert was noise.
-// New contract: pressing a dimmed tab is a complete no-op.
-func TestProjectDetailKeyHandlerSilentlyIgnoresDimmedTabs(t *testing.T) {
+// TestProjectDetailKeyHandlerEnvDiffAndDatabase guards the Sprint
+// 20 TASK-20.4 unstub. Pressing `2` lands on the Env Diff tab,
+// pressing `3` lands on the Database tab. No alert is raised; the
+// surfaces are read-only views populated from cached config.
+func TestProjectDetailKeyHandlerEnvDiffAndDatabase(t *testing.T) {
 	t.Parallel()
 
 	m := modelWithProject(t)
 	mAny, _ := m.updateProjectDetailKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
 	m = mAny.(Model)
 	if m.alert != "" {
-		t.Fatalf("pressing '2' raised alert %q, want silent ignore", m.alert)
+		t.Fatalf("pressing '2' raised alert %q, want empty", m.alert)
 	}
-	if m.activeTab != TabOverview {
-		t.Fatalf("activeTab = %s, want still TabOverview", m.activeTab)
+	if m.activeTab != TabEnvDiff {
+		t.Fatalf("activeTab = %s, want TabEnvDiff", m.activeTab)
+	}
+
+	mAny, _ = m.updateProjectDetailKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
+	m = mAny.(Model)
+	if m.activeTab != TabDatabase {
+		t.Fatalf("activeTab = %s, want TabDatabase", m.activeTab)
 	}
 }

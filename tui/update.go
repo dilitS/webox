@@ -886,14 +886,24 @@ func (m Model) updateProjectDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "1":
 		m.activeTab = TabOverview
 		return m, nil
+	case "2":
+		// Sprint 20 TASK-20.4 — Env Diff is now a read-only
+		// view of `project.SecretsMeta`. No provider I/O.
+		m.activeTab = TabEnvDiff
+		return m, nil
+	case "3":
+		// Sprint 20 TASK-20.4 — Database is now a stack-aware
+		// connection cheatsheet. Like Env Diff, it consumes
+		// only cached data; live DB queries belong to
+		// `webox doctor db creds` (Sprint 21+).
+		m.activeTab = TabDatabase
+		return m, nil
 	case "4":
 		return m.enterLiveLogsTab()
-	case "2", "3", "h", "l":
-		// Sprint 20 — silent ignore. The tab labels themselves
-		// already render `[2] Env Diff - unlocked in v0.2` /
-		// `[3] Database - unlocked in v0.2`, so the previous
-		// "tab available in v0.2" alert was redundant noise that
-		// new operators mistook for a routing bug.
+	case "h", "l":
+		// Vim-style horizontal nav lives in the wizard router,
+		// not on the project detail surface. Silently ignore
+		// here so muscle memory does not surface stale alerts.
 		return m, nil
 	case "r":
 		return m.dispatchProjectAction(ProjectActionRestart)
