@@ -131,14 +131,19 @@ func TestLiveLogsViewRendersTabAndBuffer(t *testing.T) {
 	}
 }
 
-func TestProjectDetailKeyHandlerStillBlocksUnsupportedTabs(t *testing.T) {
+// TestProjectDetailKeyHandlerSilentlyIgnoresDimmedTabs replaces the
+// pre-Sprint-20 contract that raised a redundant "tab available in
+// v0.2" alert. The tab label itself ("[2] Env Diff - unlocked in
+// v0.2") already carries that information; the alert was noise.
+// New contract: pressing a dimmed tab is a complete no-op.
+func TestProjectDetailKeyHandlerSilentlyIgnoresDimmedTabs(t *testing.T) {
 	t.Parallel()
 
 	m := modelWithProject(t)
 	mAny, _ := m.updateProjectDetailKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
 	m = mAny.(Model)
-	if m.alert == "" {
-		t.Fatal("pressing '2' on overview tab should set alert about v0.2")
+	if m.alert != "" {
+		t.Fatalf("pressing '2' raised alert %q, want silent ignore", m.alert)
 	}
 	if m.activeTab != TabOverview {
 		t.Fatalf("activeTab = %s, want still TabOverview", m.activeTab)

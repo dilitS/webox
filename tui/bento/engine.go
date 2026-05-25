@@ -128,6 +128,12 @@ func (e *Engine) RenderMode(width, height int, mode Mode) string {
 // renderTinyFallback emits a single warning panel telling the operator
 // the cockpit cannot fit. It deliberately mentions the recommended
 // terminal size so the user knows what to aim for.
+//
+// Sprint 20 — the previous "press [r] to redraw" instruction was
+// misleading: Bubble Tea auto-emits a `tea.WindowSizeMsg` on every
+// resize, so no manual key press is needed. The `r` key was never
+// wired up at the global level either. The current copy tells the
+// operator the truth: just resize, the cockpit re-renders itself.
 func renderTinyFallback(width, height int) string {
 	tokens := theme.Default()
 	lines := []string{
@@ -138,7 +144,8 @@ func renderTinyFallback(width, height int) string {
 		"Bento Ultra:     120x35",
 		"Bento Ultra+:    160x45",
 		"",
-		"Resize the window, then press [r] to redraw.",
+		"Resize the window — the cockpit re-renders automatically.",
+		"Press [q] or [Ctrl+C] to quit.",
 		"",
 		"[Tiny fallback active]",
 	}
@@ -250,9 +257,14 @@ func (e *Engine) renderUltraGrid(width, height int, mode Mode) string {
 	logsRow := e.renderSlot(bySlot[SlotLogs], mode, width-tileBorderOverhead)
 	logsRow = clipTileBlock(logsRow, budget.Logs)
 
-	// Capacity: status bar + top row + second row + logs row + optional
-	// deep-dive strip.
-	const maxSections = 5
+	// Capacity: status bar + top row + second row + logs row.
+	// Sprint 20 — the UltraPlus "deep dive" footer strip used to
+	// add a `[Deep-dive strip] Reserved for Sprint 11+` placeholder
+	// line. Sprint 11 has long since shipped; the placeholder was
+	// dead weight that consumed two precious viewport rows. The
+	// extra 4K real estate now flows into the live-log row via
+	// [bentoLogsTargetUltraPlus].
+	const maxSections = 4
 	sections := make([]string, 0, maxSections)
 	if e.statusBar != "" {
 		sections = append(sections, e.statusBar)
@@ -260,9 +272,6 @@ func (e *Engine) renderUltraGrid(width, height int, mode Mode) string {
 		sections = append(sections, renderHeader(e.title, mode, width))
 	}
 	sections = append(sections, topRow, secondRow, logsRow)
-	if mode == ModeUltraPlus {
-		sections = append(sections, renderDeepDiveStrip(width))
-	}
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }
 
@@ -291,9 +300,6 @@ const (
 	// chrome itself eats 3 lines (top border + header + bottom
 	// border); going below 6 would leave nothing scrollable.
 	bentoMinRowLines = 6
-	// bentoDeepDiveLines reserves the UltraPlus footer strip so it
-	// is not stolen from the two main grid rows.
-	bentoDeepDiveLines = 2
 	// bentoGridRows reflects the two stacked tile rows in the Ultra
 	// grid (top: Projects+Server, second: Topology+CI/CD). We never
 	// allocate fewer than this many rows, so it doubles as a divisor
@@ -305,6 +311,11 @@ const (
 // three cockpit rows. When height is unknown (≤ 0) every budget is
 // zero, which clipTileBlock interprets as "no clip" — that matches
 // every pre-Sprint-13 caller path (tests, narrow legacy fallbacks).
+//
+// Sprint 20 — the UltraPlus deep-dive strip is gone, so the planner
+// no longer reserves two trailing rows for it. The freed lines flow
+// into the live-log target ([bentoLogsTargetUltraPlus]), which is
+// the most useful place for them on a 160×45+ viewport.
 func planRowBudgets(height int, mode Mode) rowBudget {
 	if height <= 0 {
 		return rowBudget{}
@@ -316,16 +327,10 @@ func planRowBudgets(height int, mode Mode) rowBudget {
 	}
 
 	available := height - bentoStatusBarLines - logs
-	if mode == ModeUltraPlus {
-		available -= bentoDeepDiveLines
-	}
 	if available < bentoGridRows*bentoMinRowLines {
 		// Shrink the logs row first — the operator can still tail
 		// via the Live Logs tab if the bottom row collapses.
 		logs = height - bentoStatusBarLines - bentoGridRows*bentoMinRowLines
-		if mode == ModeUltraPlus {
-			logs -= bentoDeepDiveLines
-		}
 		if logs < bentoLogsMinLines {
 			logs = bentoLogsMinLines
 		}
@@ -492,20 +497,12 @@ func renderHeader(title string, mode Mode, width int) string {
 	})
 }
 
-// renderDeepDiveStrip is the UltraPlus-only footer that hints at the
-// extra real estate. Sprint 11 will populate it with the topology
-// timeline; for now we render a muted spacer so the silhouette is
-// visibly different from plain Ultra.
-//
-// width is currently unused but kept in the signature so Sprint 11 can
-// honour the viewport without churning every caller.
-func renderDeepDiveStrip(_ int) string {
-	tokens := theme.Default()
-	body := "[Deep-dive strip] Reserved for service timelines (Sprint 11+)"
-	style := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), true, false, false, false).
-		BorderForeground(lipgloss.Color(tokens.Muted)).
-		Foreground(lipgloss.Color(tokens.TextDim)).
-		Padding(0, 1)
-	return style.Render(body)
-}
+// renderDeepDiveStrip — REMOVED in Sprint 20. The UltraPlus tier
+// used to render a "Reserved for Sprint 11+" placeholder strip
+// below the live-log row. Sprint 11 has long since shipped (live
+// log stream + topology map both live in the main grid), so the
+// strip carried no information. The freed two rows now flow into
+// the live-log target via [bentoLogsTargetUltraPlus]. If a future
+// sprint wants to reintroduce a deep-dive strip it should land
+// behind a feature flag plus a fresh ADR; the previous incarnation
+// was UX dead weight.

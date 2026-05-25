@@ -50,4 +50,8 @@ func (Surface) Footer(_ surface.Context) surface.FooterHint {
 // silently consume them as text.
 func (Surface) AcceptsScroll(_ surface.Context) bool { return false }
 
-const defaultFooterHint = "  [q] quit · [?] help · [/] command palette · [Tab] cycle panels"
+// defaultFooterHint shows the keys that actually advance the
+// wizard. The pre-Sprint-20 string referenced an unimplemented
+// command palette, which was misleading; the wizard is keyboard-
+// driven via Tab / Enter / Shift+Tab and Esc.
+const defaultFooterHint = "  [q] quit · [?] help · [Tab/Enter] next · [Shift+Tab] back · [Esc] cancel"

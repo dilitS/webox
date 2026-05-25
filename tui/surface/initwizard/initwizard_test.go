@@ -56,17 +56,20 @@ func TestSurface_Crumb(t *testing.T) {
 	}
 }
 
-func TestSurface_FooterCarriesGlobalHint(t *testing.T) {
+func TestSurface_FooterPublishesWizardKeys(t *testing.T) {
 	t.Parallel()
 
 	hint := initwizard.Surface{}.Footer(fixtureContext(0))
 	if hint.ScrollHint {
 		t.Error("init wizard footer should not force a scroll hint")
 	}
-	for _, needle := range []string{"[q] quit", "[?] help", "[/] command palette", "[Tab] cycle panels"} {
+	for _, needle := range []string{"[q] quit", "[?] help", "[Tab/Enter] next", "[Esc] back"} {
 		if !strings.Contains(hint.Text, needle) {
 			t.Errorf("footer missing %q in %q", needle, hint.Text)
 		}
+	}
+	if strings.Contains(hint.Text, "command palette") {
+		t.Errorf("init wizard footer must not advertise unimplemented command palette: %q", hint.Text)
 	}
 }
 

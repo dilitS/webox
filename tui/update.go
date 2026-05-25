@@ -137,19 +137,36 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:gocyclo // To
 // and large enough that a flick on a real wheel does not feel slow.
 const mouseWheelStep = 3
 
-// updateMouse handles the scroll-wheel cases that the Sprint-13 chrome
-// contract surfaces inside the body slot. Click / drag events are
-// reserved for future per-tile click-through and currently no-op.
+// updateMouse handles mouse events surfaced by Bubble Tea's
+// `tea.WithMouseCellMotion` opt-in. As of Sprint 20 the cockpit
+// understands two button families:
+//
+//   - **Wheel up / wheel down** — scrolls the focused tile (when one
+//     is Tab-focused) or the global body viewport (otherwise),
+//     mirroring `PgUp`/`PgDn` / `Home`/`End`. Step size is
+//     [mouseWheelStep] lines.
+//   - **Left button press** — a coarse "click-to-drill /
+//     click-to-back" affordance: clicking on the dashboard opens
+//     the currently-selected project's detail surface (`Enter`
+//     equivalent); clicking on the project detail returns to the
+//     dashboard (`Esc` equivalent). Other surfaces (wizards,
+//     resume, import, modals) ignore the click because they have
+//     their own keyboard-driven flow and a stray click would risk
+//     derailing it. While a tile is Tab-focused the click is also a
+//     no-op so the operator does not lose scroll context.
 //
 // Bubble Tea v1.3+ split `MouseMsg.Type` into the orthogonal
 // `MouseAction` (press/release/motion) + `MouseButton`
 // (left/middle/wheel-up/wheel-down/…) pair. We only react to *press*
-// actions on the two scroll-wheel buttons so a long mouse drag does
-// not accidentally fire repeated viewport jumps.
+// actions so a long mouse drag does not fire repeated jumps.
 //
-// Sprint 14 TASK-14.2 — when a tile is focused the wheel scrolls
-// that tile's offset instead of the global body viewport. Matches
-// the keyboard contract documented in [Model.handleViewportKey].
+// Per-tile hit testing (clicking on a specific tile to focus it,
+// clicking on a CI/CD step to expand, etc.) is deferred to the
+// Sprint 20+ Provider Catalog work; it requires the bento engine
+// to publish a layout map keyed by slot, which is a separate
+// design problem. The current contract gives clicks meaningful
+// behaviour for the most common operator gesture without that
+// dependency.
 func (m Model) updateMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if msg.Action != tea.MouseActionPress {
 		return m, nil
@@ -166,10 +183,39 @@ func (m Model) updateMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	switch msg.Button {
 	case tea.MouseButtonWheelUp:
 		m.scrollViewportBy(-mouseWheelStep)
+		return m, nil
 	case tea.MouseButtonWheelDown:
 		m.scrollViewportBy(mouseWheelStep)
+		return m, nil
+	case tea.MouseButtonLeft:
+		return m.handleLeftClick(), nil
 	}
 	return m, nil
+}
+
+// handleLeftClick implements the coarse "click-to-drill /
+// click-to-back" affordance documented on [updateMouse]. It is a
+// pure model transform; all I/O stays in commands.
+func (m Model) handleLeftClick() Model {
+	switch m.state {
+	case StateDashboard:
+		if m.cicdModal.Open || m.hostKeyModal.Open {
+			return m
+		}
+		if len(cfgProjects(m.cfg)) == 0 {
+			return m
+		}
+		m.state = StateProjectDetail
+		m.activeTab = TabOverview
+		return m
+	case StateProjectDetail:
+		if m.activeTab == TabLogs {
+			return m
+		}
+		m.state = StateDashboard
+		return m
+	}
+	return m
 }
 
 func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -738,7 +784,11 @@ func (m Model) updateProjectDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateLiveLogsKey(msg)
 	}
 	switch msg.String() {
-	case "left", "esc":
+	case "left", "esc", "tab":
+		// Sprint 20 — Tab joins Esc/Left as a back-nav alias so
+		// the operator's muscle-memory "move between panes"
+		// gesture lands them on the dashboard instead of a silent
+		// no-op.
 		m.state = StateDashboard
 		return m, nil
 	case "1":
@@ -747,7 +797,11 @@ func (m Model) updateProjectDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "4":
 		return m.enterLiveLogsTab()
 	case "2", "3", "h", "l":
-		m.alert = "tab available in v0.2"
+		// Sprint 20 — silent ignore. The tab labels themselves
+		// already render `[2] Env Diff - unlocked in v0.2` /
+		// `[3] Database - unlocked in v0.2`, so the previous
+		// "tab available in v0.2" alert was redundant noise that
+		// new operators mistook for a routing bug.
 		return m, nil
 	case "r":
 		return m.dispatchProjectAction(ProjectActionRestart)

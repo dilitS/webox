@@ -60,9 +60,9 @@ func (Surface) Footer(_ surface.Context) surface.FooterHint {
 // any `tea.KeyRunes`).
 func (Surface) AcceptsScroll(_ surface.Context) bool { return false }
 
-// defaultFooterHint is the global cockpit legend reused by every
-// migrated surface. Keeping the constant here (rather than importing
-// from `tui`) avoids an import cycle and documents the shared
-// contract: any new surface gets the same affordance unless it
-// explicitly overrides the text.
-const defaultFooterHint = "  [q] quit · [?] help · [/] command palette · [Tab] cycle panels"
+// defaultFooterHint surfaces the keys that actually advance the
+// init wizard. Sprint 20 split the per-surface hints (closing the
+// long-standing TODO from Sprint 14 TASK-14.1) so we no longer
+// advertise the unimplemented `[/] command palette` or the
+// dashboard-only `[Tab] cycle panels` here.
+const defaultFooterHint = "  [q] quit · [?] help · [Tab/Enter] next · [Esc] back"

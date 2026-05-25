@@ -1,5 +1,7 @@
 # Sprint 17 — cPanel Adapter MVP (Part 1: skeleton + read-only ops)
 
+> ⚠️ **Superseded — 2026-05-25.** Renumeracja: po Sprincie 19 (preset registry — out-of-order) i Sprincie 20 (TUI polish + Provider Catalog) treść tego planu została zmigrowana do **[Sprint 21 — cPanel Adapter (part 1) + Public Launch Prep](sprint-21-cpanel-adapter-prep.md)**. Public Launch prep z [Sprint 16](sprint-16-public-launch.md) został złożony do Sprint 21 jako parallel ops track. Treść poniżej zostaje jako historyczny wkład do planu (nie należy jej kopiować — bezpośrednio czytaj Sprint 21).
+
 > **Daty:** TBD (po Sprint 16) → +12 dni · **Czas:** ~25-30h
 >
 > **Cel:** dostarczyć **drugi działający adapter** w core Webox. cPanel UAPI + SSH fallback, focus na operacjach **odczytowych i bezpiecznych** (list, status, restart). Mutacyjne operacje (CreateSubdomain z Application Manager, CreateDatabase, IssueSSL) idą do Sprint 18. **To jest moment, w którym Webox przestaje być projektem niszowym.**

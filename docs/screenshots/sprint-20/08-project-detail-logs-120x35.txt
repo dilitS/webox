@@ -1,0 +1,14 @@
+WEBOX v0.0.0-dev  LIVE  Live Logs │ 14:32:01 │ us-east-1 │ Uptime: 24d 11h │ Load: 0.12, 0.28, 0.31 │ RAM: 3.4/8.0 GB (42%) │ Ping: 18ms (SF01)
+╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗                     
+║ 📜 [Live Logs: ShopEase-Web]                                                                                           ║                     
+║                                                                                                                        ║                     
+║ [1] Overview  [2] Env Diff - unlocked in v0.2  [3] Database - unlocked in v0.2  [4] Logs                               ║                     
+║                                                                                                                        ║                     
+║ Active File: (awaiting log path) · Stream: Tail -f: On · Disconnected · Buffer: 0/1024 lines                           ║                     
+║                                                                                                                        ║                     
+║ Waiting for the first log line…                                                                                        ║                     
+║                                                                                                                        ║                     
+║ [f] toggle auto-scroll  [c] clear buffer  [Esc] back                                                                   ║                     
+║ up/down: scroll · q: quit                                                                                              ║                     
+╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝                     
+  [q] quit · [?] help · [Esc/Tab] back · [1] overview · [4] logs · [r] restart · [s] ssl · [v] tail                                            

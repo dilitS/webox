@@ -1,6 +1,8 @@
 # Sprint 16 — Public Launch + cPanel Research
 
-> **Daty:** TBD (po Sprint 15) → +12-14 dni · **Czas:** ~20-25h (kod) + 8-10h launch-day attendance
+> ⚠️ **Partial supersedence — 2026-05-25.** Po Sprintach 19-20 ops-track (README EN, asciinema, cPanel test account onboarding) został **złożony do** [Sprint 21 — cPanel Adapter (part 1) + Public Launch Prep](sprint-21-cpanel-adapter-prep.md) jako parallel ops track obok kod-track. Reddit / Hacker News launch-day attendance dalej jest w Sprint 16 jako event sprint do uruchomienia po Sprincie 22 (gdy v0.2.0-rc1 + dwa verified providery są publishable). Pozostała (community attendance) treść tego planu jest aktualna; ops-prep widać w Sprint 21.
+
+> **Daty:** TBD (po Sprint 22, gdy v0.2.0-rc1 jest gotowe) → +5-7 dni · **Czas:** ~8-10h launch-day attendance
 >
 > **Cel:** wystrzelić projekt publicznie *raz, dobrze* (Reddit + r/golang + r/selfhosted + Hacker News) **i** zacząć cPanel od strony researchowej **przed** zakupem hostingu testowego. Po tym sprincie albo mamy pierwszego kontrybutora i sygnał życia, albo wiemy dokładnie, że pozycjonowanie wymaga zmiany.
 

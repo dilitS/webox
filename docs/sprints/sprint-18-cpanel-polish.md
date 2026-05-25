@@ -1,5 +1,7 @@
 # Sprint 18 — cPanel Adapter (Part 2: mutations + v0.2.0-rc1)
 
+> ⚠️ **Superseded — 2026-05-25.** Po renumeracji (Sprint 19 out-of-order + Sprint 20 TUI polish) treść tego planu wraca jako **Sprint 22+** (decision-gated). Decyzja: cPanel mutating ops (Application Manager, CreateDatabase, IssueSSL) + v0.2.0-rc1 vs DirectAdmin adapter vs Public Launch redux — wybór po retro Sprint 21. Tymczasowy decision doc: [sprint-20-plus-options.md](sprint-20-plus-options.md). Treść poniżej zostaje jako historyczny wkład — nie kopiuj jej; nowy plan powstanie post-Sprint-21.
+
 > **Daty:** TBD (po Sprint 17) → +10-12 dni · **Czas:** ~25-30h
 >
 > **Cel:** dokończyć cPanel adapter (CreateSubdomain, CreateDatabase, IssueSSL) z pełnym wizard flow + LIFO rollback + E2E test against real account. Wyciąć `v0.2.0-rc1` z dwoma verified providerami. **Po tym sprintcie Webox jest realnym, dwu-providerowym narzędziem.**

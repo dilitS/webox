@@ -8,6 +8,141 @@ import (
 	"github.com/dilitS/webox/tui/bento"
 )
 
+// TestMouse_LeftClickOnDashboardDrillsIntoSelectedProject is the
+// Sprint 20 minimum-viable mouse contract: a single left-click on
+// the dashboard opens the currently-selected project's detail
+// surface (mirrors `Right` / `Enter`). Until layout-aware hit
+// testing lands (deferred for the per-tile click design), this is
+// the one click semantics the operator can rely on. No tile
+// boundary maths is required — the operator is signalling
+// intent ("show me more about this row") regardless of where they
+// click on the dashboard frame.
+func TestMouse_LeftClickOnDashboardDrillsIntoSelectedProject(t *testing.T) {
+	t.Parallel()
+
+	m := New(MockOptions(""))
+	if m.state != StateDashboard {
+		t.Fatalf("setup: state = %v, want StateDashboard", m.state)
+	}
+
+	updated, _ := m.Update(tea.MouseMsg{Action: tea.MouseActionPress, Button: tea.MouseButtonLeft})
+	m = updated.(Model)
+	if m.state != StateProjectDetail {
+		t.Fatalf("state after left-click on dashboard = %v, want StateProjectDetail", m.state)
+	}
+	if m.activeTab != TabOverview {
+		t.Errorf("activeTab after drill = %v, want TabOverview", m.activeTab)
+	}
+}
+
+// TestMouse_LeftClickOnProjectDetailReturnsToDashboard is the
+// counterpart to the dashboard-drill click: when the operator is
+// already on the project detail surface, the next left-click goes
+// back to the dashboard (mirrors `Esc` / `Left`). Together the two
+// rules form a stable "click to drill / click to back" mental
+// model the operator can use without remembering keystrokes.
+func TestMouse_LeftClickOnProjectDetailReturnsToDashboard(t *testing.T) {
+	t.Parallel()
+
+	m := New(MockOptions(""))
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = updated.(Model)
+	if m.state != StateProjectDetail {
+		t.Fatalf("setup: state = %v, want StateProjectDetail", m.state)
+	}
+
+	updated, _ = m.Update(tea.MouseMsg{Action: tea.MouseActionPress, Button: tea.MouseButtonLeft})
+	m = updated.(Model)
+	if m.state != StateDashboard {
+		t.Errorf("state after left-click on project detail = %v, want StateDashboard", m.state)
+	}
+}
+
+// TestProjectDetail_PressingDimmedTabIsSilent guards the Sprint 20
+// chrome cleanup: the unimplemented v0.2 tabs ([2] Env Diff,
+// [3] Database) MUST NOT raise the redundant "tab available in
+// v0.2" alert, because the tab label itself already carries the
+// `unlocked in v0.2` annotation. The alert was a documented
+// no-op that confused new operators into thinking the press was
+// a misroute. The new contract: 2 / 3 / h / l are silent on the
+// project detail surface; the active tab does not change.
+func TestProjectDetail_PressingDimmedTabIsSilent(t *testing.T) {
+	t.Parallel()
+
+	m := New(MockOptions(""))
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = updated.(Model)
+	if m.state != StateProjectDetail {
+		t.Fatalf("setup: state = %v, want StateProjectDetail", m.state)
+	}
+	if m.activeTab != TabOverview {
+		t.Fatalf("setup: activeTab = %v, want TabOverview", m.activeTab)
+	}
+
+	for _, key := range []string{"2", "3", "h", "l"} {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
+		m = updated.(Model)
+		if m.alert != "" {
+			t.Errorf("press %q: alert = %q, want empty (silent ignore)", key, m.alert)
+		}
+		if m.activeTab != TabOverview {
+			t.Errorf("press %q: activeTab = %v, want TabOverview (preserved)", key, m.activeTab)
+		}
+	}
+}
+
+// TestProjectDetail_TabReturnsToDashboard adds Tab as a back-nav
+// alias on the project detail surface. Esc / Left already work
+// but Tab is the muscle-memory most operators use to move between
+// "panes"; without it Tab is silently swallowed and feels broken.
+// On the dashboard Tab still cycles tile focus (covered by
+// [TestTileFocus_TabCyclesThroughScrollableTiles]); the surface
+// disambiguates by state.
+func TestProjectDetail_TabReturnsToDashboard(t *testing.T) {
+	t.Parallel()
+
+	m := New(MockOptions(""))
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = updated.(Model)
+	if m.state != StateProjectDetail {
+		t.Fatalf("setup: state = %v, want StateProjectDetail", m.state)
+	}
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = updated.(Model)
+	if m.state != StateDashboard {
+		t.Errorf("state after Tab on project detail = %v, want StateDashboard", m.state)
+	}
+}
+
+// TestMouse_LeftClickIgnoredWhenTileFocused guards a subtle UX
+// trap: while the operator has Tab-focused a scrollable tile, a
+// stray left-click MUST NOT also drill into project detail —
+// that would silently exit the tile and the operator would lose
+// scroll context. Focused-tile state takes precedence over the
+// click drill rule; clicks in this mode become no-ops (wheel
+// events still scroll the focused tile, covered separately).
+func TestMouse_LeftClickIgnoredWhenTileFocused(t *testing.T) {
+	t.Parallel()
+
+	m := New(MockOptions(""))
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = updated.(Model)
+	if m.focusedTile == nil {
+		t.Fatal("setup: Tab did not focus a tile")
+	}
+	focused := *m.focusedTile
+
+	updated, _ = m.Update(tea.MouseMsg{Action: tea.MouseActionPress, Button: tea.MouseButtonLeft})
+	m = updated.(Model)
+	if m.state != StateDashboard {
+		t.Errorf("state after click with focused tile = %v, want StateDashboard", m.state)
+	}
+	if m.focusedTile == nil || *m.focusedTile != focused {
+		t.Errorf("focusedTile after click = %v, want %v (preserved)", m.focusedTile, focused)
+	}
+}
+
 // TestTileFocus_TabCyclesThroughScrollableTiles verifies the
 // Sprint 14 TASK-14.2 contract:
 //
