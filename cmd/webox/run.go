@@ -11,6 +11,7 @@ import (
 
 	"github.com/dilitS/webox/internal/telemetry"
 	"github.com/dilitS/webox/internal/version"
+	"github.com/dilitS/webox/presets"
 	ghsvc "github.com/dilitS/webox/services/github"
 	"github.com/dilitS/webox/tui"
 )
@@ -31,6 +32,8 @@ Usage:
   webox doctor --json                    run local diagnostics and print JSON
   webox doctor github                    run read-only GitHub integration diagnostics
   webox doctor github --json             run GitHub integration diagnostics as JSON
+  webox doctor preset                    list all embedded provider presets
+  webox doctor preset --id=ID            show preset details (use --json for machine output)
   webox provider new <name> [--preset=PRESET] scaffold a new hosting provider adapter
   webox --version                        print build metadata and exit
   webox --help                           print this help and exit
@@ -52,6 +55,12 @@ Flags:
                        blank (default), cpanel-uapi, directadmin, cyberpanel.
   --dry-run            (only with ` + "`provider new`" + `) report what would be
                        written without touching the filesystem.
+  --id=ID              (only with ` + "`doctor preset`" + `) show details for the
+                       preset with the given id (e.g. cpanel-generic).
+  --probe              (only with ` + "`doctor preset --id=ID`" + `) execute the
+                       preset's probe commands. v0.2 baseline: stub. Live
+                       probe execution lands with the cPanel adapter
+                       (Sprint 17/18).
 
 Documentation:
   https://github.com/dilitS/webox/tree/main/docs
@@ -68,7 +77,7 @@ type opts struct {
 	mock         bool
 	doctor       bool
 	doctorJSON   bool
-	doctorTarget string // "" | "github"
+	doctorTarget string // "" | "github" | "preset"
 	// debugTracePath, when non-empty, instructs the launcher to open
 	// a [telemetry.FileSink] at the given path and route cockpit /
 	// SSH / doctor events into it. Empty value keeps the default
@@ -83,6 +92,13 @@ type opts struct {
 	providerNewName string
 	providerPreset  string
 	providerDryRun  bool
+	// presetID and presetProbe are the sub-flags that target a
+	// specific preset under `webox doctor preset`. presetProbe is
+	// a stub in v0.2 baseline (live execution lands with the
+	// cPanel adapter); kept here so the parser surface stays
+	// stable when probe execution flips on.
+	presetID    string
+	presetProbe bool
 }
 
 // doctorDispatcher is the seam that lets tests run the CLI router
@@ -90,13 +106,15 @@ type opts struct {
 // package-level state.
 type doctorDispatcher func(jsonOutput bool, stdout, stderr io.Writer) int
 
+type presetDispatcher func(opts presetOpts, stdout, stderr io.Writer) int
+
 type tuiDispatcher func(stdout, stderr io.Writer) int
 
 // Run dispatches the command implied by args (without the program name)
 // and returns the process exit code. Output is written to the supplied
 // writers so tests can capture it without touching os.Stdout/os.Stderr.
 func Run(args []string, stdout, stderr io.Writer) int {
-	return runWithFullDeps(args, stdout, stderr, runDoctor, runDoctorGitHub, runTUI)
+	return runWithFullDeps(args, stdout, stderr, runDoctor, runDoctorGitHub, defaultPresetDispatcher, runTUI)
 }
 
 // runWithDeps preserves the legacy two-dispatcher seam used by existing
@@ -109,7 +127,7 @@ func runWithDeps(
 	dispatch doctorDispatcher,
 	startTUI tuiDispatcher,
 ) int {
-	return runWithFullDeps(args, stdout, stderr, dispatch, runDoctorGitHub, startTUI)
+	return runWithFullDeps(args, stdout, stderr, dispatch, runDoctorGitHub, defaultPresetDispatcher, startTUI)
 }
 
 func runWithFullDeps(
@@ -118,6 +136,7 @@ func runWithFullDeps(
 	stderr io.Writer,
 	dispatchCore doctorDispatcher,
 	dispatchGitHub doctorDispatcher,
+	dispatchPreset presetDispatcher,
 	startTUI tuiDispatcher,
 ) int {
 	parsed, errMsg := parseArgs(args)
@@ -137,6 +156,12 @@ func runWithFullDeps(
 		switch parsed.doctorTarget {
 		case "github":
 			return dispatchGitHub(parsed.doctorJSON, stdout, stderr)
+		case "preset":
+			return dispatchPreset(presetOpts{
+				id:    parsed.presetID,
+				json:  parsed.doctorJSON,
+				probe: parsed.presetProbe,
+			}, stdout, stderr)
 		default:
 			return dispatchCore(parsed.doctorJSON, stdout, stderr)
 		}
@@ -187,6 +212,20 @@ func runTUIWithTrace(stdout, stderr io.Writer, sink telemetry.Sink, dispatch tui
 		logsFetcherFor(client),
 	)
 }
+
+// defaultPresetDispatcher is the production wiring for `webox
+// doctor preset`. It binds the runtime registry resolver to
+// presets.Default(), keeping the dispatch surface stub-able from
+// tests via [runWithFullDeps].
+func defaultPresetDispatcher(opts presetOpts, stdout, stderr io.Writer) int {
+	return runPresetDoctor(opts, stdout, stderr, defaultPresetRegistry)
+}
+
+// defaultPresetRegistry returns the singleton preset registry for
+// production callers. The seam is exported as a package-level
+// variable so a future test that wants to swap it can do so by
+// assigning before runPresetDoctor is invoked.
+var defaultPresetRegistry presetRegistryProvider = presets.Default
 
 // runMockTUIWithTrace mirrors runMockTUI but injects a trace sink
 // into the mock cockpit. Used when an operator runs
@@ -416,24 +455,19 @@ func parseArgs(args []string) (parsed opts, errMsg string) {
 // AND the operator combined it incorrectly (e.g. `--dry-run` outside
 // `provider new`). It returns "" both for "handled" and "not mine";
 // the caller disambiguates via [simpleFlagHandled].
+//
+// Cyclomatic complexity is kept under control by routing
+// context-sensitive tokens (`github`, `preset`, `new`, `--probe`,
+// `--dry-run`) through helper functions; standalone tokens stay
+// in the switch arm.
 func applySimpleFlag(parsed *opts, arg string) string {
 	switch arg {
 	case "doctor":
 		parsed.doctor = true
-	case "github":
-		if !parsed.doctor {
-			return "webox: `github` is only valid after `doctor`."
-		}
-		if parsed.doctorTarget != "" && parsed.doctorTarget != "github" {
-			return fmt.Sprintf("webox: doctor target already set to %q.", parsed.doctorTarget)
-		}
-		parsed.doctorTarget = "github"
+	case "github", "preset", "new":
+		return applyContextualToken(parsed, arg)
 	case "provider":
 		parsed.providerNew = true
-	case "new":
-		if !parsed.providerNew {
-			return "webox: `new` is only valid after `provider` (usage: webox provider new <name>)."
-		}
 	case "--version":
 		parsed.showVersion = true
 	case "--help", "-h":
@@ -444,12 +478,55 @@ func applySimpleFlag(parsed *opts, arg string) string {
 		parsed.mock = true
 	case "--json":
 		parsed.doctorJSON = true
+	case "--probe":
+		return applyProbeFlag(parsed)
 	case "--dry-run":
-		if !parsed.providerNew {
-			return "webox: --dry-run is only valid with `provider new`."
-		}
-		parsed.providerDryRun = true
+		return applyDryRunFlag(parsed)
 	}
+	return ""
+}
+
+// applyContextualToken handles tokens that are only valid in a
+// specific subcommand context. Kept separate from applySimpleFlag
+// so the parent stays under the gocyclo budget.
+func applyContextualToken(parsed *opts, arg string) string {
+	switch arg {
+	case "github":
+		return setDoctorTarget(parsed, "github", "`github` is only valid after `doctor`.")
+	case "preset":
+		return setDoctorTarget(parsed, "preset", "`preset` is only valid after `doctor` (usage: webox doctor preset).")
+	case "new":
+		if !parsed.providerNew {
+			return "webox: `new` is only valid after `provider` (usage: webox provider new <name>)."
+		}
+	}
+	return ""
+}
+
+func setDoctorTarget(parsed *opts, target, missingDoctorMsg string) string {
+	if !parsed.doctor {
+		return "webox: " + missingDoctorMsg
+	}
+	if parsed.doctorTarget != "" && parsed.doctorTarget != target {
+		return fmt.Sprintf("webox: doctor target already set to %q.", parsed.doctorTarget)
+	}
+	parsed.doctorTarget = target
+	return ""
+}
+
+func applyProbeFlag(parsed *opts) string {
+	if parsed.doctorTarget != "preset" {
+		return "webox: --probe is only valid with `webox doctor preset`."
+	}
+	parsed.presetProbe = true
+	return ""
+}
+
+func applyDryRunFlag(parsed *opts) string {
+	if !parsed.providerNew {
+		return "webox: --dry-run is only valid with `provider new`."
+	}
+	parsed.providerDryRun = true
 	return ""
 }
 
@@ -458,9 +535,9 @@ func applySimpleFlag(parsed *opts, arg string) string {
 // flat — without it, gocyclo flags the function as too complex.
 func simpleFlagHandled(arg string) bool {
 	switch arg {
-	case "doctor", "github", "provider", "new",
+	case "doctor", "github", "preset", "provider", "new",
 		"--version", "--help", "-h", "--debug",
-		"--mock", "--json", "--dry-run":
+		"--mock", "--json", "--probe", "--dry-run":
 		return true
 	}
 	return false
@@ -487,11 +564,23 @@ func applyPrefixedFlag(parsed *opts, arg string) string {
 		parsed.providerPreset = preset
 		return ""
 	}
+	if id, ok := strings.CutPrefix(arg, "--id="); ok {
+		if parsed.doctorTarget != "preset" {
+			return "webox: --id is only valid with `webox doctor preset`."
+		}
+		if id == "" {
+			return "webox: --id requires a value (e.g. --id=cpanel-generic)."
+		}
+		parsed.presetID = id
+		return ""
+	}
 	return ""
 }
 
 func prefixedFlagHandled(arg string) bool {
-	return strings.HasPrefix(arg, "--debug-trace=") || strings.HasPrefix(arg, "--preset=")
+	return strings.HasPrefix(arg, "--debug-trace=") ||
+		strings.HasPrefix(arg, "--preset=") ||
+		strings.HasPrefix(arg, "--id=")
 }
 
 // postParseValidation enforces cross-flag invariants that cannot be
@@ -499,6 +588,9 @@ func prefixedFlagHandled(arg string) bool {
 func postParseValidation(parsed opts) string {
 	if parsed.doctorJSON && !parsed.doctor {
 		return "webox: --json is only valid with `webox doctor`."
+	}
+	if parsed.presetProbe && parsed.presetID == "" {
+		return "webox: --probe requires --id=<preset-id> (usage: webox doctor preset --id=<id> --probe)."
 	}
 	if parsed.providerNew && parsed.providerNewName == "" {
 		return "webox: `provider new` requires a name (usage: webox provider new <name> [--preset=PRESET])."
