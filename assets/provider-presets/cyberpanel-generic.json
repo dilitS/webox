@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "cyberpanel-generic",
+  "display_name": "Generic CyberPanel + OpenLiteSpeed (experimental)",
+  "provider_type": "cyberpanel",
+  "status": "research",
+  "markets": ["global"],
+  "panel": {
+    "name": "CyberPanel",
+    "api": "cyberpanel_cli",
+    "ssh_required": true
+  },
+  "capabilities": {
+    "node_runtime": "manual_pm2",
+    "restart_method": "pm2",
+    "ssl_provider": "letsencrypt",
+    "database_engines": ["mysql"],
+    "git_available": false,
+    "sftp_available": true,
+    "logs_path_known": false,
+    "safe_restart": false
+  },
+  "paths": {
+    "deploy_path_template": "/home/{{domain}}/public_html",
+    "log_path_template": "/home/{{domain}}/logs"
+  },
+  "probes": [
+    "command -v cyberpanel",
+    "cyberpanel --help",
+    "command -v pm2",
+    "command -v nodecyber"
+  ],
+  "known_risks": [
+    "Operator typically requires root/sudo for OpenLiteSpeed configuration changes.",
+    "Global OLS reload affects all vhosts on the server; not safe for multi-tenant hosts.",
+    "CyberPanel CLI may report success despite partial failures; verify state independently.",
+    "API surface has had public security issues; prefer SSH + CLI over panel API."
+  ],
+  "sources": [
+    "https://community.cyberpanel.net/t/cyberpanel-command-line-interface/30683",
+    "https://github.com/usmannasir/cyberpanel"
+  ],
+  "verified": {}
+}

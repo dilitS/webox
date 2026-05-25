@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "id": "cpanel-generic",
+  "display_name": "Generic cPanel UAPI + Application Manager",
+  "provider_type": "cpanel",
+  "status": "research",
+  "markets": ["global"],
+  "panel": {
+    "name": "cPanel",
+    "api": "uapi",
+    "api_port": 2083,
+    "ssh_required": true
+  },
+  "capabilities": {
+    "node_runtime": "passenger",
+    "restart_method": "passenger",
+    "ssl_provider": "autossl",
+    "database_engines": ["mysql"],
+    "git_available": true,
+    "sftp_available": true,
+    "logs_path_known": true,
+    "safe_restart": true
+  },
+  "paths": {
+    "deploy_path_template": "/home/{{user}}/{{app_root}}/public",
+    "log_path_template": "/home/{{user}}/{{app_root}}/logs",
+    "env_path_template": "/home/{{user}}/{{app_root}}/.env",
+    "node_versions_path": "/opt/cpanel"
+  },
+  "probes": [
+    "uapi --output=json Version get_version",
+    "uapi --output=json PassengerApps list_applications",
+    "uapi --output=json Tokens list",
+    "uapi --output=json SSL installed_hosts",
+    "command -v passenger-config"
+  ],
+  "known_risks": [
+    "Application Manager may be disabled in WHM Feature Manager.",
+    "Only one ea-nodejs package may be installed at a time on shared cPanel.",
+    "API tokens may be disabled by hoster; SSH uapi fallback then required.",
+    "PassengerStartupFile defaults to app.js; non-default entrypoints need manual configuration."
+  ],
+  "sources": [
+    "https://api.docs.cpanel.net/specifications/cpanel.openapi",
+    "https://docs.cpanel.net/cpanel/software/application-manager/",
+    "https://docs.cpanel.net/cpanel/security/manage-api-tokens-in-cpanel/",
+    "https://www.phusionpassenger.com/docs/advanced_guides/troubleshooting/apache/restart_app.html"
+  ],
+  "verified": {}
+}

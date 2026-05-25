@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "id": "smallhost-devil",
+  "display_name": "small.pl (Devil panel)",
+  "provider_type": "smallhost",
+  "status": "verified",
+  "markets": ["PL", "global"],
+  "panel": {
+    "name": "Devil",
+    "api": "devil_cli",
+    "ssh_required": true
+  },
+  "capabilities": {
+    "node_runtime": "devil",
+    "restart_method": "devil",
+    "ssl_provider": "letsencrypt",
+    "database_engines": ["mysql"],
+    "git_available": false,
+    "sftp_available": true,
+    "logs_path_known": true,
+    "safe_restart": true
+  },
+  "paths": {
+    "deploy_path_template": "/home/{{user}}/domains/{{domain}}/public_html",
+    "log_path_template": "/home/{{user}}/domains/{{domain}}/logs",
+    "env_path_template": "/home/{{user}}/domains/{{domain}}/.env"
+  },
+  "probes": [
+    "devil --version",
+    "devil node list",
+    "devil www list",
+    "devil mysql db list"
+  ],
+  "known_risks": [
+    "Devil CLI requires interactive SSH shell; no web API available.",
+    "Restart aggressively re-binds Node.js sockets; brief downtime expected."
+  ],
+  "sources": [
+    "https://small.pl/pomoc/"
+  ],
+  "verified": {
+    "fixture_dir": "testing/fixtures/devil",
+    "last_verified_at": "2026-05-25",
+    "verified_by": "@maintainer"
+  }
+}

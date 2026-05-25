@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "id": "directadmin-generic",
+  "display_name": "Generic DirectAdmin (Live API + Legacy fallback)",
+  "provider_type": "directadmin",
+  "status": "research",
+  "markets": ["global"],
+  "panel": {
+    "name": "DirectAdmin",
+    "api": "directadmin_api",
+    "api_port": 2222,
+    "ssh_required": true
+  },
+  "capabilities": {
+    "node_runtime": "cloudlinux_selector",
+    "restart_method": "passenger",
+    "ssl_provider": "letsencrypt",
+    "database_engines": ["mysql"],
+    "git_available": true,
+    "sftp_available": true,
+    "logs_path_known": true,
+    "safe_restart": true
+  },
+  "paths": {
+    "deploy_path_template": "/home/{{user}}/domains/{{domain}}/public_html",
+    "log_path_template": "/home/{{user}}/domains/{{domain}}/logs",
+    "env_path_template": "/home/{{user}}/domains/{{domain}}/.env"
+  },
+  "probes": [
+    "command -v nodejs_selector",
+    "command -v cloudlinux-selector",
+    "command -v passenger-config"
+  ],
+  "known_risks": [
+    "Live API endpoint coverage varies by DirectAdmin version; Legacy API fallback is often required.",
+    "Login Key system mandatory for unattended automation; main password must never be stored.",
+    "Some hosters expose Nginx Unit instead of Passenger; runtime detection critical."
+  ],
+  "sources": [
+    "https://docs.directadmin.com/developer/api/",
+    "https://docs-dev.directadmin.com/developer/api/examples.html",
+    "https://docs.directadmin.com/webservices/nginx_unit/"
+  ],
+  "verified": {}
+}

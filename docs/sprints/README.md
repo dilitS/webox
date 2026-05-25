@@ -247,7 +247,7 @@ Wszystkie powtarzalne kroki są skryptowane. Główne komendy z `Makefile`:
 | 16 | **Public Launch + cPanel Research** — soft launch PL → Show HN/r/golang/r/selfhosted, partnership outreach H88, cPanel test account + fixtures | 📝 Planned | [sprint-16-public-launch.md](sprint-16-public-launch.md) | — |
 | 17 | **cPanel Adapter MVP (part 1)** — UAPI client + SSH fallback, read-only ops, `webox doctor cpanel` | 📝 Planned | [sprint-17-cpanel-adapter.md](sprint-17-cpanel-adapter.md) | — |
 | 18 | **cPanel Adapter (part 2) + v0.2.0-rc1** — mutating ops, wizard integration, E2E, release | 📝 Planned | [sprint-18-cpanel-polish.md](sprint-18-cpanel-polish.md) | — |
-| 19 | **Preset Registry Foundation** — JSON-schema `assets/provider-presets/`, Provider Catalog TUI, `webox doctor preset`, ADR-0008 | 📝 Planned | [sprint-19-preset-registry.md](sprint-19-preset-registry.md) | — |
+| 19 | **Preset Registry Foundation** — JSON-schema `assets/provider-presets/`, `webox doctor preset` CLI, 6 initial presets, ADR-0008 (TUI Provider Catalog deferred to Sprint 20+) | ✅ Done (out-of-cadence — 2026-05-25) | [sprint-19-preset-registry.md](sprint-19-preset-registry.md) | [retros/2026-05-25-sprint-19.md](../retros/2026-05-25-sprint-19.md) |
 | 20+ | **Decision Matrix** — A: DirectAdmin / B: OAuth+Polish / C: Repositioning. Wybór po Sprint 19 retro. | 📝 Decision doc | [sprint-20-plus-options.md](sprint-20-plus-options.md) | — |
 
 **Etapy projektu:**
