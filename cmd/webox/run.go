@@ -31,7 +31,7 @@ Usage:
   webox doctor --json                    run local diagnostics and print JSON
   webox doctor github                    run read-only GitHub integration diagnostics
   webox doctor github --json             run GitHub integration diagnostics as JSON
-  webox provider new <name> [--preset P] scaffold a new hosting provider adapter
+  webox provider new <name> [--preset=PRESET] scaffold a new hosting provider adapter
   webox --version                        print build metadata and exit
   webox --help                           print this help and exit
 
@@ -501,7 +501,7 @@ func postParseValidation(parsed opts) string {
 		return "webox: --json is only valid with `webox doctor`."
 	}
 	if parsed.providerNew && parsed.providerNewName == "" {
-		return "webox: `provider new` requires a name (usage: webox provider new <name> [--preset PRESET])."
+		return "webox: `provider new` requires a name (usage: webox provider new <name> [--preset=PRESET])."
 	}
 	return ""
 }

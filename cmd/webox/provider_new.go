@@ -113,7 +113,7 @@ type providerNewResult struct {
 var errProviderNew = errors.New("webox provider new: invalid input")
 
 // runProviderNew is the package-level entry point invoked by Run when
-// the operator types `webox provider new <name> [--preset PRESET] [--dry-run]`.
+// the operator types `webox provider new <name> [--preset=PRESET] [--dry-run]`.
 //
 // stderr carries the operator-facing walkthrough; stdout stays empty
 // so callers that pipe the command into a script see no surprise

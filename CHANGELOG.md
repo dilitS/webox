@@ -15,6 +15,10 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ## [Unreleased]
 
+### Fixed
+
+- **CLI help text disambiguates `--preset` form (post-verification fix, 2026-05-25).** `webox --help` and the `provider new` error messages now consistently show `--preset=PRESET` (the equals-form, which is what the parser actually accepts). Discovered during the Sprint 15 pre-release smoke test: the previous help text rendered `[--preset P]` which most users would type as `--preset cpanel-uapi` (space-separated) and hit a `unknown argument "--preset"` error. The parser is unchanged — all existing tests still pass — only the docstrings + error messages were tightened. Space-form support is a v0.2 candidate; not blocking v0.1.0.
+
 ### Changed
 
 - **Sprint 15 — Sprint outcome + Sprint 16 pre-planning refresh (TASK-15.8, 2026-05-25).** Sprint 15 zamknięte z 8/8 tasków done (15.1-15.7 + 15.9; 15.2 / 15.5 carry-overy są **operator-only** artefakty: asciinema recording + landing body native-speaker pass). [`docs/sprints/sprint-15-launch-readiness.md`](./docs/sprints/sprint-15-launch-readiness.md) Outcome section wypełniona — explicit decyzja: **generator zostaje w mainline `webox` binary** (nie `webox-dev`), bo to operator/contributor-facing komenda, nie debug. [`docs/sprints/README.md`](./docs/sprints/README.md) Sprint 15 status → ✅ Done z retro linkiem. [`docs/sprints/sprint-16-public-launch.md`](./docs/sprints/sprint-16-public-launch.md) Pre-flight Checklist zaktualizowany: tasks z Sprint 15 oznaczone jako gotowe, 3 nowe carry-over checkboxes (cast recording, screenshot capture, landing EN body), 1 nowa decyzja-do-Sprint-16-retro (community vs. maintainer-led cPanel skeleton). [`docs/ROADMAP.md`](./docs/ROADMAP.md) Sprint 15 row zaktualizowany. Nowy retro plik [`docs/retros/2026-05-25-sprint-15.md`](./docs/retros/2026-05-25-sprint-15.md) — 4 sekcje (what worked, what didn't, surprises, changes to apply going forward) + 3 open questions kierujące Sprint 16 planning.
