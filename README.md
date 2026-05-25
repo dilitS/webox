@@ -19,7 +19,9 @@
 git clone https://github.com/dilitS/webox.git && cd webox && make build
 ./bin/webox --mock   # synthetic data; no SSH, no token, no config
 ```
-> Requirements: **Go 1.25+**, POSIX shell. Tested on macOS arm64/amd64 and Linux amd64. Static gallery: [`docs/screenshots/sprint-20/`](./docs/screenshots/sprint-20). Asciinema cast + GIF land with v0.2.0 (see [`scripts/record-demo.sh`](./scripts/record-demo.sh)).
+> Requirements: **Go 1.25+**, POSIX shell. Tested on macOS arm64/amd64 and Linux amd64. Static gallery: [`docs/screenshots/sprint-20/`](./docs/screenshots/sprint-20). 45-second demo: [`docs/screenshots/sprint-21/demo.cast`](./docs/screenshots/sprint-21/demo.cast) (asciinema 3.x) — rendered GIF below; recorded via [`scripts/record-demo.sh`](./scripts/record-demo.sh).
+
+<p align="center"><img alt="Webox v0.1 — 45-second mock cockpit tour" src="https://raw.githubusercontent.com/dilitS/webox/main/docs/screenshots/sprint-21/demo.gif" width="860"></p>
 
 ## What works today (v0.1)
 
