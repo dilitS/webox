@@ -17,6 +17,17 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ### Added
 
+- **Sprint 15 — `webox provider new <name>` adapter scaffolding generator (TASK-15.4, 2026-05-25).** New CLI subcommand that scaffolds a complete `providers/<name>/` adapter package + matching fixtures + production blank import, dropping the cost of adding a hosting panel from "read 9 method signatures and copy-paste" to one command. Highlights:
+  - **Generated files (all `gofmt`-clean and AST-parseable on every run):** `providers/<name>/{doc,provider,provider_test,parsers,parsers_test}.go` + `testing/fixtures/<name>/README.md`.
+  - **Embedded templates** under `assets/provider-template/*.tmpl` (Go `text/template`), loaded via `//go:embed` so the generator works in any clone without external paths.
+  - **`--preset PRESET`** (one of `blank`, `cpanel-uapi`, `directadmin`, `cyberpanel`) seeds the doc comments with the chosen vendor's display name; vendor-specific transport scaffolding lands in Sprint 17/18 work.
+  - **`--dry-run`** prints the would-write plan and patched-imports note without touching disk — operators see exactly what the generator will do before committing.
+  - **Idempotent blank-import patch:** rewrites `cmd/webox/providers.go` in canonical sorted order; re-running on an already-registered name is a no-op (no spurious diff).
+  - **Strict name validation:** lowercase ASCII letter start + `[a-z0-9_]{2,31}` body + reserved-name guard (blocks `smallhost`, `mock`, `main`, `init`, `test`, `testing`).
+  - **CLI hygiene:** `parseArgs` was refactored into focused helpers (`applySimpleFlag`, `applyPrefixedFlag`, `postParseValidation`) so the new subcommand keeps the cyclomatic-complexity gate green; stdout stays empty for clean pipe usage; walkthrough message lands on stderr.
+  - **Tests:** 22 new test cases covering name regex, reserved list, preset matrix, dry-run safety, idempotency, AST validity of the generated Go, parsed-imports round-trip, `--preset` / `--dry-run` parse error matrix. End-to-end smoke verified by running `./bin/webox provider new sandboxtest && go test ./providers/sandboxtest/...` (green; output cleaned post-verification).
+  - **Why now:** Sprint 15 TASK-15.4 calls this out as "the single strongest contributor magnet, more important than README marketing." `docs/contributing/PROVIDER.md` (already merged in the Sprint 15 docs scaffold) references the generator as Step 1 of the 4-hour walkthrough.
+
 - **Launch readiness scaffolding — Sprint 15-20+ plans + `.local/` ops room (2026-05-25).** Post-Sprint-14 strategic planning iteration that captures the decision to push `v0.1` GA into a **public OSS launch** rather than staying in technical-only mode. Six new sprint plans now own the post-MVP path:
   - `docs/sprints/sprint-15-launch-readiness.md` — README EN, asciinema z `--mock`, `webox provider new` generator, `docs/contributing/PROVIDER.md` walkthrough, AGENTS.md slim (≤150 linii), Apache-2.0 consistency, repo public-readiness audit. Głównie nie-kod.
   - `docs/sprints/sprint-16-public-launch.md` — Tydzień 1 PL soft launch + Tydzień 2 Show HN + r/golang + r/selfhosted (środa rano EST). Partnership outreach H88 (small.pl/lh.pl) + cPanel test account purchase + `docs/providers/cpanel.md` real-world expansion.

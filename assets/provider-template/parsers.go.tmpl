@@ -1,0 +1,18 @@
+package {{.PackageName}}
+
+// Parser scaffolding for {{.DisplayName}}.
+//
+// Every panel command Webox calls (create subdomain, create DB, list
+// vhosts, …) gets its own parser here. Parsers are pure functions:
+// raw bytes in, typed result out. Steps for each new parser:
+//
+//  1. Capture a golden fixture in testing/fixtures/{{.Name}}/ — see
+//     the directory's README.md for sanitisation policy.
+//  2. Add a table-driven entry to parsers_test.go: success +
+//     known-error + malicious (ANSI / NUL / oversized) fixtures.
+//  3. Implement the parser using `stripAndNormalize` + a named-group
+//     regex. Return providers.ErrUnknownOutputFormat for unrecognised
+//     shapes; never include raw secret bytes in the error.
+//  4. Wire the parser into the method in provider.go.
+//
+// See providers/smallhost/parsers.go for the canonical reference.
