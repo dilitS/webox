@@ -1,0 +1,36 @@
+{
+  "result": {
+    "status": 1,
+    "errors": null,
+    "warnings": null,
+    "messages": null,
+    "data": {
+      "applications": [
+        {
+          "name": "shop-backend",
+          "path": "/home/operator/apps/shop-backend",
+          "domain": "shop.example.com",
+          "enabled": true,
+          "status": "running",
+          "base_uri": "/",
+          "envvars": {
+            "NODE_ENV": "production",
+            "PORT": "3000"
+          }
+        },
+        {
+          "name": "marketing-cms",
+          "path": "/home/operator/apps/marketing-cms",
+          "domain": "marketing.example.com",
+          "enabled": true,
+          "status": "stopped",
+          "base_uri": "/admin",
+          "envvars": {
+            "NODE_ENV": "production"
+          }
+        }
+      ]
+    },
+    "metadata": {}
+  }
+}

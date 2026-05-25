@@ -1,0 +1,25 @@
+{
+  "result": {
+    "status": 1,
+    "errors": null,
+    "warnings": null,
+    "messages": null,
+    "data": {
+      "keys": [
+        {
+          "friendly_name": "example.com primary",
+          "host": "example.com",
+          "modulus_length": 4096,
+          "not_after": "2027-04-01T00:00:00Z"
+        },
+        {
+          "friendly_name": "shop.example.com",
+          "host": "shop.example.com",
+          "modulus_length": 2048,
+          "not_after": "2026-11-15T00:00:00Z"
+        }
+      ]
+    },
+    "metadata": {}
+  }
+}

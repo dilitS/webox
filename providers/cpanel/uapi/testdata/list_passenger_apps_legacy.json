@@ -1,0 +1,25 @@
+{
+  "result": {
+    "status": 1,
+    "errors": null,
+    "warnings": null,
+    "messages": null,
+    "data": {
+      "shop-backend": {
+        "path": "/home/operator/apps/shop-backend",
+        "domain": "shop.example.com",
+        "enabled": true,
+        "status": "running",
+        "base_uri": "/"
+      },
+      "marketing-cms": {
+        "path": "/home/operator/apps/marketing-cms",
+        "domain": "marketing.example.com",
+        "enabled": false,
+        "status": "stopped",
+        "base_uri": "/admin"
+      }
+    },
+    "metadata": {}
+  }
+}

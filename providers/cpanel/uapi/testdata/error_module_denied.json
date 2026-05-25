@@ -1,0 +1,10 @@
+{
+  "result": {
+    "status": 0,
+    "errors": ["Sorry, the feature you are using is disabled for this account."],
+    "warnings": null,
+    "messages": null,
+    "data": null,
+    "metadata": {}
+  }
+}
