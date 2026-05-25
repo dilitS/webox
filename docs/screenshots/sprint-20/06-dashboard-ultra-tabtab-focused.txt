@@ -1,0 +1,35 @@
+WEBOX v0.0.0-dev  LIVE  14:32:01 │ us-east-1 │ Uptime: 24d 11h │ Load: 0.12, 0.28, 0.31 │ RAM: 3.4/8.0 GB (42%) │ Ping: 18ms (SF01)
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓           
+┃ 📂 [Active Projects]                                ┃┃ 🖥  [SERVER: ShopEase-Web]                                     ┃           
+┃ ╭──────────────╮                                    ┃┃ ▣ Profile: us-east-1                                          ┃           
+┃ │ ShopEase-Web │ ●                                  ┃┃ ◆ Stack: node-express                                         ┃           
+┃ ╰──────────────╯                                    ┃┃ ◉ Node.js: v20.11.0 ●                                         ┃           
+┃   API-Gateway ●                                     ┃┃ ✓ Status: ONLINE ●                                            ┃           
+┃   Auth-Service ●                                    ┃┃ ↔ HTTP: 200 OK                                                ┃           
+┃   Dashboard ●                                       ┃┃ ⚿ SSL: Valid (114 days remaining) ●                           ┃           
+┃   Dashboard-Admin ●                                 ┃┃ ⎇ Repo: dilitS-demo/shopease-web                              ┃           
+┃   Payment-UI ●                                      ┃┃ ⏲ Last Deploy: 2h ago · success                               ┃           
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛           
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓           
+┃ 🌐 [Live Service Topology]                          ┃┃ 🚀 [CI/CD PIPELINE: Main Branch]                              ┃           
+┃ ┌────────────────────────────────────────────┐      ┃┃  LIVE  ShopEase-Web · deploy.yml                              ┃           
+┃ │ 📦 dilitS-demo/shopease-web  ●             │      ┃┃ Build #412: SUCCESS ✓ · 1m 42s (14:12 UTC)                    ┃           
+┃ └────────────────────────────────────────────┘      ┃┃ Pipeline Steps:                                               ┃           
+┃         │ GHA Deploy                                ┃┃ [1] Git Checkout ✓ · 2s                                       ┃           
+┃         ▼ ✓                                         ┃┃ [2] Install Deps ✓ · 12s                                      ┃           
+┃ ┌────────────────────────────────────────────┐      ┃┃ [3] Code Lint ✓ · 7s                                          ┃           
+┃ │ 🖥 us-east-1  ●                             │      ┃┃ [4] Build Artifact ✓ · 38s                                    ┃           
+┃ └────────────────────────────────────────────┘      ┃┃ [5] Unit Tests ✓ · 19s                                        ┃           
+┃ … +7 more lines · scroll inside tab/modal           ┃┃ … +3 more lines · scroll inside tab/modal                     ┃           
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛           
+╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗           
+║ 📜 [Live Server Logs]                                                                                                ║           
+║ [14:32:10] INFO  - API-Gateway: Incoming GET /users (status: 200)                                                    ║           
+║ [14:32:11] WARN  - Auth-Service: High latency detected (450ms)                                                       ║           
+║ [14:32:12] INFO  - ShopEase-Web: Served /products in 88ms                                                            ║           
+║ [14:32:14] DEBUG - Worker #2: Cache hit for key 'prod:list'                                                          ║           
+║ [14:32:15] INFO  - API-Gateway: Healthcheck OK (12ms)                                                                ║           
+║ [14:32:16] INFO  - cockpit: telemetry.Sink = Disabled (no --debug-trace flag)                                        ║           
+┃ … +2 more lines · scroll inside tab/modal                                                                            ┃           
+╚══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝           
+  [q] quit · [?] help  ·  focus: logs · [PgUp/PgDn] scroll panel · [Esc] release                                                   

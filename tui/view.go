@@ -120,21 +120,61 @@ func (m Model) renderChromeTop(screen views.Screen, crumb string) string {
 // the global "scroll body" hint for a tile-scoped one so the
 // operator can tell at a glance that PgUp/PgDn now route inside
 // the panel and that Esc releases focus.
+//
+// Sprint 20 — the global hint is now sourced from the active
+// [surface.Surface]'s `Footer().Text` so each state can publish
+// keys that actually do something there (e.g. project detail
+// surfaces `[1] / [4]` tabs and `[r] / [s] / [v]` actions instead
+// of pretending `[/] command palette` exists). When a tile is
+// focused the global hint collapses to the absolute-minimum legend
+// and the focus suffix takes over the available width — the
+// surface's keys are paused (Tab no longer cycles tiles when
+// focused; PgUp/PgDn moves the panel; Esc releases). This keeps the
+// chrome readable on `120` column terminals where the long
+// dashboard hint would otherwise truncate the focus annotation.
 func (m Model) renderChromeBottom(width, total, available, offset int) string {
 	tokens := theme.Default()
-	hints := "  [q] quit · [?] help · [/] command palette · [Tab] cycle panels"
-	if m.focusedTile != nil {
+	var hints string
+	switch {
+	case m.focusedTile != nil:
+		hints = defaultGlobalFooterHint
 		hints += fmt.Sprintf("  ·  focus: %s · [PgUp/PgDn] scroll panel · [Esc] release",
 			slotLabel(*m.focusedTile))
-	} else if total > available && available > 0 {
+	case total > available && available > 0:
+		hints = surfaceFooterText(m.surfaceFor(), m.screen())
 		maxOffset := total - available
 		hints += fmt.Sprintf("  ·  ↕ scroll: PgUp/PgDn (%d/%d)", offset, maxOffset)
+	default:
+		hints = surfaceFooterText(m.surfaceFor(), m.screen())
 	}
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color(tokens.TextDim)).
 		Width(width).
 		Render(hints)
 }
+
+// surfaceFooterText pulls the per-surface footer hint string. When a
+// surface is missing or returns an empty hint we fall back to the
+// minimal universal legend so the footer never collapses to an empty
+// strip; Tiny terminals never reach this code path because [View]
+// short-circuits there.
+func surfaceFooterText(s surface.Surface, screen views.Screen) string {
+	if s == nil {
+		return defaultGlobalFooterHint
+	}
+	hint := s.Footer(surface.Context{Screen: screen})
+	if hint.Text == "" {
+		return defaultGlobalFooterHint
+	}
+	return hint.Text
+}
+
+// defaultGlobalFooterHint is the absolute-minimum legend rendered
+// when a surface declines to publish its own. Kept short on purpose
+// so the right-edge clip on a 100-column terminal still preserves
+// the `[q]` and `[?]` cells. Surfaces that need more keys override
+// via their [surface.Surface] adapter.
+const defaultGlobalFooterHint = "  [q] quit · [?] help"
 
 // slotLabel maps a [bento.Slot] to a short, human-readable label
 // for the footer hint. Kept terse so it fits inside the existing

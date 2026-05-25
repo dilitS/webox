@@ -77,7 +77,7 @@ func TestUpdateDashboardNavigationAndDetailReturn(t *testing.T) {
 	}
 }
 
-func TestUpdateProjectDetailDisabledTabsSetAlert(t *testing.T) {
+func TestUpdateProjectDetailDisabledTabsAreSilent(t *testing.T) {
 	t.Parallel()
 
 	m := New(Options{})
@@ -88,8 +88,14 @@ func TestUpdateProjectDetailDisabledTabsSetAlert(t *testing.T) {
 		pressed := pressed
 		t.Run(pressed, func(t *testing.T) {
 			got, _ := applyMsg(t, m, key(tea.KeyRunes, pressed))
-			if got.Alert() == "" {
-				t.Fatalf("key %q should set disabled-tab alert", pressed)
+			// Sprint 20 — pressing a v0.2-only tab MUST be silent.
+			// The tab label itself already renders the
+			// "unlocked in v0.2" annotation; the previous
+			// "tab available in v0.2" alert was redundant
+			// noise that new operators mistook for a routing
+			// bug.
+			if got.Alert() != "" {
+				t.Fatalf("key %q raised alert %q, want silent ignore", pressed, got.Alert())
 			}
 			if got.State() != StateProjectDetail {
 				t.Fatalf("key %q changed state to %s", pressed, got.State())

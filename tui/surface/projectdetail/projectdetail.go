@@ -78,5 +78,11 @@ const (
 	// be a cycle: `tui` imports the surface package).
 	tabLogs = "Logs"
 
-	defaultFooterHint = "  [q] quit · [?] help · [/] command palette · [Tab] cycle panels"
+	// defaultFooterHint surfaces the keys that actually do something
+	// on the project-detail surface: tab back to the dashboard, the
+	// two implemented tabs (1 / 4), and the three project actions
+	// (restart / SSL renew / log tail). The dishonest
+	// `[/] command palette` reference is gone (no palette ships in
+	// v0.1).
+	defaultFooterHint = "  [q] quit · [?] help · [Esc/Tab] back · [1] overview · [4] logs · [r] restart · [s] ssl · [v] tail"
 )

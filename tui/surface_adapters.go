@@ -69,12 +69,17 @@ func (d dashboardSurface) Body(ctx surface.Context) string {
 // so stacking a second crumb would produce a visually noisy header.
 func (d dashboardSurface) Crumb(_ surface.Context) string { return "" }
 
-// Footer reuses the cockpit's default keybinding legend. The View
-// layer is responsible for appending the `↕ scroll …` indicator when
-// the body overflows, so we deliberately leave ScrollHint=false here.
+// Footer surfaces the keys that actually do something on the
+// dashboard: cycle scrollable panels, drill into the selected
+// project, plus the cockpit-wide quit / help affordances. Sprint 20
+// — the previous `[/] command palette` mention referred to a feature
+// that does not ship in v0.1 / v0.2; including it lied to the
+// operator and was the most-reported "feels unfinished" cue. The
+// View layer appends the `↕ scroll …` and focus suffixes on top
+// when applicable, so we leave ScrollHint=false here.
 func (d dashboardSurface) Footer(_ surface.Context) surface.FooterHint {
 	return surface.FooterHint{
-		Text: "  [q] quit · [?] help · [/] command palette · [Tab] cycle panels",
+		Text: "  [q] quit · [?] help · [Tab] cycle panels · [Right/Enter] open · [n] new · [i] import",
 	}
 }
 

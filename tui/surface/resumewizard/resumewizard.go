@@ -55,4 +55,8 @@ func (Surface) Footer(_ surface.Context) surface.FooterHint {
 //     stack capacity (≤ 16 entries; DESIGN §10.2).
 func (Surface) AcceptsScroll(_ surface.Context) bool { return false }
 
-const defaultFooterHint = "  [q] quit · [?] help · [/] command palette · [Tab] cycle panels"
+// defaultFooterHint surfaces the keys that actually drive the
+// resume-wizard decision (rollback / discard / keep + quit). The
+// dishonest `[/] command palette` reference is gone (no palette
+// ships in v0.1).
+const defaultFooterHint = "  [q] quit · [?] help · [r] rollback · [d] discard · [k] keep snapshot"

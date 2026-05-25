@@ -368,8 +368,17 @@ func TestCockpit_FocusedTileScrollsIndependentOfViewport(t *testing.T) {
 // accident (or just wants to return to global viewport scrolling)
 // MUST be able to release focus with a single `Esc`, without
 // quitting the dashboard. We verify the footer hint reverts from
-// the tile-scoped form ("focus: <name>") back to the absence of
-// that token, while the dashboard chrome stays put.
+// the tile-scoped form ("focus: <name>") back to the dashboard's
+// own chrome legend (which surfaces `[Right/Enter] open` —
+// dashboard-only, never present while a tile is focused).
+//
+// Sprint 20 — the previous needle (`[Active Projects]`) was the
+// projects-tile title which never changes between focused and
+// released frames. Bubble Tea's renderer diffs the per-line
+// content between frames and only re-emits lines that changed; so
+// after the previous WaitFor consumed the buffer, that line was
+// never re-emitted. We now needle on a footer token that *does*
+// change between modes so the wait sees fresh bytes.
 func TestCockpit_TileFocusReleasesOnEsc(t *testing.T) {
 	t.Parallel()
 
@@ -381,14 +390,14 @@ func TestCockpit_TileFocusReleasesOnEsc(t *testing.T) {
 		}
 	})
 
-	requireAllNeedles(t, tm, [][]byte{[]byte("[Active Projects]")})
+	requireAllNeedles(t, tm, [][]byte{[]byte("[Right/Enter] open")})
 
 	tm.Send(tea.KeyMsg{Type: tea.KeyTab})
 	requireAllNeedles(t, tm, [][]byte{[]byte("focus:")})
 
 	tm.Send(tea.KeyMsg{Type: tea.KeyEsc})
 
-	requireAllNeedles(t, tm, [][]byte{[]byte("[Active Projects]")})
+	requireAllNeedles(t, tm, [][]byte{[]byte("[Right/Enter] open")})
 
 	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
 	tm.WaitFinished(t, teatest.WithFinalTimeout(e2eFrameTimeout))

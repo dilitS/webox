@@ -71,10 +71,13 @@ func TestDashboardSurface_FooterAndCrumb(t *testing.T) {
 	if footer.ScrollHint {
 		t.Error("dashboard footer should not force scroll hint; View adds it dynamically")
 	}
-	for _, needle := range []string{"[q] quit", "[?] help", "[/] command palette", "[Tab] cycle panels"} {
+	for _, needle := range []string{"[q] quit", "[?] help", "[Tab] cycle panels", "[Right/Enter] open", "[n] new", "[i] import"} {
 		if !strings.Contains(footer.Text, needle) {
 			t.Errorf("footer missing %q\n--- footer ---\n%s", needle, footer.Text)
 		}
+	}
+	if strings.Contains(footer.Text, "command palette") {
+		t.Errorf("dashboard footer must not advertise unimplemented command palette\n--- footer ---\n%s", footer.Text)
 	}
 	if !s.AcceptsScroll(ctx) {
 		t.Error("dashboard surface should accept scroll (PgUp/PgDn/Mouse)")

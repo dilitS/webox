@@ -47,4 +47,8 @@ func (Surface) Footer(_ surface.Context) surface.FooterHint {
 // tile of its own.
 func (Surface) AcceptsScroll(_ surface.Context) bool { return true }
 
-const defaultFooterHint = "  [q] quit · [?] help · [/] command palette · [Tab] cycle panels"
+// defaultFooterHint surfaces the keys that actually do something on
+// the import-preview surface: bulk-import all, or back out to the
+// dashboard. The dishonest `[/] command palette` reference is gone
+// (no palette ships in v0.1).
+const defaultFooterHint = "  [q] quit · [?] help · [a] import all · [Esc] back"

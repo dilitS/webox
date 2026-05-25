@@ -96,17 +96,20 @@ func TestSurface_CrumbSwitchesPerTab(t *testing.T) {
 	}
 }
 
-func TestSurface_FooterCarriesGlobalHint(t *testing.T) {
+func TestSurface_FooterPublishesProjectDetailKeys(t *testing.T) {
 	t.Parallel()
 
 	hint := projectdetail.Surface{}.Footer(fixtureContext("Overview"))
 	if hint.ScrollHint {
 		t.Error("project detail footer must let View inject the scroll hint dynamically")
 	}
-	for _, needle := range []string{"[q] quit", "[Tab] cycle panels"} {
+	for _, needle := range []string{"[q] quit", "[Esc/Tab] back", "[1] overview", "[4] logs", "[r] restart", "[s] ssl", "[v] tail"} {
 		if !strings.Contains(hint.Text, needle) {
 			t.Errorf("footer missing %q in %q", needle, hint.Text)
 		}
+	}
+	if strings.Contains(hint.Text, "command palette") {
+		t.Errorf("project detail footer must not advertise unimplemented command palette: %q", hint.Text)
 	}
 }
 

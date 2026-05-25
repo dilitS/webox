@@ -1,14 +1,15 @@
-╔════════════════════════════════════════════════╗
-║                                                ║
-║  Terminal too small for cockpit.               ║
-║                                                ║
-║  Current viewport: 60x18                       ║
-║  Minimum size:    100x30                       ║
-║  Bento Ultra:     120x35                       ║
-║  Bento Ultra+:    160x45                       ║
-║                                                ║
-║  Resize the window, then press [r] to redraw.  ║
-║                                                ║
-║  [Tiny fallback active]                        ║
-║                                                ║
-╚════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════════╗
+║                                                          ║
+║  Terminal too small for cockpit.                         ║
+║                                                          ║
+║  Current viewport: 60x18                                 ║
+║  Minimum size:    100x30                                 ║
+║  Bento Ultra:     120x35                                 ║
+║  Bento Ultra+:    160x45                                 ║
+║                                                          ║
+║  Resize the window — the cockpit re-renders automatically. ║
+║  Press [q] or [Ctrl+C] to quit.                          ║
+║                                                          ║
+║  [Tiny fallback active]                                  ║
+║                                                          ║
+╚══════════════════════════════════════════════════════════╝
