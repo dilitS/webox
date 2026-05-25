@@ -138,35 +138,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:gocyclo // To
 const mouseWheelStep = 3
 
 // updateMouse handles mouse events surfaced by Bubble Tea's
-// `tea.WithMouseCellMotion` opt-in. As of Sprint 20 the cockpit
-// understands two button families:
+// `tea.WithMouseCellMotion` opt-in. The cockpit understands two
+// button families:
 //
 //   - **Wheel up / wheel down** — scrolls the focused tile (when one
 //     is Tab-focused) or the global body viewport (otherwise),
 //     mirroring `PgUp`/`PgDn` / `Home`/`End`. Step size is
 //     [mouseWheelStep] lines.
-//   - **Left button press** — a coarse "click-to-drill /
-//     click-to-back" affordance: clicking on the dashboard opens
-//     the currently-selected project's detail surface (`Enter`
-//     equivalent); clicking on the project detail returns to the
-//     dashboard (`Esc` equivalent). Other surfaces (wizards,
-//     resume, import, modals) ignore the click because they have
-//     their own keyboard-driven flow and a stray click would risk
-//     derailing it. While a tile is Tab-focused the click is also a
-//     no-op so the operator does not lose scroll context.
+//   - **Left button press** — layout-aware hit testing routes the
+//     click into one of three behaviours:
+//   - clicking the row Y of the Projects tile sets selectedIndex
+//     to that row AND drills into project detail.
+//   - clicking on a non-scrollable tile (Overview, Topology,
+//     Metrics) drills into project detail (mirrors Enter).
+//   - clicking on a scrollable tile (Logs, CI/CD) focuses that
+//     tile so wheel events scroll its body instead of the
+//     viewport.
+//   - clicking the project detail body returns to the dashboard.
+//   - clicking on the status bar or any region outside a slot
+//     is a no-op (chrome should be informational only).
+//   - while a tile is already Tab-focused, left-click is a no-op
+//     so the operator does not lose scroll context — Esc is the
+//     explicit release path.
 //
 // Bubble Tea v1.3+ split `MouseMsg.Type` into the orthogonal
 // `MouseAction` (press/release/motion) + `MouseButton`
 // (left/middle/wheel-up/wheel-down/…) pair. We only react to *press*
 // actions so a long mouse drag does not fire repeated jumps.
-//
-// Per-tile hit testing (clicking on a specific tile to focus it,
-// clicking on a CI/CD step to expand, etc.) is deferred to the
-// Sprint 20+ Provider Catalog work; it requires the bento engine
-// to publish a layout map keyed by slot, which is a separate
-// design problem. The current contract gives clicks meaningful
-// behaviour for the most common operator gesture without that
-// dependency.
 func (m Model) updateMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if msg.Action != tea.MouseActionPress {
 		return m, nil
@@ -188,26 +186,33 @@ func (m Model) updateMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		m.scrollViewportBy(mouseWheelStep)
 		return m, nil
 	case tea.MouseButtonLeft:
-		return m.handleLeftClick(), nil
+		return m.handleLeftClick(msg.X, msg.Y), nil
 	}
 	return m, nil
 }
 
-// handleLeftClick implements the coarse "click-to-drill /
-// click-to-back" affordance documented on [updateMouse]. It is a
-// pure model transform; all I/O stays in commands.
-func (m Model) handleLeftClick() Model {
+// handleLeftClick implements the layout-aware click router
+// documented on [updateMouse]. It is a pure model transform; all
+// I/O stays in commands.
+//
+// The dashboard branch resolves the click coordinate against
+// [Model.dashboardLayout] so the slot under the cursor decides
+// whether the cockpit drills, focuses, or stays put. Non-dashboard
+// states use coarse semantics: project detail clicks return to
+// the dashboard; wizards and modals ignore clicks because their
+// keyboard-driven flow would be derailed by stray pointer events.
+func (m Model) handleLeftClick(x, y int) Model {
 	switch m.state {
 	case StateDashboard:
 		if m.cicdModal.Open || m.hostKeyModal.Open {
 			return m
 		}
-		if len(cfgProjects(m.cfg)) == 0 {
+		layout := m.dashboardLayout()
+		slot, ok := layout.SlotAt(x, y)
+		if !ok {
 			return m
 		}
-		m.state = StateProjectDetail
-		m.activeTab = TabOverview
-		return m
+		return m.routeDashboardClick(slot, x, y, layout)
 	case StateProjectDetail:
 		if m.activeTab == TabLogs {
 			return m
@@ -216,6 +221,93 @@ func (m Model) handleLeftClick() Model {
 		return m
 	}
 	return m
+}
+
+// routeDashboardClick decides what to do once the layout map has
+// resolved a click into a [bento.Slot]. Split out from
+// [handleLeftClick] so the router stays narratable: each slot has
+// its own one-line case.
+func (m Model) routeDashboardClick(slot bento.Slot, _, y int, layout bento.LayoutMap) Model {
+	switch slot {
+	case bento.SlotProjects:
+		projects := cfgProjects(m.cfg)
+		if len(projects) == 0 {
+			return m
+		}
+		// Inside the Projects tile: skip the top border + tile
+		// header (2 chrome rows) to get the body offset, then
+		// each subsequent row maps to one project. The clamp
+		// prevents an out-of-range index when the click lands on
+		// the bottom border or the empty padding area.
+		const chromeRows = 2
+		rowOffset := y - layout.Slots[slot].Y - chromeRows
+		if rowOffset < 0 {
+			rowOffset = 0
+		}
+		if rowOffset >= len(projects) {
+			rowOffset = len(projects) - 1
+		}
+		m.selectedIndex = rowOffset
+		m.state = StateProjectDetail
+		m.activeTab = TabOverview
+		return m
+	case bento.SlotLogs, bento.SlotCICD:
+		// Scrollable tile → focus it directly. Tab cycle still
+		// works; this is the click shortcut that lets the
+		// operator pick a panel without remembering its position
+		// in the rotation.
+		if !m.slotIsScrollableInDashboard(slot) {
+			// Defensive guard: in case a future engine change
+			// reuses these slot ids for non-scrollable tiles,
+			// fall back to the drill behaviour rather than
+			// silently breaking.
+			return m.drillIntoSelectedProject()
+		}
+		focus := slot
+		m.focusedTile = &focus
+		return m
+	case bento.SlotOverview, bento.SlotTopology, bento.SlotMetrics:
+		return m.drillIntoSelectedProject()
+	}
+	return m
+}
+
+// drillIntoSelectedProject is the shared "click drilled, no row
+// selection" path. The current selectedIndex is preserved.
+func (m Model) drillIntoSelectedProject() Model {
+	if len(cfgProjects(m.cfg)) == 0 {
+		return m
+	}
+	m.state = StateProjectDetail
+	m.activeTab = TabOverview
+	return m
+}
+
+// slotIsScrollableInDashboard reports whether the dashboard frame
+// would expose `slot` as Tab-focusable (i.e. the underlying tile
+// implements [bento.ScrollableTile]). Used by
+// [routeDashboardClick] so a click on a scrollable tile lands
+// directly on focus regardless of the current Tab cycle position.
+func (m Model) slotIsScrollableInDashboard(slot bento.Slot) bool {
+	for _, tile := range m.dashboardBentoTiles() {
+		if tile.Slot() != slot {
+			continue
+		}
+		_, ok := tile.(bento.ScrollableTile)
+		return ok
+	}
+	return false
+}
+
+// dashboardLayout returns the [bento.LayoutMap] for the current
+// viewport. Computed deterministically from `m.width`, `m.height`,
+// and the active [bento.Mode] so the result tracks whatever
+// [Engine.RenderMode] would actually paint. Centralised here so
+// both the click router and any future test helper can ask for
+// the same answer without reaching into the engine themselves.
+func (m Model) dashboardLayout() bento.LayoutMap {
+	return bento.NewEngine("Webox Cockpit v0.1", nil).
+		ComputeLayout(m.width, m.height, m.BentoMode())
 }
 
 func (m Model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
