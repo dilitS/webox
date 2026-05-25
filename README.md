@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/dilitS/webox/actions/workflows/ci.yml"><img src="https://github.com/dilitS/webox/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
-  <a href="https://github.com/dilitS/webox/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-7d56f4" alt="License: MIT"></a>
+  <a href="https://github.com/dilitS/webox/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-7d56f4" alt="License: Apache-2.0"></a>
   <a href="docs/ROADMAP.md"><img src="https://img.shields.io/badge/status-docs--first%20pre--MVP-d846ef" alt="Stage: docs-first pre-MVP"></a>
   <a href="https://pkg.go.dev/github.com/dilitS/webox"><img src="https://img.shields.io/badge/go-1.25%2B-00ADD8?logo=go" alt="Go 1.25+"></a>
   <a href="docs/ROADMAP.md"><img src="https://img.shields.io/badge/v0.1-in--design-ffb800" alt="v0.1 in design"></a>
@@ -493,7 +493,7 @@ Discussion will happen in GitHub Discussions and Issues once the public reposito
 
 ## 📄 License
 
-[MIT](LICENSE) — open source from day one.
+[Apache License 2.0](LICENSE) — open source from day one, with an explicit patent grant so adapters for commercial hosting panels (cPanel LLC, DirectAdmin Inc., CyberPanel/OpenLiteSpeed) ship without legal ambiguity.
 
 ---
 

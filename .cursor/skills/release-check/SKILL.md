@@ -29,7 +29,7 @@ Task progress:
 - [ ] 12. No unresolved P0 / P1 items left in AUDIT.md
 - [ ] 13. Docs cross-references valid (no dead anchors)
 - [ ] 14. CODE_OF_CONDUCT.md present
-- [ ] 15. LICENSE present (MIT)
+- [ ] 15. LICENSE present (Apache-2.0)
 - [ ] 16. README.md last-updated badge fresh
 - [ ] 17. Homebrew tap PR drafted (post v0.1)
 - [ ] 18. Retrospective entry drafted for release
@@ -79,8 +79,8 @@ Tag must match: `git tag v0.1.0` (with `v` prefix).
 ```bash
 head -3 go.mod
 # module github.com/dilitS/webox
-# 
-# go 1.24
+#
+# go 1.25.0
 ```
 
 ### 5. Linter
@@ -171,7 +171,7 @@ Any 404 anchor must be fixed before release.
 ls CODE_OF_CONDUCT.md LICENSE
 ```
 
-Both present, MIT license.
+Both present, Apache-2.0 license (file header line 1 must read `Apache License Version 2.0, January 2004`).
 
 ### 16. README freshness
 

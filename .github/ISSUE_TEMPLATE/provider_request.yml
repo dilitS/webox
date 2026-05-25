@@ -1,0 +1,121 @@
+name: Provider request
+description: Request (or volunteer to implement) a new hosting-panel adapter
+title: "[provider]: <panel name>"
+labels: ["provider", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping Webox grow.
+
+        Webox uses a **provider pattern** ([`docs/adr/0003-provider-pattern.md`](../docs/adr/0003-provider-pattern.md)) — every hosting panel is an adapter implementing the `providers.HostingProvider` interface. Adding one usually takes **3–6 hours** if you follow [`docs/contributing/PROVIDER.md`](../docs/contributing/PROVIDER.md). The scaffolding generator (`webox provider new <name>`) gives you a working skeleton in 30 seconds.
+
+        Before submitting, please scan existing [`provider`](https://github.com/dilitS/webox/issues?q=is%3Aissue+label%3Aprovider) issues — your panel may already be tracked.
+
+  - type: input
+    id: panel-name
+    attributes:
+      label: Panel name
+      description: Marketing / common name of the hosting panel.
+      placeholder: cPanel / DirectAdmin / CyberPanel / Plesk / aaPanel / ISPmanager
+    validations:
+      required: true
+
+  - type: input
+    id: panel-vendor
+    attributes:
+      label: Vendor / homepage
+      description: Official vendor URL (so we can verify the panel is still maintained).
+      placeholder: https://cpanel.net
+    validations:
+      required: true
+
+  - type: input
+    id: api-docs
+    attributes:
+      label: Public API / CLI documentation URL
+      description: |
+        Link to the **most useful** API or CLI reference (UAPI, WHM API, panel CLI binary docs, etc.). If documentation is paywalled or requires login, write the URL anyway and mention it.
+      placeholder: https://api.docs.cpanel.net/cpanel/introduction/
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ssh
+    attributes:
+      label: SSH availability on the panel
+      description: |
+        Webox is primarily SSH-driven. Panels without SSH need either a stable HTTP API or a polite "not supported" message.
+      options:
+        - "Yes — SSH is available to end-user accounts"
+        - "Partial — SSH is available only on higher-tier plans"
+        - "No — only HTTP/CLI on the panel server"
+        - "Unknown"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: node-runtime
+    attributes:
+      label: Node.js / runtime support on the panel
+      description: |
+        Most Webox use-cases ship Vite/React/Next.js apps. Knowing this up-front saves a research round.
+      options:
+        - "Yes — Node.js LTS supported and documented"
+        - "Partial — Node.js via PassengerApps or similar"
+        - "PHP / Python / Ruby only — no Node.js"
+        - "Unknown"
+    validations:
+      required: true
+
+  - type: textarea
+    id: target-market
+    attributes:
+      label: Target market / why this panel matters
+      description: |
+        Short paragraph: who hosts on this panel, why we should prioritise it, and rough estimate of how many devs would benefit. Bonus points for citing market-share data or community size.
+      placeholder: |
+        cPanel powers ~70 percent of shared hosting in NA and EMEA. WHM is the de-facto standard for reseller hosts. Adding cPanel unlocks ~30M+ websites.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: commitment
+    attributes:
+      label: Your commitment level
+      description: |
+        Be honest — there is no wrong answer. Suggestions are valuable; implementers are gold; co-maintainers are heroes.
+      options:
+        - "Just suggesting — I won't implement, but I want this panel supported"
+        - "Want to implement — I will open a PR within 4 weeks"
+        - "Want to implement — I need pair-review / mentoring on the first PR"
+        - "Want to be a co-maintainer for this provider after the initial PR lands"
+    validations:
+      required: true
+
+  - type: input
+    id: test-account
+    attributes:
+      label: Test account availability
+      description: |
+        Optional but extremely useful. Do you have a real account on this panel that you can use to capture fixtures? You will **not** be asked to share credentials publicly — fixtures are sanitised with `scripts/sanitize-fixture.sh` first.
+      placeholder: "Yes — shared hosting on Hostinger / No / Can provide for the implementer"
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes
+      description: |
+        Anything else: known panel quirks, API rate limits, breaking version differences, similar provider already integrated by another tool, etc.
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Pre-submit checklist
+      options:
+        - label: I scanned existing [`provider`](https://github.com/dilitS/webox/issues?q=is%3Aissue+label%3Aprovider) issues and this panel is not already tracked.
+          required: true
+        - label: I read [`docs/contributing/PROVIDER.md`](../docs/contributing/PROVIDER.md) (4-hour walkthrough) if I plan to implement myself.
+          required: false
+        - label: I checked [`docs/ROADMAP.md`](../docs/ROADMAP.md) and this provider is not already on the roadmap with a different ETA.
+          required: true
