@@ -133,7 +133,8 @@ The choice is captured at sprint start in this document under "Outcome".
 ## Outcome (wypełnij po sprincie)
 
 - 📌 Path selected: **A** — full parallel (code + ops tracks both active). Maintainer chose "B and C" which functionally maps to A (the two alternatives in the path-selection menu, when both picked, equal the full-parallel scope). Recorded at sprint start 2026-05-25.
-- ✅ Done: <fill in per task>
+- ✅ Done:
+  - **TASK-21.5 (2026-05-25)** — README EN final at 58 lines (≤ 60-line cap), single H1 (`# Webox`), value proposition + install + 30-second tour pointer + static gallery link instead of the not-yet-recorded GIF. RC2 badge wired to `https://github.com/dilitS/webox/releases/tag/v0.1.0-rc2`. All 13 internal links resolve. `docs/CONTRIBUTING.md` (PL legacy) banner + linkbacks already in place since Sprint 15.
 - ⏭️ Carry-over: <task → Sprint 22 + reason>
 - 📌 Decyzje: <ADR jeśli powstał>
 - 🧠 Surprises: <co się okazało inne niż w docs>
