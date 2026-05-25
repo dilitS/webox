@@ -6,6 +6,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/dilitS/webox/presets"
 )
@@ -17,12 +18,17 @@ import (
 type presetRegistryProvider func() (*presets.Registry, error)
 
 // presetOpts collects the parsed sub-flags accepted by
-// `webox doctor preset`. Only one of {list, show, probe} is true at
-// a time — empty id with --probe falls back to "list".
+// `webox doctor preset`. {host, user, port, timeout} are populated
+// only when --probe is set; the documentation surface tolerates
+// zero values gracefully.
 type presetOpts struct {
-	id    string
-	json  bool
-	probe bool
+	id      string
+	json    bool
+	probe   bool
+	host    string
+	user    string
+	port    int
+	timeout time.Duration
 }
 
 // runPresetDoctor implements `webox doctor preset` and
@@ -64,13 +70,31 @@ func showPreset(opts presetOpts, reg *presets.Registry, stdout, stderr io.Writer
 		return exitMisuse
 	}
 	if opts.probe {
-		// Probe execution requires a live adapter (UAPI client,
-		// SSH session, etc.). The cPanel adapter (Sprint 17/18)
-		// brings the first concrete probe path; until then we
-		// surface an explicit, user-friendly stub instead of
-		// silently doing nothing.
-		fmt.Fprintln(stderr, "webox: --probe is a stub in v0.2 baseline. Live capability probes ship with the cPanel adapter (Sprint 17/18).")
-		fmt.Fprintln(stderr, "webox: showing declarative preset metadata below; re-run without --probe to silence this notice.")
+		if opts.host != "" && opts.user != "" {
+			// Live execution path: Sprint 21 TASK-21.4 wires
+			// runPresetProbe through the production SSH
+			// runner. The dispatcher (probe.go) handles
+			// formatting, exit codes, and per-probe context
+			// timeouts.
+			return runPresetProbe(
+				probeOpts{
+					id:      opts.id,
+					host:    opts.host,
+					user:    opts.user,
+					port:    opts.port,
+					timeout: opts.timeout,
+					json:    opts.json,
+				},
+				stdout, stderr,
+				func() (*presets.Registry, error) { return reg, nil },
+				newSSHProbeRunner,
+			)
+		}
+		// No --host / --user yet → surface a polite stub so
+		// the operator gets actionable expectations instead
+		// of silent metadata dumping.
+		fmt.Fprintln(stderr, "webox: --probe also requires --host=<HOST> and --user=<USER> to execute against a live panel.")
+		fmt.Fprintln(stderr, "webox: showing declarative preset metadata below; supply both flags to run probes.")
 	}
 	if opts.json {
 		return writeShowJSON(stdout, p)

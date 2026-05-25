@@ -168,20 +168,25 @@ func TestPresetDoctor_Show_NotFoundReturnsMisuse(t *testing.T) {
 	}
 }
 
-func TestPresetDoctor_ProbeIsStubInBaselineButPrintsDetails(t *testing.T) {
+func TestPresetDoctor_ProbeWithoutHostUserFallsBackToDeclarative(t *testing.T) {
 	t.Parallel()
 
+	// Sprint 21 TASK-21.4 wires live probing behind --host / --user;
+	// without those flags the command must NOT attempt SSH and MUST
+	// still print preset metadata so the operator can read the
+	// declarative info. The notice on stderr explains how to switch
+	// to live execution.
 	reg := stubRegistry(t, map[string]string{"smallhost-devil.json": stubValidPreset})
 	var stdout, stderr bytes.Buffer
 	got := runPresetDoctor(presetOpts{id: "smallhost-devil", probe: true}, &stdout, &stderr, stubProvider(reg))
 	if got != exitOK {
 		t.Fatalf("exit = %d, want 0 (stderr=%q)", got, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "stub") {
-		t.Fatalf("stderr should mention probe stub: %q", stderr.String())
+	if !strings.Contains(stderr.String(), "--host") || !strings.Contains(stderr.String(), "--user") {
+		t.Fatalf("stderr should explain how to enable live probing: %q", stderr.String())
 	}
 	if !strings.Contains(stdout.String(), "small.pl") {
-		t.Fatalf("stdout should still print preset details when --probe is requested: %q", stdout.String())
+		t.Fatalf("stdout should still print preset details when --probe is requested without host/user: %q", stdout.String())
 	}
 }
 

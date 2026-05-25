@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -16,12 +18,20 @@ import (
 	"github.com/dilitS/webox/tui"
 )
 
-// Exit codes follow the POSIX convention: 0 success, 1 general error,
-// 2 command-line misuse (unknown flag, bad arg).
+// Exit codes follow the POSIX convention: 0 success, 1 general error
+// (e.g. probe runner could not dial, registry load failed at runtime),
+// 2 command-line misuse (unknown flag, bad arg, or — for probe runs —
+// preset mismatches that still warrant a non-zero gate exit).
 const (
-	exitOK     = 0
-	exitMisuse = 2
+	exitOK      = 0
+	exitGeneric = 1
+	exitMisuse  = 2
 )
+
+// maxTCPPort caps the SSH --port value at the legal upper bound for
+// well-formed TCP. Pulled out as a constant so the parser error
+// message stays consistent with the validation logic.
+const maxTCPPort = 65535
 
 const helpText = `webox — keyboard-driven cockpit for shared-hosting deployments
 
@@ -58,9 +68,18 @@ Flags:
   --id=ID              (only with ` + "`doctor preset`" + `) show details for the
                        preset with the given id (e.g. cpanel-generic).
   --probe              (only with ` + "`doctor preset --id=ID`" + `) execute the
-                       preset's probe commands. v0.2 baseline: stub. Live
-                       probe execution lands with the cPanel adapter
-                       (Sprint 17/18).
+                       preset's probe commands over SSH (Sprint 21+). Requires
+                       --host=HOST and --user=USER. Without those flags it
+                       falls back to a documentation dump of the declarative
+                       metadata and explains how to enable live execution.
+  --host=HOST          (only with ` + "`doctor preset --probe`" + `) target host for
+                       live preset probing (e.g. --host=panel.example.com).
+  --user=USER          (only with ` + "`doctor preset --probe`" + `) SSH user for
+                       live preset probing (e.g. --user=operator).
+  --port=N             (only with ` + "`doctor preset --probe`" + `) SSH port. Defaults
+                       to the value in ~/.ssh/config when omitted (typically 22).
+  --timeout=DUR        (only with ` + "`doctor preset --probe`" + `) per-probe
+                       timeout in Go duration form (default 30s).
 
 Documentation:
   https://github.com/dilitS/webox/tree/main/docs
@@ -93,12 +112,15 @@ type opts struct {
 	providerPreset  string
 	providerDryRun  bool
 	// presetID and presetProbe are the sub-flags that target a
-	// specific preset under `webox doctor preset`. presetProbe is
-	// a stub in v0.2 baseline (live execution lands with the
-	// cPanel adapter); kept here so the parser surface stays
-	// stable when probe execution flips on.
-	presetID    string
-	presetProbe bool
+	// specific preset under `webox doctor preset`. presetProbe
+	// turns live SSH execution on; --host / --user / --port /
+	// --timeout supply the connection parameters.
+	presetID      string
+	presetProbe   bool
+	presetHost    string
+	presetUser    string
+	presetPort    int
+	presetTimeout time.Duration
 }
 
 // doctorDispatcher is the seam that lets tests run the CLI router
@@ -158,9 +180,13 @@ func runWithFullDeps(
 			return dispatchGitHub(parsed.doctorJSON, stdout, stderr)
 		case "preset":
 			return dispatchPreset(presetOpts{
-				id:    parsed.presetID,
-				json:  parsed.doctorJSON,
-				probe: parsed.presetProbe,
+				id:      parsed.presetID,
+				json:    parsed.doctorJSON,
+				probe:   parsed.presetProbe,
+				host:    parsed.presetHost,
+				user:    parsed.presetUser,
+				port:    parsed.presetPort,
+				timeout: parsed.presetTimeout,
 			}, stdout, stderr)
 		default:
 			return dispatchCore(parsed.doctorJSON, stdout, stderr)
@@ -545,7 +571,8 @@ func simpleFlagHandled(arg string) bool {
 
 // applyPrefixedFlag handles `--key=value` form options. Returns
 // non-empty `errMsg` on validation failure; otherwise "" (handled or
-// not mine — caller checks [prefixedFlagHandled]).
+// not mine — caller checks [prefixedFlagHandled]). Kept under
+// gocyclo's threshold by delegating each flag family to a helper.
 func applyPrefixedFlag(parsed *opts, arg string) string {
 	if path, ok := strings.CutPrefix(arg, "--debug-trace="); ok {
 		if path == "" {
@@ -564,23 +591,92 @@ func applyPrefixedFlag(parsed *opts, arg string) string {
 		parsed.providerPreset = preset
 		return ""
 	}
-	if id, ok := strings.CutPrefix(arg, "--id="); ok {
-		if parsed.doctorTarget != "preset" {
-			return "webox: --id is only valid with `webox doctor preset`."
-		}
-		if id == "" {
-			return "webox: --id requires a value (e.g. --id=cpanel-generic)."
-		}
-		parsed.presetID = id
-		return ""
+	if msg, handled := applyPresetIDFlag(parsed, arg); handled {
+		return msg
+	}
+	if msg, handled := applyPresetProbeFlag(parsed, arg); handled {
+		return msg
 	}
 	return ""
+}
+
+// applyPresetIDFlag handles --id=ID for the preset subcommand.
+// Returns (errMsg, handled). `handled=true` means caller should
+// stop scanning further prefix matchers.
+func applyPresetIDFlag(parsed *opts, arg string) (string, bool) {
+	id, ok := strings.CutPrefix(arg, "--id=")
+	if !ok {
+		return "", false
+	}
+	if parsed.doctorTarget != "preset" {
+		return "webox: --id is only valid with `webox doctor preset`.", true
+	}
+	if id == "" {
+		return "webox: --id requires a value (e.g. --id=cpanel-generic).", true
+	}
+	parsed.presetID = id
+	return "", true
+}
+
+// applyPresetProbeFlag handles the four flags that parameterise a
+// live `doctor preset --probe` run: --host, --user, --port, --timeout.
+// Each one independently asserts that the doctor target is "preset"
+// so the parser surfaces a focused error message when an operator
+// types --host before --preset.
+func applyPresetProbeFlag(parsed *opts, arg string) (string, bool) {
+	if host, ok := strings.CutPrefix(arg, "--host="); ok {
+		if parsed.doctorTarget != "preset" {
+			return "webox: --host is only valid with `webox doctor preset --probe`.", true
+		}
+		if host == "" {
+			return "webox: --host requires a value (e.g. --host=panel.example.com).", true
+		}
+		parsed.presetHost = host
+		return "", true
+	}
+	if user, ok := strings.CutPrefix(arg, "--user="); ok {
+		if parsed.doctorTarget != "preset" {
+			return "webox: --user is only valid with `webox doctor preset --probe`.", true
+		}
+		if user == "" {
+			return "webox: --user requires a value (e.g. --user=operator).", true
+		}
+		parsed.presetUser = user
+		return "", true
+	}
+	if portStr, ok := strings.CutPrefix(arg, "--port="); ok {
+		if parsed.doctorTarget != "preset" {
+			return "webox: --port is only valid with `webox doctor preset --probe`.", true
+		}
+		port, err := strconv.Atoi(portStr)
+		if err != nil || port <= 0 || port > maxTCPPort {
+			return fmt.Sprintf("webox: --port=%q must be a positive integer <= %d.", portStr, maxTCPPort), true
+		}
+		parsed.presetPort = port
+		return "", true
+	}
+	if timeoutStr, ok := strings.CutPrefix(arg, "--timeout="); ok {
+		if parsed.doctorTarget != "preset" {
+			return "webox: --timeout is only valid with `webox doctor preset --probe`.", true
+		}
+		dur, err := time.ParseDuration(timeoutStr)
+		if err != nil || dur <= 0 {
+			return fmt.Sprintf("webox: --timeout=%q must be a positive Go duration (e.g. 5s, 1m).", timeoutStr), true
+		}
+		parsed.presetTimeout = dur
+		return "", true
+	}
+	return "", false
 }
 
 func prefixedFlagHandled(arg string) bool {
 	return strings.HasPrefix(arg, "--debug-trace=") ||
 		strings.HasPrefix(arg, "--preset=") ||
-		strings.HasPrefix(arg, "--id=")
+		strings.HasPrefix(arg, "--id=") ||
+		strings.HasPrefix(arg, "--host=") ||
+		strings.HasPrefix(arg, "--user=") ||
+		strings.HasPrefix(arg, "--port=") ||
+		strings.HasPrefix(arg, "--timeout=")
 }
 
 // postParseValidation enforces cross-flag invariants that cannot be
