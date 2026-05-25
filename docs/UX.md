@@ -11,6 +11,8 @@
 UX/UI Webox wkracza w generację **2026/2027** jako zintegrowany **Terminal Cockpit klasy premium**. **MVP (v0.1)** po [ADR-0007](./adr/0007-bento-ultra-eskalacja-mvp.md) dostarcza **pełną siatkę Bento-Box Grid (`120×35`)** z adaptive layout (fallback do `100×30` Standard Cockpit dla mniejszych terminali), **Live Log Stream** (§4.3 Tab [4]), **Live Service Topology Map** (§3.4), GitHub Actions live panel i server metrics header bar. 🔶 **STRETCH (v0.2+)** zostają: **Bento Ultra+ (`≥ 160×45`)** z dodatkowymi kafelkami (multi-server agregator, TTL panels), **Sound Engine** (§12), **`/env` Merger** (§9.3) i **fast-chord bindings**. Tradycyjny, liniowy kreator zastępujemy **Self-Healing Wizardem** prezentującym wizualny graf zależności z opcją chirurgicznego wznawiania i korekcji błędów na żywo — to **w MVP**, ale jako liniowy step-by-step z prostym LIFO rollback (graf jako wizualizacja, **nie** DAG-based engine — patrz [DESIGN §10](./DESIGN.md#10-dag-based-transactional-engine-wznawialny-rollback)).
 
 > **Konwencja scope w tym dokumencie:** `🔵 MVP (v0.1)` = w zakresie pierwszego release'u. `🔶 STRETCH (v0.2+)` = zaprojektowane, ale **niezimplementowane** w MVP. Patrz [ROADMAP §3.3](./ROADMAP.md#33-czego-nie-ma-w-mvp).
+>
+> **Konwencja mockupów:** Wszystkie nazwy domen, profili, użytkowników i wartości env w mockupach ASCII (`s1.small.pl`, `biuromody`, `sui.biuromody.smallhost.pl`, `mysql://biuro_local:secPassword@…`, etc.) są **fikcyjne i ilustracyjne** — pochodzą z pierwotnego dogfooding setupu autora i służą tylko jako wzorzec wizualny. Zastępując je dla własnych testów używaj swojego profilu / aliasu / hosta. Żadne z tych wartości nie reprezentują działającego credentialu.
 
 ---
 

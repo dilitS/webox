@@ -277,7 +277,7 @@ Pełna analiza w [UX.md §5](./UX.md#5-wymagania-terminala).
 
 ### 12.1 Model dystrybucji
 
-**Decyzja:** open-source od dnia 1, licencja **MIT**. Powód: ekosystem TUI Charm/Bubble Tea jest open-source i tylko publiczne repo umożliwia community-provided providery.
+**Decyzja:** open-source od dnia 1, licencja **Apache-2.0** (zmiana z MIT, 2026-05-25 — patrz `CHANGELOG.md`). Powód MIT → Apache: explicit patent grant pozwala bezpiecznie pisać adaptery do paneli komercyjnych (cPanel LLC, DirectAdmin Inc., CyberPanel/OpenLiteSpeed). Powód open-source vs. closed: ekosystem TUI Charm/Bubble Tea jest open-source i tylko publiczne repo umożliwia community-provided providery.
 
 ### 12.2 Monetyzacja
 

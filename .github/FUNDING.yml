@@ -1,0 +1,15 @@
+# Webox funding configuration
+#
+# Webox is solo-maintained, MIT→Apache-2.0 open source, and will stay
+# free forever. These links are entirely optional. Sponsorship buys
+# the maintainer time to add more hosting-panel adapters (cPanel,
+# DirectAdmin, CyberPanel) — but every adapter ships free for everyone.
+#
+# Status: placeholders only. Real handles will be wired up before the
+# v0.1.0 public launch — see Sprint 16 (`docs/sprints/sprint-16-*.md`).
+# Until then GitHub will hide entries with empty values, which is the
+# behaviour we want (no broken Sponsor button on the repo page).
+
+github: []          # e.g. ["dilitS"] once GitHub Sponsors is enabled.
+ko_fi:              # e.g. "dilits"  (no leading @, no URL).
+custom: []          # e.g. ["https://buymeacoffee.com/dilits"] for non-GH platforms.

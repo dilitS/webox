@@ -70,11 +70,11 @@ make vulncheck      # govulncheck ./...
 
 ### 1.4 Konto testowe small.pl (opcjonalne)
 
-Do uruchomienia integration tests z realnym kontem hostingowym ustaw:
+Do uruchomienia integration tests z realnym kontem hostingowym ustaw (wartości poniżej są **placeholderami** — podstaw własne dane konta testowego, nigdy nie commituj swoich wartości do repo):
 
 ```bash
-export WEBOX_TEST_HOST=s1.small.pl
-export WEBOX_TEST_USER=<twój login testowy>
+export WEBOX_TEST_HOST=<your-test-host.example.com>
+export WEBOX_TEST_USER=<your-test-login>
 export WEBOX_TEST_KEY=~/.ssh/id_ed25519_webox_test
 ```
 
