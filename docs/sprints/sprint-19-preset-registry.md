@@ -106,19 +106,38 @@ Scope sprint 19:
 
 ---
 
-## Outcome (wypełnij po sprincie)
+## Outcome — 2026-05-25 (out-of-cadence early delivery)
 
-- ✅ Done: ...
-- 📌 Decyzje: ADR-0008 ratified: TAK / NIE. v0.2.0 final czy rc2: ...
-- 🧠 Surprises: ...
-- 📊 Metryki:
-  - Preset registry coverage: ?
-  - Provider Catalog UX testing (3rd party): ?
-  - Probe latency P95: ?
-- ➡️ Następny sprint: `sprint-20-plus-options.md` (decyzja)
+> Sprint 19 wykonany **przed** Sprintem 16/17/18, jako autonomiczna sesja (operator śpi). Decyzja: kod-heavy fundament Preset Registry można w pełni dostarczyć bez żywego konta cPanel — żywe probes są stub'owane do Sprint 17/18. Cała powierzchnia non-TUI gotowa, **TUI Provider Catalog (TASK-19.4) świadomie odroczone do Sprint 20+** żeby nie ryzykować regresji w `teatest` goldenach poza godzinami operatora.
+
+- ✅ **Done:**
+  - **ADR-0008** — embedded `go:embed` (nie URL, nie filesystem), strict JSON Schema (Draft 2020-12), singleton API z DI seam.
+  - **JSON Schema v1** (`assets/provider-presets/schema.json`) — `$id: https://webox.dev/schema/provider-presets/v1.json`. `additionalProperties: false`, regex pattern dla `id` / `provider_type` / paths / probes (zakaz shell metacharacters w probach).
+  - **`presets/` package** — `Preset`, `Capabilities`, `Paths`, `Verified` types z deterministycznymi helperami (`Region()`, `CapabilityBadges()`); validator + secret tripwire (GitHub tokens, OpenAI keys, AWS access keys, PEM PRIVATE KEY blocks); `embed.FS` loader z skip-on-error semantics; runtime `Registry` z `sync.RWMutex` + singleton via `sync.Once`. Coverage **88.1 %** (≥ 85 % AC). Race tests + concurrency goroutine smoke pass.
+  - **6 initial presets** (zamiast planowanych 3): `smallhost-devil` (verified), `mock` (verified), `cpanel-generic` (research), `cpanel-cloudlinux-selector` (research), `directadmin-generic` (research), `cyberpanel-generic` (research).
+  - **`webox doctor preset` CLI** — list (text + `--json`), show (`--id=ID`), `--probe` jako stub z explicit komunikatem o Sprint 17/18 jako live-probe milestone. 11 nowych testów w `cmd/webox/preset_test.go`.
+  - **`docs/contributing/PRESET.md`** — 1-godzinny walkthrough dla nie-Go-developerów (capture host facts → fill JSON → validate → optional fixtures → PR).
+  - **CHANGELOG `[Unreleased]`** — szczegółowe wpisy w sekcji Added.
+- ⏭️ **Świadomie odroczone:**
+  - **TASK-19.4 TUI Provider Catalog** — wymaga `tui/surface/providercatalog/` + golden refresh dla 4-5 `teatest` scenariuszy + integracja z `wizard`. Sprint 20+ kiedy operator dostępny do akceptacji wizualnej regresji.
+  - **TASK-19.5 live capability probes** — czeka na cPanel adapter (Sprint 17/18) który ma już metody do wykonania `uapi --output=json Version get_version`. Stub z grzeczną wiadomością wystarczy do ekspozycji powierzchni CLI.
+  - **TASK-19.9 v0.2.0 GA decision** — bez Sprintów 17/18 (cPanel adapter), v0.2.0 nie jest cuttable, więc decyzja przenosi się tam.
+- 📌 **Decyzje:** ADR-0008 ratified: **TAK**. v0.2.0 final czy rc2: **decyzja przesunięta do Sprint 18 retro** (cPanel adapter musi być najpierw kompletny). Preset registry shippuje w ramach v0.2.0 single-cut.
+- 🧠 **Surprises:**
+  - **`assets/` package już istniał** dla landing assets — czyste rozdzielenie `embed.FS` na poziomie `assets/provider_presets.go` (a nie `presets/embed.go`) pojawiło się naturalnie i utrzymuje wszystkie `go:embed` w jednym miejscu pakietowym. Mała wygrana architekturalna.
+  - **`golangci-lint` mnd alarmował na `statusRank` switch** zwracający `0..5`. Naprawione przez `const rankVerified = 0; rankCandidate = 1; ...` — efekt uboczny: czytelniejszy `Sort` w testach (`statusRank(StatusVerified) == rankVerified`).
+  - **Konwencja `--key=value` jest twarda** — pierwszy smoke test próbował `--id smallhost-devil` (z spacją) i to nie działa, bo parser `webox` używa `strings.CutPrefix("--id=")`. Zgodne z istniejącymi `--debug-trace=PATH` i `--preset=ID`. Documented w `webox --help` przykładach.
+- 📊 **Metryki:**
+  - **Preset registry coverage:** **88.1 %** (cel 85 %). Brakujące 12 % to error branches w `loader.go` które trafiają fs-edge cases (np. plik `.json` który nie jest plikiem) — tryb defensywny zachowany, ale cost/benefit testowania symlink hell zbyt wysoki.
+  - **Provider Catalog UX testing (3rd party):** N/A (TASK-19.4 odroczony).
+  - **Probe latency P95:** N/A (live probes odroczone do Sprint 17/18).
+  - **Liczba initial presets:** 6 (planowane 3 → +100 % przez dodanie `mock`, `cpanel-cloudlinux-selector`, `directadmin-generic`, `cyberpanel-generic` jako research-tier seedów).
+  - **`make ci`:** zielony (lint 0 issues, race-tests 100 %, coverage 80.8 % global, govulncheck 0 vuln, build OK).
+  - **`make bench-check`:** zielony (worst 202 290 ns/op ≤ 5 000 000 budżetu).
+- ➡️ **Następny sprint:** **Sprint 16** (Public Launch, operator-time) lub **Sprint 17** (cPanel Adapter MVP part 1) — wybór operatora po przebudzeniu. TUI Provider Catalog (TASK-19.4) zostaje w `sprint-20-plus-options.md` jako wariant **D: Provider Catalog Polish** post-cPanel.
 
 ---
 
 ## Retro Link
 
-`docs/retros/<data>-sprint-19.md`
+[`docs/retros/2026-05-25-sprint-19.md`](../retros/2026-05-25-sprint-19.md)
