@@ -17,6 +17,15 @@ For the *why* behind larger architectural shifts, read the corresponding [ADR](.
 
 ### Changed
 
+- **Sprint 15 — 5 launch-day `good-first-issue` body drafts (TASK-15.6, 2026-05-25).** `.github/issue-drafts/` now holds five maintainer-approved issue bodies ready for `gh issue create --body-file …`:
+  1. **cPanel UAPI skeleton** (🟢 mainstream · 4-8 h · `good-first-issue` `help wanted` `provider`).
+  2. **DirectAdmin skeleton** (🟡 mixed API · 4-6 h · `good-first-issue` `help wanted` `provider`).
+  3. **CyberPanel API research** (🔴 root concerns · 2-3 h · `help wanted` `provider` `research`).
+  4. **Next.js scaffolding template** (🟢 starter · 1-2 h · `good-first-issue` `help wanted` `documentation`).
+  5. **German (DE) translation** (🟢 no-code · 1 h · `good-first-issue` `help wanted` `documentation`).
+
+  Every body has a difficulty badge, estimated time, "maintainer pair-review available" promise, 30-second start command, explicit acceptance criteria, a "what we will NOT accept" guardrail block, and useful references. `create-all.sh` ships all five sequentially (gh label-attach is rate-limited under concurrency), skips already-open issues with the same title, supports `--dry-run` and `--continue-from <N>`, and prints the required label-create commands. The five issues are the **public scoreboard for the v0.1.0 launch** — closed issues will be the visible social proof in Sprint 16.
+
 - **Sprint 15 — README.md rewritten as v0.1 launch landing (TASK-15.1, 2026-05-25).** The repo's front page now follows the conversion structure from `docs/sprints/sprint-15-launch-readiness.md` TASK-15.1: Hero (badges + demo links) → **Why Webox** (one paragraph, magnet words `cPanel` / `DirectAdmin` / `shared hosting` / `Node.js` / `terminal`) → **Try it in 30 seconds** (`git clone && make build && ./bin/webox --mock`, no SSH, no config) → **What you can do today** (one verified provider, 8 implemented capabilities) → **Add your hosting in 4 hours** (`webox provider new` demo + 4-preset matrix + 4-hour walkthrough link + explicit pair-review promise) → **Architecture highlights** (Provider Pattern, MVU Bubble Tea, SSH pool + SWR, keyring + AES-GCM, atomic config + 80 % coverage) → **Status & roadmap** (small.pl v0.1 → cPanel v0.2 → DirectAdmin v0.3) → **Contributing** (3 paths + guardrail summary) → **License & credits** (Apache-2.0 + Charmbracelet + small.pl + Go ecosystem ack). All 22 links absolute so the README works in forks. 136 lines vs. previous 506 — strict adherence to "no testimonials, no `go install`, no >10 feature list" from the AC. Demo + screenshot embeds reference the recorder-script READMEs so the page remains clean before the operator records the canonical `demo.cast` and `dashboard.png` for v0.1.0 GA.
 
 ### Added
