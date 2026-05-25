@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://webox.dev/schema/provider-presets/v1.json",
+  "title": "Webox Provider Preset (v1)",
+  "description": "Schema for Webox provider presets. A preset is a host-specific configuration bundle that augments a hosting-panel adapter (provider_type) with concrete runtime, paths, restart strategy, SSL strategy, probe commands, known risks, and verification metadata. See docs/providers/preconfiguration-vision.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "display_name",
+    "provider_type",
+    "status",
+    "panel",
+    "capabilities",
+    "paths"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Preset schema version. Hard-coded to 1 in v0.2 baseline; bumped only via ADR + migration tool."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "minLength": 3,
+      "maxLength": 64,
+      "description": "Stable preset identifier. Lowercase ASCII, dash-separated, e.g. 'cpanel-generic', 'smallhost-devil', 'directadmin-hitme-pl'. Used as filename stem in assets/provider-presets/<id>.json."
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128,
+      "description": "Human-readable label shown in TUI Provider Catalog and CLI."
+    },
+    "provider_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,30}$",
+      "description": "The HostingProvider adapter type this preset binds to. Must match an adapter registered in providers/. Current: smallhost, mock; v0.2+: cpanel, directadmin, cyberpanel."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["research", "candidate", "verified", "deprecated", "community"],
+      "description": "Preset lifecycle status. See preconfiguration-vision.md §8.1: research (public sources only), candidate (test account, partial fixtures), verified (full fixtures + manual checklist), deprecated (panel/runtime changed), community (external maintainer)."
+    },
+    "markets": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z]{2,3}|global$",
+        "maxLength": 16
+      },
+      "uniqueItems": true,
+      "maxItems": 16,
+      "description": "ISO-3166 alpha-2/alpha-3 country codes or 'global'. Used by Provider Catalog regional grouping."
+    },
+    "panel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "api"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 64,
+          "description": "Vendor-facing panel name, e.g. 'cPanel', 'DirectAdmin', 'CyberPanel', 'Devil'."
+        },
+        "api": {
+          "type": "string",
+          "enum": ["uapi", "directadmin_api", "cyberpanel_cli", "devil_cli", "ssh_only", "none"],
+          "description": "Primary control-plane protocol. ssh_only = no panel API, all operations through SSH commands."
+        },
+        "api_port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "TCP port for panel API endpoint. Optional when api=ssh_only or none."
+        },
+        "ssh_required": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether the preset assumes SSH access. Webox always prefers SSH for tail/restart, but some panels expose enough via API alone."
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_runtime", "restart_method", "ssl_provider", "database_engines"],
+      "properties": {
+        "node_runtime": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{2,40}$",
+          "description": "Node.js runtime mechanism. Common values: passenger, cloudlinux_selector, application_manager, nginx_unit, pm2, systemd_user, manual_pm2, nodecyber, devil, static_only, unknown."
+        },
+        "restart_method": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,40}$",
+          "description": "How Webox restarts the application. Common values: passenger, pm2, systemd, devil, ssh_signal, none, dangerous_global."
+        },
+        "ssl_provider": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,40}$",
+          "description": "SSL issuance mechanism. Common values: autossl, letsencrypt, devil, manual, none."
+        },
+        "database_engines": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["mysql", "mariadb", "postgresql", "sqlite", "none"]
+          },
+          "uniqueItems": true,
+          "maxItems": 8
+        },
+        "git_available": {"type": "boolean", "default": false},
+        "sftp_available": {"type": "boolean", "default": false},
+        "logs_path_known": {"type": "boolean", "default": false},
+        "safe_restart": {
+          "type": "boolean",
+          "default": false,
+          "description": "True when restart only affects this app (Passenger restart-app, pm2 reload). False when restart is server-wide (OLS reload). Drives the 'Safe Restart' badge in Provider Catalog."
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deploy_path_template", "log_path_template"],
+      "properties": {
+        "deploy_path_template": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_/.{}\\-]+$",
+          "description": "Filesystem path template for the deploy target. Placeholders: {{user}}, {{app_root}}, {{domain}}. No shell metacharacters."
+        },
+        "log_path_template": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_/.{}\\-]+$"
+        },
+        "env_path_template": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_/.{}\\-]+$"
+        },
+        "node_versions_path": {
+          "type": "string",
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_/.{}\\-]+$"
+        }
+      }
+    },
+    "probes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256,
+        "pattern": "^[A-Za-z0-9 _\\-./{}=:]+$"
+      },
+      "maxItems": 32,
+      "uniqueItems": true,
+      "description": "Documentation-only probe commands. NOT executed in v0.2 baseline; future probe execution (Sprint 17/18+) uses an explicit allowlist + exec.Command with separate args, never sh -c. Pattern excludes shell metacharacters (;, |, &, $, `, >, <)."
+    },
+    "known_risks": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 4,
+        "maxLength": 256
+      },
+      "maxItems": 32,
+      "uniqueItems": true,
+      "description": "Free-form English notes about edge cases, hoster-specific gotchas, or capability disablement. Surfaces in Provider Catalog detail panel."
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri",
+        "pattern": "^https://",
+        "maxLength": 512
+      },
+      "maxItems": 16,
+      "uniqueItems": true,
+      "description": "Public documentation references. HTTPS-only. No tracking URLs."
+    },
+    "verified": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fixture_dir": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^([a-z][a-z0-9_/-]*)?$",
+          "description": "Path inside testing/fixtures/ where this preset's fixtures live. Empty for status=research."
+        },
+        "last_verified_at": {
+          "type": "string",
+          "maxLength": 32,
+          "pattern": "^([0-9]{4}-[0-9]{2}-[0-9]{2})?$",
+          "description": "ISO-8601 date of last manual verification (YYYY-MM-DD). Empty for status=research."
+        },
+        "verified_by": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^([@a-zA-Z0-9_./-]*)?$",
+          "description": "GitHub handle or external maintainer attribution. Empty for status=research."
+        }
+      }
+    }
+  }
+}

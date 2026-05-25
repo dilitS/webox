@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "id": "cpanel-cloudlinux-selector",
+  "display_name": "cPanel + CloudLinux Node.js Selector",
+  "provider_type": "cpanel",
+  "status": "research",
+  "markets": ["global"],
+  "panel": {
+    "name": "cPanel",
+    "api": "uapi",
+    "api_port": 2083,
+    "ssh_required": true
+  },
+  "capabilities": {
+    "node_runtime": "cloudlinux_selector",
+    "restart_method": "passenger",
+    "ssl_provider": "autossl",
+    "database_engines": ["mysql"],
+    "git_available": true,
+    "sftp_available": true,
+    "logs_path_known": true,
+    "safe_restart": true
+  },
+  "paths": {
+    "deploy_path_template": "/home/{{user}}/nodejs/{{app_root}}/public",
+    "log_path_template": "/home/{{user}}/nodejs/{{app_root}}/logs",
+    "env_path_template": "/home/{{user}}/nodejs/{{app_root}}/.env"
+  },
+  "probes": [
+    "command -v cloudlinux-selector",
+    "command -v selectorctl",
+    "command -v nodejs_selector",
+    "uapi --output=json Version get_version",
+    "uapi --output=json PassengerApps list_applications"
+  ],
+  "known_risks": [
+    "Selector tooling differs across hosts: cloudlinux-selector vs selectorctl vs nodejs_selector.",
+    "Restart often goes through Passenger even when Selector is the runtime owner; verify per-host.",
+    "Some hosters expose Application Manager AND Node.js Selector with overlapping app paths."
+  ],
+  "sources": [
+    "https://cloudlinux.com/getting-started-with-cloudlinux-os/42-profitability-and-php-features/959-nodejs-selector/",
+    "https://api.docs.cpanel.net/specifications/cpanel.openapi"
+  ],
+  "verified": {}
+}

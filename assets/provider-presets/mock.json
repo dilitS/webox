@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "id": "mock",
+  "display_name": "Mock provider (deterministic seed for --mock UI)",
+  "provider_type": "mock",
+  "status": "verified",
+  "markets": ["global"],
+  "panel": {
+    "name": "Mock",
+    "api": "none",
+    "ssh_required": false
+  },
+  "capabilities": {
+    "node_runtime": "static_only",
+    "restart_method": "none",
+    "ssl_provider": "none",
+    "database_engines": ["none"],
+    "git_available": false,
+    "sftp_available": false,
+    "logs_path_known": true,
+    "safe_restart": true
+  },
+  "paths": {
+    "deploy_path_template": "/mock/{{user}}/{{domain}}/public",
+    "log_path_template": "/mock/{{user}}/{{domain}}/logs"
+  },
+  "probes": [
+    "echo mock-probe-ok"
+  ],
+  "known_risks": [
+    "Mock provider is for screenshots and offline UI iteration only; never connects to real hosts."
+  ],
+  "sources": [],
+  "verified": {
+    "fixture_dir": "providers/mock",
+    "last_verified_at": "2026-05-25",
+    "verified_by": "@maintainer"
+  }
+}
