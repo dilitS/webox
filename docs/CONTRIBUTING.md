@@ -1,6 +1,8 @@
-# Webox — Contributing Guide
+# Webox — Contributing Guide (PL detailed reference)
 
-> Status: Draft · Ostatnia aktualizacja: 2026-05-22 · Właściciel: @maintainer
+> Status: Draft · Ostatnia aktualizacja: 2026-05-25 · Właściciel: @maintainer
+>
+> **This is the legacy detailed PL guide.** For the 5-minute EN on-ramp see [../CONTRIBUTING.md](../CONTRIBUTING.md) (root). Both files stay in sync; this one keeps the deep workflow, audit links, sprint cadence, and PL community context.
 >
 > Pokrewne dokumenty: [DESIGN.md](./DESIGN.md), [TESTING.md](./TESTING.md), [SECURITY.md](./SECURITY.md), [providers/smallhost.md](./providers/smallhost.md).
 
