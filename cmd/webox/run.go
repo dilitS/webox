@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -16,12 +18,20 @@ import (
 	"github.com/dilitS/webox/tui"
 )
 
-// Exit codes follow the POSIX convention: 0 success, 1 general error,
-// 2 command-line misuse (unknown flag, bad arg).
+// Exit codes follow the POSIX convention: 0 success, 1 general error
+// (e.g. probe runner could not dial, registry load failed at runtime),
+// 2 command-line misuse (unknown flag, bad arg, or — for probe runs —
+// preset mismatches that still warrant a non-zero gate exit).
 const (
-	exitOK     = 0
-	exitMisuse = 2
+	exitOK      = 0
+	exitGeneric = 1
+	exitMisuse  = 2
 )
+
+// maxTCPPort caps the SSH --port value at the legal upper bound for
+// well-formed TCP. Pulled out as a constant so the parser error
+// message stays consistent with the validation logic.
+const maxTCPPort = 65535
 
 const helpText = `webox — keyboard-driven cockpit for shared-hosting deployments
 
@@ -34,6 +44,7 @@ Usage:
   webox doctor github --json             run GitHub integration diagnostics as JSON
   webox doctor preset                    list all embedded provider presets
   webox doctor preset --id=ID            show preset details (use --json for machine output)
+  webox doctor cpanel --host=H --user=U  read-only cPanel diagnostics (UAPI + SSH fallback)
   webox provider new <name> [--preset=PRESET] scaffold a new hosting provider adapter
   webox --version                        print build metadata and exit
   webox --help                           print this help and exit
@@ -58,9 +69,28 @@ Flags:
   --id=ID              (only with ` + "`doctor preset`" + `) show details for the
                        preset with the given id (e.g. cpanel-generic).
   --probe              (only with ` + "`doctor preset --id=ID`" + `) execute the
-                       preset's probe commands. v0.2 baseline: stub. Live
-                       probe execution lands with the cPanel adapter
-                       (Sprint 17/18).
+                       preset's probe commands over SSH (Sprint 21+). Requires
+                       --host=HOST and --user=USER. Without those flags it
+                       falls back to a documentation dump of the declarative
+                       metadata and explains how to enable live execution.
+  --host=HOST          (with ` + "`doctor preset --probe`" + ` or ` + "`doctor cpanel`" + `) target
+                       host (e.g. --host=panel.example.com).
+  --user=USER          (with ` + "`doctor preset --probe`" + ` or ` + "`doctor cpanel`" + `) login
+                       user (e.g. --user=operator).
+  --port=N             (with ` + "`doctor preset --probe`" + `) SSH port. Defaults to the
+                       value in ~/.ssh/config when omitted (typically 22).
+  --timeout=DUR        (with ` + "`doctor preset --probe`" + ` or ` + "`doctor cpanel`" + `) per-call
+                       timeout in Go duration form (default 30s).
+  --token=TOKEN        (only with ` + "`doctor cpanel`" + `) cPanel UAPI access token
+                       (https://manage2.cpanel.net/account/api_token). When
+                       absent the HTTPS UAPI path is disabled and ` + "`doctor cpanel`" + `
+                       runs SSH-only.
+  --api-port=N         (only with ` + "`doctor cpanel`" + `) HTTPS UAPI port (default 2083).
+  --ssh-port=N         (only with ` + "`doctor cpanel`" + `) SSH port (default 22).
+  --no-ssh             (only with ` + "`doctor cpanel`" + `) disable the SSH fallback.
+                       Requires --token. Useful for verifying UAPI-only setups.
+  --no-uapi            (only with ` + "`doctor cpanel`" + `) disable the HTTPS UAPI path.
+                       Forces every check through SSH.
 
 Documentation:
   https://github.com/dilitS/webox/tree/main/docs
@@ -77,7 +107,7 @@ type opts struct {
 	mock         bool
 	doctor       bool
 	doctorJSON   bool
-	doctorTarget string // "" | "github" | "preset"
+	doctorTarget string // "" | "github" | "preset" | "cpanel"
 	// debugTracePath, when non-empty, instructs the launcher to open
 	// a [telemetry.FileSink] at the given path and route cockpit /
 	// SSH / doctor events into it. Empty value keeps the default
@@ -93,12 +123,24 @@ type opts struct {
 	providerPreset  string
 	providerDryRun  bool
 	// presetID and presetProbe are the sub-flags that target a
-	// specific preset under `webox doctor preset`. presetProbe is
-	// a stub in v0.2 baseline (live execution lands with the
-	// cPanel adapter); kept here so the parser surface stays
-	// stable when probe execution flips on.
-	presetID    string
-	presetProbe bool
+	// specific preset under `webox doctor preset`. presetProbe
+	// turns live SSH execution on; --host / --user / --port /
+	// --timeout supply the connection parameters.
+	presetID      string
+	presetProbe   bool
+	presetHost    string
+	presetUser    string
+	presetPort    int
+	presetTimeout time.Duration
+	// cpanel* fields scope to `webox doctor cpanel`. token feeds
+	// the UAPI HTTPS path; apiPort defaults to 2083, sshPort to
+	// 22 when absent. noSSH / noUAPI let operators force a
+	// single transport (useful for debugging which side breaks).
+	cpanelToken   string
+	cpanelAPIPort int
+	cpanelSSHPort int
+	cpanelNoSSH   bool
+	cpanelNoUAPI  bool
 }
 
 // doctorDispatcher is the seam that lets tests run the CLI router
@@ -108,13 +150,15 @@ type doctorDispatcher func(jsonOutput bool, stdout, stderr io.Writer) int
 
 type presetDispatcher func(opts presetOpts, stdout, stderr io.Writer) int
 
+type cpanelDispatcher func(opts cpanelOpts, stdout, stderr io.Writer) int
+
 type tuiDispatcher func(stdout, stderr io.Writer) int
 
 // Run dispatches the command implied by args (without the program name)
 // and returns the process exit code. Output is written to the supplied
 // writers so tests can capture it without touching os.Stdout/os.Stderr.
 func Run(args []string, stdout, stderr io.Writer) int {
-	return runWithFullDeps(args, stdout, stderr, runDoctor, runDoctorGitHub, defaultPresetDispatcher, runTUI)
+	return runWithFullDeps(args, stdout, stderr, runDoctor, runDoctorGitHub, defaultPresetDispatcher, runDoctorCpanel, runTUI)
 }
 
 // runWithDeps preserves the legacy two-dispatcher seam used by existing
@@ -127,7 +171,7 @@ func runWithDeps(
 	dispatch doctorDispatcher,
 	startTUI tuiDispatcher,
 ) int {
-	return runWithFullDeps(args, stdout, stderr, dispatch, runDoctorGitHub, defaultPresetDispatcher, startTUI)
+	return runWithFullDeps(args, stdout, stderr, dispatch, runDoctorGitHub, defaultPresetDispatcher, runDoctorCpanel, startTUI)
 }
 
 func runWithFullDeps(
@@ -137,6 +181,7 @@ func runWithFullDeps(
 	dispatchCore doctorDispatcher,
 	dispatchGitHub doctorDispatcher,
 	dispatchPreset presetDispatcher,
+	dispatchCpanel cpanelDispatcher,
 	startTUI tuiDispatcher,
 ) int {
 	parsed, errMsg := parseArgs(args)
@@ -158,9 +203,25 @@ func runWithFullDeps(
 			return dispatchGitHub(parsed.doctorJSON, stdout, stderr)
 		case "preset":
 			return dispatchPreset(presetOpts{
-				id:    parsed.presetID,
-				json:  parsed.doctorJSON,
-				probe: parsed.presetProbe,
+				id:      parsed.presetID,
+				json:    parsed.doctorJSON,
+				probe:   parsed.presetProbe,
+				host:    parsed.presetHost,
+				user:    parsed.presetUser,
+				port:    parsed.presetPort,
+				timeout: parsed.presetTimeout,
+			}, stdout, stderr)
+		case "cpanel":
+			return dispatchCpanel(cpanelOpts{
+				host:    parsed.presetHost,
+				user:    parsed.presetUser,
+				token:   parsed.cpanelToken,
+				apiPort: parsed.cpanelAPIPort,
+				sshPort: parsed.cpanelSSHPort,
+				timeout: parsed.presetTimeout,
+				json:    parsed.doctorJSON,
+				noSSH:   parsed.cpanelNoSSH,
+				noUAPI:  parsed.cpanelNoUAPI,
 			}, stdout, stderr)
 		default:
 			return dispatchCore(parsed.doctorJSON, stdout, stderr)
@@ -429,7 +490,7 @@ func parseArgs(args []string) (parsed opts, errMsg string) {
 		if errMsg = applySimpleFlag(&parsed, arg); errMsg != "" {
 			return opts{}, errMsg
 		}
-		if simpleFlagHandled(arg) {
+		if simpleFlagHandled(&parsed, arg) {
 			continue
 		}
 		if errMsg = applyPrefixedFlag(&parsed, arg); errMsg != "" {
@@ -464,7 +525,7 @@ func applySimpleFlag(parsed *opts, arg string) string {
 	switch arg {
 	case "doctor":
 		parsed.doctor = true
-	case "github", "preset", "new":
+	case "github", "preset", "cpanel", "new":
 		return applyContextualToken(parsed, arg)
 	case "provider":
 		parsed.providerNew = true
@@ -482,6 +543,10 @@ func applySimpleFlag(parsed *opts, arg string) string {
 		return applyProbeFlag(parsed)
 	case "--dry-run":
 		return applyDryRunFlag(parsed)
+	case "--no-ssh":
+		return applyCpanelToggle(parsed, "--no-ssh", &parsed.cpanelNoSSH)
+	case "--no-uapi":
+		return applyCpanelToggle(parsed, "--no-uapi", &parsed.cpanelNoUAPI)
 	}
 	return ""
 }
@@ -489,17 +554,52 @@ func applySimpleFlag(parsed *opts, arg string) string {
 // applyContextualToken handles tokens that are only valid in a
 // specific subcommand context. Kept separate from applySimpleFlag
 // so the parent stays under the gocyclo budget.
+//
+// When `provider new` is pending its name slot, the `github` /
+// `preset` / `cpanel` tokens drop through unchanged so the
+// provider-name branch in [parseArgs] can claim them as the future
+// adapter's identifier. [simpleFlagHandled] reflects the same
+// state-dependent claim so the token isn't double-handled.
 func applyContextualToken(parsed *opts, arg string) string {
 	switch arg {
 	case "github":
+		if isPendingProviderNameSlot(parsed) {
+			return ""
+		}
 		return setDoctorTarget(parsed, "github", "`github` is only valid after `doctor`.")
 	case "preset":
+		if isPendingProviderNameSlot(parsed) {
+			return ""
+		}
 		return setDoctorTarget(parsed, "preset", "`preset` is only valid after `doctor` (usage: webox doctor preset).")
+	case "cpanel":
+		if isPendingProviderNameSlot(parsed) {
+			return ""
+		}
+		return setDoctorTarget(parsed, "cpanel", "`cpanel` is only valid after `doctor` (usage: webox doctor cpanel --host=... --user=...).")
 	case "new":
 		if !parsed.providerNew {
 			return "webox: `new` is only valid after `provider` (usage: webox provider new <name>)."
 		}
 	}
+	return ""
+}
+
+// isPendingProviderNameSlot returns true when the parser is mid-
+// way through a `provider new <name>` invocation and the next
+// non-flag token should be claimed as the new adapter's name.
+func isPendingProviderNameSlot(parsed *opts) bool {
+	return parsed.providerNew && parsed.providerNewName == ""
+}
+
+// applyCpanelToggle handles the two boolean toggles --no-ssh and
+// --no-uapi. They only apply to `doctor cpanel`; the helper rejects
+// them in any other context with a focused error.
+func applyCpanelToggle(parsed *opts, name string, target *bool) string {
+	if parsed.doctorTarget != "cpanel" {
+		return fmt.Sprintf("webox: %s is only valid with `webox doctor cpanel`.", name)
+	}
+	*target = true
 	return ""
 }
 
@@ -533,11 +633,20 @@ func applyDryRunFlag(parsed *opts) string {
 // simpleFlagHandled returns true when applySimpleFlag consumed the
 // argument, false otherwise. The split keeps parseArgs's main loop
 // flat — without it, gocyclo flags the function as too complex.
-func simpleFlagHandled(arg string) bool {
+//
+// The function is state-aware for the three doctor-target tokens
+// (`github` / `preset` / `cpanel`): when `provider new` is pending
+// its name slot, those tokens fall through to the provider-name
+// branch in [parseArgs] instead of being consumed here, matching
+// the operator's intent of `webox provider new cpanel`.
+func simpleFlagHandled(parsed *opts, arg string) bool {
 	switch arg {
-	case "doctor", "github", "preset", "provider", "new",
+	case "github", "preset", "cpanel":
+		return !isPendingProviderNameSlot(parsed)
+	case "doctor", "provider", "new",
 		"--version", "--help", "-h", "--debug",
-		"--mock", "--json", "--probe", "--dry-run":
+		"--mock", "--json", "--probe", "--dry-run",
+		"--no-ssh", "--no-uapi":
 		return true
 	}
 	return false
@@ -545,7 +654,8 @@ func simpleFlagHandled(arg string) bool {
 
 // applyPrefixedFlag handles `--key=value` form options. Returns
 // non-empty `errMsg` on validation failure; otherwise "" (handled or
-// not mine — caller checks [prefixedFlagHandled]).
+// not mine — caller checks [prefixedFlagHandled]). Kept under
+// gocyclo's threshold by delegating each flag family to a helper.
 func applyPrefixedFlag(parsed *opts, arg string) string {
 	if path, ok := strings.CutPrefix(arg, "--debug-trace="); ok {
 		if path == "" {
@@ -564,23 +674,144 @@ func applyPrefixedFlag(parsed *opts, arg string) string {
 		parsed.providerPreset = preset
 		return ""
 	}
-	if id, ok := strings.CutPrefix(arg, "--id="); ok {
-		if parsed.doctorTarget != "preset" {
-			return "webox: --id is only valid with `webox doctor preset`."
-		}
-		if id == "" {
-			return "webox: --id requires a value (e.g. --id=cpanel-generic)."
-		}
-		parsed.presetID = id
-		return ""
+	if msg, handled := applyPresetIDFlag(parsed, arg); handled {
+		return msg
+	}
+	if msg, handled := applyPresetProbeFlag(parsed, arg); handled {
+		return msg
 	}
 	return ""
+}
+
+// applyPresetIDFlag handles --id=ID for the preset subcommand.
+// Returns (errMsg, handled). `handled=true` means caller should
+// stop scanning further prefix matchers.
+func applyPresetIDFlag(parsed *opts, arg string) (string, bool) {
+	id, ok := strings.CutPrefix(arg, "--id=")
+	if !ok {
+		return "", false
+	}
+	if parsed.doctorTarget != "preset" {
+		return "webox: --id is only valid with `webox doctor preset`.", true
+	}
+	if id == "" {
+		return "webox: --id requires a value (e.g. --id=cpanel-generic).", true
+	}
+	parsed.presetID = id
+	return "", true
+}
+
+// applyPresetProbeFlag handles the four flags that parameterise a
+// live `doctor preset --probe` run AND the four equivalent flags
+// for `doctor cpanel`: --host, --user, --port, --timeout. Each one
+// independently asserts that the doctor target is either "preset"
+// or "cpanel" so the parser surfaces a focused error message when
+// an operator types --host before --preset / --cpanel.
+func applyPresetProbeFlag(parsed *opts, arg string) (string, bool) {
+	if host, ok := strings.CutPrefix(arg, "--host="); ok {
+		if !isPresetOrCpanelContext(parsed) {
+			return "webox: --host is only valid with `webox doctor preset --probe` or `webox doctor cpanel`.", true
+		}
+		if host == "" {
+			return "webox: --host requires a value (e.g. --host=panel.example.com).", true
+		}
+		parsed.presetHost = host
+		return "", true
+	}
+	if user, ok := strings.CutPrefix(arg, "--user="); ok {
+		if !isPresetOrCpanelContext(parsed) {
+			return "webox: --user is only valid with `webox doctor preset --probe` or `webox doctor cpanel`.", true
+		}
+		if user == "" {
+			return "webox: --user requires a value (e.g. --user=operator).", true
+		}
+		parsed.presetUser = user
+		return "", true
+	}
+	if portStr, ok := strings.CutPrefix(arg, "--port="); ok {
+		if parsed.doctorTarget != "preset" {
+			return "webox: --port is only valid with `webox doctor preset --probe`. Use --ssh-port / --api-port with `doctor cpanel`.", true
+		}
+		port, err := strconv.Atoi(portStr)
+		if err != nil || port <= 0 || port > maxTCPPort {
+			return fmt.Sprintf("webox: --port=%q must be a positive integer <= %d.", portStr, maxTCPPort), true
+		}
+		parsed.presetPort = port
+		return "", true
+	}
+	if timeoutStr, ok := strings.CutPrefix(arg, "--timeout="); ok {
+		if !isPresetOrCpanelContext(parsed) {
+			return "webox: --timeout is only valid with `webox doctor preset --probe` or `webox doctor cpanel`.", true
+		}
+		dur, err := time.ParseDuration(timeoutStr)
+		if err != nil || dur <= 0 {
+			return fmt.Sprintf("webox: --timeout=%q must be a positive Go duration (e.g. 5s, 1m).", timeoutStr), true
+		}
+		parsed.presetTimeout = dur
+		return "", true
+	}
+	return applyCpanelPrefixFlag(parsed, arg)
+}
+
+// applyCpanelPrefixFlag handles --token, --api-port, --ssh-port —
+// the three cPanel-only prefixed flags. Kept separate from
+// applyPresetProbeFlag so each parent function stays under the
+// gocyclo budget.
+func applyCpanelPrefixFlag(parsed *opts, arg string) (string, bool) {
+	if tok, ok := strings.CutPrefix(arg, "--token="); ok {
+		if parsed.doctorTarget != "cpanel" {
+			return "webox: --token is only valid with `webox doctor cpanel`.", true
+		}
+		if tok == "" {
+			return "webox: --token requires a value (cPanel UAPI access token).", true
+		}
+		parsed.cpanelToken = tok
+		return "", true
+	}
+	if portStr, ok := strings.CutPrefix(arg, "--api-port="); ok {
+		if parsed.doctorTarget != "cpanel" {
+			return "webox: --api-port is only valid with `webox doctor cpanel`.", true
+		}
+		port, err := strconv.Atoi(portStr)
+		if err != nil || port <= 0 || port > maxTCPPort {
+			return fmt.Sprintf("webox: --api-port=%q must be a positive integer <= %d.", portStr, maxTCPPort), true
+		}
+		parsed.cpanelAPIPort = port
+		return "", true
+	}
+	if portStr, ok := strings.CutPrefix(arg, "--ssh-port="); ok {
+		if parsed.doctorTarget != "cpanel" {
+			return "webox: --ssh-port is only valid with `webox doctor cpanel`.", true
+		}
+		port, err := strconv.Atoi(portStr)
+		if err != nil || port <= 0 || port > maxTCPPort {
+			return fmt.Sprintf("webox: --ssh-port=%q must be a positive integer <= %d.", portStr, maxTCPPort), true
+		}
+		parsed.cpanelSSHPort = port
+		return "", true
+	}
+	return "", false
+}
+
+// isPresetOrCpanelContext consolidates the gate that --host /
+// --user / --timeout share. They're valid in either
+// `doctor preset --probe` or `doctor cpanel`; centralising the
+// check keeps the error messages consistent.
+func isPresetOrCpanelContext(parsed *opts) bool {
+	return parsed.doctorTarget == "preset" || parsed.doctorTarget == "cpanel"
 }
 
 func prefixedFlagHandled(arg string) bool {
 	return strings.HasPrefix(arg, "--debug-trace=") ||
 		strings.HasPrefix(arg, "--preset=") ||
-		strings.HasPrefix(arg, "--id=")
+		strings.HasPrefix(arg, "--id=") ||
+		strings.HasPrefix(arg, "--host=") ||
+		strings.HasPrefix(arg, "--user=") ||
+		strings.HasPrefix(arg, "--port=") ||
+		strings.HasPrefix(arg, "--timeout=") ||
+		strings.HasPrefix(arg, "--token=") ||
+		strings.HasPrefix(arg, "--api-port=") ||
+		strings.HasPrefix(arg, "--ssh-port=")
 }
 
 // postParseValidation enforces cross-flag invariants that cannot be

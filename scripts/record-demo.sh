@@ -7,10 +7,12 @@
 # the next time. Manual ad-libbing while recording is not allowed —
 # re-run this script instead and re-upload.
 #
-# Output:
-#   assets/demo/demo.cast     The asciinema 2.x cast.
-#   assets/demo/demo.sh.log   Companion: the literal keystroke script
-#                             played, so reviewers can diff timing.
+# Output (defaults; override with DEMO_OUT_DIR=path scripts/record-demo.sh):
+#   docs/screenshots/sprint-21/demo.cast   The asciinema 3.x cast.
+#   docs/screenshots/sprint-21/demo.gif    Animated GIF (rendered via agg).
+#   docs/screenshots/sprint-21/demo.sh.log Companion: the literal keystroke
+#                                          script played, so reviewers can
+#                                          diff timing between recordings.
 #
 # Requirements:
 #   - asciinema 2.x or 3.x in PATH (https://asciinema.org/docs/install)
@@ -50,16 +52,21 @@ if [[ ! -x "$BIN" ]]; then
   make build >/dev/null
 fi
 
-# Enforce 120x35 terminal size so framing is reproducible. Bento Ultra
-# layout requires it; smaller terminals get the Standard Cockpit fallback
-# which would produce a different cast.
-COLS="$(tput cols)"
-ROWS="$(tput lines)"
-if [[ "$COLS" != "120" || "$ROWS" != "35" ]]; then
-  die "terminal must be exactly 120x35 (currently ${COLS}x${ROWS}). Resize and retry."
+# Enforce 120x35 framing for the cast. asciinema 3.x's --window-size flag
+# handles this without forcing the operator to resize their parent terminal;
+# we still warn when the parent terminal is smaller so the operator notices
+# truncated console output during the recording.
+TARGET_WINDOW="120x35"
+COLS="$(tput cols 2>/dev/null || echo 0)"
+ROWS="$(tput lines 2>/dev/null || echo 0)"
+if [[ "$COLS" -lt 120 || "$ROWS" -lt 35 ]]; then
+  warn "parent terminal is ${COLS}x${ROWS}; the cast is pinned at ${TARGET_WINDOW} via --window-size,"
+  warn "but the live preview during the recording will be truncated. Resize for a clean preview."
 fi
 
-OUT_DIR="assets/demo"
+# Default to the sprint-21 archive directory (Sprint 21 TASK-21.6 contract).
+# Operators recording a new cast for a later sprint should set DEMO_OUT_DIR.
+OUT_DIR="${DEMO_OUT_DIR:-docs/screenshots/sprint-21}"
 mkdir -p "$OUT_DIR"
 
 CAST="$OUT_DIR/demo.cast"
@@ -116,10 +123,11 @@ send "q"
 expect eof
 EXPECT_EOF
 
-info "Recording demo to $CAST (target 45-60 s)…"
+info "Recording demo to $CAST (target 45-60 s) at ${TARGET_WINDOW}…"
 asciinema rec \
   --idle-time-limit=1.5 \
   --overwrite \
+  --window-size="$TARGET_WINDOW" \
   --title="Webox v0.1 — 45-second mock cockpit tour" \
   --command="expect -f $EXPECT_SCRIPT" \
   "$CAST"
@@ -127,9 +135,19 @@ asciinema rec \
 cp -f "$EXPECT_SCRIPT" "$LOG"
 ok "Recorded: $CAST"
 info "Companion script saved at: $LOG"
+
+GIF="$OUT_DIR/demo.gif"
+if command -v agg >/dev/null 2>&1; then
+  info "Rendering animated GIF via agg -> $GIF ..."
+  agg --cols 120 --rows 35 --speed 1.0 --idle-time-limit 1.5 "$CAST" "$GIF"
+  ok "Rendered: $GIF"
+else
+  warn "agg not in PATH; skipping GIF render. Install: brew install agg (or cargo install agg)."
+fi
+
 info ""
 info "Next steps:"
 info "  1. Play it back locally:    asciinema play $CAST"
 info "  2. Upload to asciinema.org: asciinema upload $CAST"
-info "  3. Update README.md badge URL with the new cast id."
+info "  3. Embed $GIF (if rendered) into release notes / landing."
 info "  4. Capture frame ~8s as static PNG via scripts/capture-screenshot.sh."

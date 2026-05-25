@@ -1,0 +1,15 @@
+{
+  "result": {
+    "status": 1,
+    "errors": null,
+    "warnings": null,
+    "messages": null,
+    "data": {
+      "main_domain": "example.com",
+      "sub_domains": ["api.example.com", "blog.example.com"],
+      "addon_domains": ["second-example.com"],
+      "parked_domains": ["example.net"]
+    },
+    "metadata": {}
+  }
+}

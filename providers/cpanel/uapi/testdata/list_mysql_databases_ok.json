@@ -1,0 +1,15 @@
+{
+  "result": {
+    "status": 1,
+    "errors": null,
+    "warnings": null,
+    "messages": null,
+    "data": {
+      "databases": [
+        { "name": "operator_shop", "disk_usage": 8421376, "user_count": 2 },
+        { "name": "operator_blog", "disk_usage": 524288, "user_count": 1 }
+      ]
+    },
+    "metadata": {}
+  }
+}

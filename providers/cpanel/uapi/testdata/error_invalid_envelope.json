@@ -1,0 +1,10 @@
+{
+  "result": {
+    "status": 0,
+    "errors": ["Generic API failure"],
+    "warnings": null,
+    "messages": null,
+    "data": null,
+    "metadata": {}
+  }
+}

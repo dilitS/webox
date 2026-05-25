@@ -168,20 +168,25 @@ func TestPresetDoctor_Show_NotFoundReturnsMisuse(t *testing.T) {
 	}
 }
 
-func TestPresetDoctor_ProbeIsStubInBaselineButPrintsDetails(t *testing.T) {
+func TestPresetDoctor_ProbeWithoutHostUserFallsBackToDeclarative(t *testing.T) {
 	t.Parallel()
 
+	// Sprint 21 TASK-21.4 wires live probing behind --host / --user;
+	// without those flags the command must NOT attempt SSH and MUST
+	// still print preset metadata so the operator can read the
+	// declarative info. The notice on stderr explains how to switch
+	// to live execution.
 	reg := stubRegistry(t, map[string]string{"smallhost-devil.json": stubValidPreset})
 	var stdout, stderr bytes.Buffer
 	got := runPresetDoctor(presetOpts{id: "smallhost-devil", probe: true}, &stdout, &stderr, stubProvider(reg))
 	if got != exitOK {
 		t.Fatalf("exit = %d, want 0 (stderr=%q)", got, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "stub") {
-		t.Fatalf("stderr should mention probe stub: %q", stderr.String())
+	if !strings.Contains(stderr.String(), "--host") || !strings.Contains(stderr.String(), "--user") {
+		t.Fatalf("stderr should explain how to enable live probing: %q", stderr.String())
 	}
 	if !strings.Contains(stdout.String(), "small.pl") {
-		t.Fatalf("stdout should still print preset details when --probe is requested: %q", stdout.String())
+		t.Fatalf("stdout should still print preset details when --probe is requested without host/user: %q", stdout.String())
 	}
 }
 
@@ -240,7 +245,7 @@ func TestRun_DoctorPreset_AcceptsTokensAndDispatches(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var stdout, stderr bytes.Buffer
-			got := runWithFullDeps(tt.args, &stdout, &stderr, runDoctor, runDoctorGitHub, stub, brokenTUI)
+			got := runWithFullDeps(tt.args, &stdout, &stderr, runDoctor, runDoctorGitHub, stub, brokenCpanelDispatcher, brokenTUI)
 			if got != exitOK {
 				t.Fatalf("exit = %d (stderr=%q)", got, stderr.String())
 			}
@@ -259,7 +264,7 @@ func TestRun_DoctorPreset_RejectsProbeWithoutID(t *testing.T) {
 	got := runWithFullDeps(
 		[]string{"doctor", "preset", "--probe"},
 		&stdout, &stderr,
-		runDoctor, runDoctorGitHub, stub, brokenTUI,
+		runDoctor, runDoctorGitHub, stub, brokenCpanelDispatcher, brokenTUI,
 	)
 	if got != exitMisuse {
 		t.Fatalf("exit = %d, want exitMisuse=%d", got, exitMisuse)
@@ -277,7 +282,7 @@ func TestRun_DoctorPreset_RejectsIDWithoutPresetTarget(t *testing.T) {
 	got := runWithFullDeps(
 		[]string{"doctor", "--id=cpanel-generic"},
 		&stdout, &stderr,
-		runDoctor, runDoctorGitHub, stub, brokenTUI,
+		runDoctor, runDoctorGitHub, stub, brokenCpanelDispatcher, brokenTUI,
 	)
 	if got != exitMisuse {
 		t.Fatalf("exit = %d, want exitMisuse=%d (stderr=%q)", got, exitMisuse, stderr.String())
@@ -285,4 +290,13 @@ func TestRun_DoctorPreset_RejectsIDWithoutPresetTarget(t *testing.T) {
 	if !strings.Contains(stderr.String(), "--id is only valid") {
 		t.Fatalf("stderr should explain --id requires preset target; got %q", stderr.String())
 	}
+}
+
+// brokenCpanelDispatcher is the sentinel dispatcher used by tests
+// that should never reach the `doctor cpanel` route; if it does,
+// the test fails with a clear error message instead of silently
+// succeeding.
+func brokenCpanelDispatcher(_ cpanelOpts, _, stderr io.Writer) int {
+	_, _ = stderr.Write([]byte("brokenCpanelDispatcher should not be reached\n"))
+	return exitGeneric
 }
