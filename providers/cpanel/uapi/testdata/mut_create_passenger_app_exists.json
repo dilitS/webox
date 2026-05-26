@@ -1,0 +1,10 @@
+{
+  "result": {
+    "status": 0,
+    "errors": ["The application name shop-backend is already in use on this account."],
+    "warnings": null,
+    "messages": null,
+    "data": null,
+    "metadata": {}
+  }
+}

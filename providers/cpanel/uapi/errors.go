@@ -90,4 +90,36 @@ var (
 	// failure path observable in tests without scraping
 	// strings.
 	ErrSSHRunnerRequired = errors.New("uapi: SSH runner is required")
+
+	// ErrMutationsDisabled signals that the operator-side env
+	// var WEBOX_CPANEL_MUTATIONS=1 is not set. Every method on
+	// the Sprint-22 [Mutator] surface returns this sentinel
+	// without making the underlying request, so a missing flag
+	// is a fail-closed default rather than an accidental
+	// destructive call. The opt-in guard is documented in
+	// docs/sprints/sprint-22-cpanel-adapter-mutations.md and
+	// docs/SECURITY.md.
+	ErrMutationsDisabled = errors.New("uapi: mutations disabled (set WEBOX_CPANEL_MUTATIONS=1 to opt in)")
+
+	// ErrInvalidArgs surfaces when a [Mutator] caller passes an
+	// args struct that fails the per-method input validation:
+	// empty domain, oversized password, control characters in a
+	// path. The adapter layer (providers/cpanel) already validates
+	// every public input; this sentinel is defence in depth for
+	// the case the package gets reused outside the adapter.
+	ErrInvalidArgs = errors.New("uapi: invalid mutating arguments")
+
+	// ErrResourceExists is the panel-level idempotency signal:
+	// the resource being created is already present. The
+	// adapter maps this onto provider-level sentinels (e.g.
+	// providers.ErrSubdomainExists or providers.ErrDBNameTaken)
+	// so callers above the transport keep using the canonical
+	// idempotent-create semantics.
+	ErrResourceExists = errors.New("uapi: resource already exists on panel")
+
+	// ErrResourceNotFound is the panel-level idempotency signal
+	// on the delete path: the resource never existed or was
+	// already gone. The adapter maps this onto nil for
+	// Remove* methods so LIFO rollback stays idempotent.
+	ErrResourceNotFound = errors.New("uapi: resource not found on panel")
 )

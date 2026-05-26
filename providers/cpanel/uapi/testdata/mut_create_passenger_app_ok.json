@@ -1,0 +1,16 @@
+{
+  "result": {
+    "status": 1,
+    "errors": null,
+    "warnings": null,
+    "messages": ["The application shop-backend has been created."],
+    "data": {
+      "name": "shop-backend",
+      "path": "/home/operator/apps/shop-backend",
+      "domain": "shop.example.com",
+      "base_uri": "/",
+      "deployment_mode": "production"
+    },
+    "metadata": {}
+  }
+}

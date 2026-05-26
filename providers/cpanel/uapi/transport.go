@@ -101,11 +101,22 @@ func (t *transport) callURL(module Module, function Function, args map[string]st
 // into their typed shape.
 //
 // The Sprint-21 read-only client always invokes the documented
-// no-arg functions, so [call] hard-codes nil args. When Sprint 22
-// adds the mutating layer it will reuse this transport and supply
-// the typed argument map.
+// no-arg functions, so [call] hard-codes nil args. Sprint 22's
+// mutating layer reuses the same transport via [callWithArgs]
+// which threads a typed argument map through the same retry +
+// envelope-decoding plumbing.
 func (t *transport) call(ctx context.Context, module Module, function Function) (*envelope, error) {
-	endpoint := t.callURL(module, function, nil)
+	return t.callWithArgs(ctx, module, function, nil)
+}
+
+// callWithArgs is the Sprint-22 entrypoint for the mutating
+// surface. Args are URL-encoded by [transport.callURL] (which
+// uses `url.Values.Set` under the hood — safe for the entire
+// printable-ASCII range and well-defined for non-ASCII). The
+// retry policy is identical to [call]: transient classes get up
+// to maxRetries attempts, terminal classes surface immediately.
+func (t *transport) callWithArgs(ctx context.Context, module Module, function Function, args map[string]string) (*envelope, error) {
+	endpoint := t.callURL(module, function, args)
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
@@ -207,14 +218,22 @@ func backoff(attempt int) time.Duration {
 // shouldRetry reports whether the error from singleCall is worth
 // another attempt. Transient: rate limit, server error, plain
 // http-client error (DNS, timeout). Terminal: auth failure,
-// malformed response, module disabled.
+// malformed response, module disabled, **API result failure**
+// (status=0 envelope — the panel made a deterministic decision
+// against this call; retrying just burns the backoff budget).
+//
+// Sprint 22 added ErrAPIResultFailure to the terminal class
+// because mutating idempotency signals ("already exists",
+// "not found") arrive as status=0 envelopes and a naive retry
+// would multiply the wall-clock by maxRetries+1 with no benefit.
 func shouldRetry(err error) bool {
 	switch {
 	case errors.Is(err, ErrRateLimited), errors.Is(err, ErrServerError):
 		return true
 	case errors.Is(err, ErrAuthenticationFailed),
 		errors.Is(err, ErrMalformedResponse),
-		errors.Is(err, ErrModuleFunctionDenied):
+		errors.Is(err, ErrModuleFunctionDenied),
+		errors.Is(err, ErrAPIResultFailure):
 		return false
 	}
 	// http.Client errors (DNS, dial, TLS handshake) are

@@ -65,13 +65,16 @@ func (j jsonRawMessage) MarshalJSON() ([]byte, error) {
 type Module string
 
 // Recognised UAPI modules. Sprint 21 scope: DomainInfo,
-// PassengerApps, Mysql, SSL. Each maps to a small set of read-only
-// functions documented inline next to the typed response below.
+// PassengerApps, Mysql, SSL. Sprint 22 adds SubDomain for the
+// addsubdomain / delsubdomain pair (the addon-domain endpoints
+// live under DomainInfo). Each maps to a small set of functions
+// documented inline next to the typed response below.
 const (
 	ModuleDomainInfo    Module = "DomainInfo"
 	ModulePassengerApps Module = "PassengerApps"
 	ModuleMysql         Module = "Mysql"
 	ModuleSSL           Module = "SSL"
+	ModuleSubDomain     Module = "SubDomain"
 )
 
 // AllReadOnlyModules returns the closed set of modules the Sprint 21
@@ -109,6 +112,100 @@ const (
 	// key has a friendly name, modulus length, and the matching
 	// CRT's NotAfter date for renewal scheduling. Read-only.
 	FunctionSSLListKeys Function = "list_keys"
+)
+
+// Sprint 22 mutating function names. Every constant below maps
+// 1:1 to a documented UAPI endpoint (api.docs.cpanel.net). The
+// type system refuses to substitute these into [Mutator] calls
+// outside the expected module — keeping a typo (`creat_database`
+// vs `create_database`) a compile error rather than a 400 at
+// runtime.
+const (
+	// FunctionDomainInfoAddAddonDomain provisions a new top-level
+	// domain as an "addon" under the account. Args: `newdomain`,
+	// `subdomain`, `dir`. cPanel UAPI v1 reference:
+	// DomainInfo::add_addon_domain.
+	FunctionDomainInfoAddAddonDomain Function = "add_addon_domain"
+
+	// FunctionDomainInfoDelDomain removes a previously-provisioned
+	// addon or subdomain. Args: `domain`. Idempotent on the panel
+	// side; this client maps the "domain not found" error onto
+	// [ErrResourceNotFound] so the adapter can treat it as nil.
+	FunctionDomainInfoDelDomain Function = "del_domain"
+
+	// FunctionSubdomainAdd provisions a subdomain under one of
+	// the account's primary domains. Args: `domain` (the leftmost
+	// label), `rootdomain`, `dir`.
+	FunctionSubdomainAdd Function = "addsubdomain"
+
+	// FunctionSubdomainDel removes a subdomain. Args: `domain`
+	// (the fully-qualified subdomain). Idempotent.
+	FunctionSubdomainDel Function = "delsubdomain"
+
+	// FunctionPassengerAppsCreate registers a Passenger / Node.js
+	// application against the panel. Args: `name`, `path`,
+	// `domain`, `deployment_mode`, `base_uri`, plus optional
+	// `envvars` flattened as `envvar.<key>=<value>` query params.
+	FunctionPassengerAppsCreate Function = "create_application" //nolint:gosec // G101: UAPI function name, not a credential.
+
+	// FunctionPassengerAppsEdit updates an existing application
+	// (typically `envvars`). Same args as create + the existing
+	// `path` selector.
+	FunctionPassengerAppsEdit Function = "edit_application"
+
+	// FunctionPassengerAppsRestart triggers a Passenger graceful
+	// restart for the application at the given `path`.
+	FunctionPassengerAppsRestart Function = "restart_application" //nolint:gosec // G101: UAPI function name, not a credential.
+
+	// FunctionPassengerAppsDelete deregisters the application at
+	// `path`. Does NOT remove the on-disk source tree — adapter
+	// callers MUST orchestrate filesystem cleanup separately
+	// when the rollback path requires it.
+	FunctionPassengerAppsDelete Function = "delete_application" //nolint:gosec // G101: UAPI function name, not a credential.
+
+	// FunctionMysqlCreateDatabase provisions a fresh MySQL
+	// database. cPanel prefixes the database name with the
+	// account user; this client passes the operator-supplied
+	// name verbatim and the adapter handles the prefix policy.
+	FunctionMysqlCreateDatabase Function = "create_database"
+
+	// FunctionMysqlDeleteDatabase drops a database. Idempotent.
+	FunctionMysqlDeleteDatabase Function = "delete_database"
+
+	// FunctionMysqlCreateUser provisions a MySQL user with the
+	// supplied password. The password travels as a query param;
+	// the transport's User-Agent and Authorization headers are
+	// the only items logged by the project's redactor, and
+	// `webox doctor` never echoes the password back to stderr.
+	FunctionMysqlCreateUser Function = "create_user"
+
+	// FunctionMysqlDeleteUser drops a MySQL user. Idempotent.
+	FunctionMysqlDeleteUser Function = "delete_user"
+
+	// FunctionMysqlSetPrivileges grants the supplied list of
+	// privileges (`ALL PRIVILEGES`, `SELECT,INSERT`, …) on the
+	// (database, user) pair. UAPI accepts the list as a single
+	// comma-separated string.
+	FunctionMysqlSetPrivileges Function = "set_privileges_on_database"
+
+	// FunctionSSLInstallSSL installs a supplied PEM cert + key
+	// (+ optional CA chain) on the given host. The adapter does
+	// not call this directly in Sprint 22 — see [FunctionSSLStartAutoSSL]
+	// for the AutoSSL path, which is the default cPanel SSL
+	// provider on shared hosting.
+	FunctionSSLInstallSSL Function = "install_ssl"
+
+	// FunctionSSLStartAutoSSL triggers AutoSSL provisioning
+	// for the given account. cPanel orchestrates Let's Encrypt
+	// behind the scenes; the call returns immediately while the
+	// cert request runs asynchronously. Callers poll
+	// [Reader.ListSSLKeys] (or follow up with a status probe) to
+	// confirm the cert landed.
+	FunctionSSLStartAutoSSL Function = "start_autossl_check"
+
+	// FunctionSSLDeleteSSL revokes the installed cert for the
+	// given host. Idempotent.
+	FunctionSSLDeleteSSL Function = "delete_ssl"
 )
 
 // DomainInfoListResponse is the typed payload returned by

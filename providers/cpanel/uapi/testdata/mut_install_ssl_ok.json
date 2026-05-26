@@ -1,0 +1,13 @@
+{
+  "result": {
+    "status": 1,
+    "errors": null,
+    "warnings": null,
+    "messages": ["SSL certificate installed on shop.example.com."],
+    "data": {
+      "domain": "shop.example.com",
+      "ip": "203.0.113.10"
+    },
+    "metadata": {}
+  }
+}
