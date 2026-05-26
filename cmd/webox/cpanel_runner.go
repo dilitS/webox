@@ -51,6 +51,11 @@ func newNativeSSHRunner(host, user string, port int, timeout time.Duration) (uap
 // single argv element to `ssh`, so no local shell expansion runs;
 // only the remote shell on the panel parses it. This is the same
 // model `webox doctor preset --probe` uses.
+//
+// See directadmin_runner.go for the design rationale (per-provider
+// typed sentinel errors prevent a clean shared helper).
+//
+//nolint:dupl // Duplicates nativeDirectadminSSHCmdRunner.Run.
 func (r *nativeSSHCmdRunner) Run(ctx context.Context, command string) (stdout, stderr []byte, exitCode int, err error) {
 	args := []string{
 		"-o", "BatchMode=yes",
