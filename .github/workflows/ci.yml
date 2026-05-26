@@ -221,10 +221,19 @@ jobs:
           fi
 
   # Sprint 20 added a tuistory-based PTY smoke harness that drives the actual
-  # binary (no teatest mocking, no diff-rendering surprises). It is not a
-  # required gate yet — we want a couple of weeks of green runs before
-  # promoting it into ci-summary. Until then it stays advisory and uploads its
-  # report + text snapshots for PR reviewers.
+  # binary (no teatest mocking, no diff-rendering surprises). It is intentionally
+  # NOT a required gate yet — and as of Sprint 21 it crashes reliably on the
+  # GitHub-hosted `ubuntu-latest` runner with SIGILL ("Illegal instruction")
+  # coming from `zigpty` (a Zig-built native node addon used by tuistory ≥ 0.8).
+  # The prebuilt `zigpty.linux-x64.node` ships with a CPU baseline that the
+  # current GHA runner kernel/CPU pair does not accept; the crash is therefore
+  # an environmental incompatibility, not a Webox regression (cf. Copilot's
+  # earlier mis-diagnosis blaming the Node version — irrelevant, since the
+  # PTY backend is what dies). Until tuistory exposes a `node-pty` fallback
+  # or zigpty publishes a more portable build, this job stays advisory: green
+  # locally on macOS/Linux developer boxes, red on CI but `continue-on-error`
+  # so it never blocks merges. Snapshot uploads remain useful for reviewers
+  # who run the suite locally.
   smoke-tui:
     name: Smoke TUI (tuistory PTY)
     runs-on: ubuntu-latest
@@ -246,12 +255,15 @@ jobs:
             go.sum
             tools/go.sum
 
-      # tuistory ships TS sources executed via Node's --experimental-strip-types.
-      # That flag is stable from Node 24+, so we pin to the latest 24.x LTS.
+      # tuistory ships TS sources executed via Node's --experimental-strip-types,
+      # which has been stable since Node 22.6 (kept on by default in 23+). Pin
+      # to Node 22 LTS — it satisfies both the strip-types requirement and the
+      # local Makefile guard, and keeps the runtime version consistent across
+      # developer machines and CI.
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: '24'
+          node-version: '22'
 
       # scripts/manual-test/.gitignore drops lock files on purpose (Sprint 20
       # carry-over: keep the harness self-contained). That means we cannot use

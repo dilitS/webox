@@ -120,7 +120,7 @@ async function writeReport(
     "",
     "Every scenario exercises a Sprint 20 user-facing change against `./bin/webox --mock` in a headless PTY. Text snapshots live next to this report as `NN-name.txt`; the markdown table below lists each scenario and its first asserted invariant.",
     "",
-    "To re-run locally: \`make smoke-test\` (requires Node 22+ for \`--experimental-strip-types\`).",
+    "To re-run locally: `make smoke-test` (requires Node 22+ for `--experimental-strip-types`).",
     "",
     "To see a scenario live: `tuistory attach -s webox-mock` while the runner sleeps, then `Ctrl+C` twice to detach.",
     "",

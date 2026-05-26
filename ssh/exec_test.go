@@ -100,12 +100,22 @@ func TestKeepaliveLoopStopsOnPoolClose(t *testing.T) {
 	waitFor(t, time.Second, func() bool {
 		return server.GlobalRequestCount(keepaliveRequest) > 0
 	})
-	beforeClose := server.GlobalRequestCount(keepaliveRequest)
+
+	// Sampling the count BEFORE Close would race with any in-flight
+	// SendRequest that the keepalive goroutine kicked off between the
+	// previous waitFor poll and the assertion: the server might bump
+	// its counter after we read `before` but before Close had a chance
+	// to tear down the underlying client. Instead, rely on the pool
+	// contract that Close blocks until every keepalive goroutine has
+	// returned (and its underlying client is closed). After Close,
+	// the counter is frozen: snapshot it, sleep well past several
+	// keepalive intervals, and assert the snapshot is identical.
 	pool.Close()
-	time.Sleep(20 * time.Millisecond)
 	afterClose := server.GlobalRequestCount(keepaliveRequest)
-	if afterClose != beforeClose {
-		t.Fatalf("keepalive count changed after pool close: before=%d after=%d", beforeClose, afterClose)
+	time.Sleep(50 * time.Millisecond)
+	finalCount := server.GlobalRequestCount(keepaliveRequest)
+	if finalCount != afterClose {
+		t.Fatalf("keepalive count changed after pool close: just-after=%d final=%d", afterClose, finalCount)
 	}
 }
 

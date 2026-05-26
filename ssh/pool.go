@@ -37,6 +37,11 @@ type PoolOptions struct {
 
 // Pool reuses SSH clients per target key and enforces a per-host
 // concurrency cap. It is safe for concurrent use.
+//
+// Close blocks until every background goroutine (cleanup ticker and
+// per-client keepalive loops) has exited so callers can assume the
+// pool is fully quiescent on return — no more keepalive
+// `SendRequest` calls hit the wire after Close completes.
 type Pool struct {
 	opts PoolOptions
 
@@ -44,6 +49,7 @@ type Pool struct {
 	hosts  map[string]*hostPool
 	closed bool
 	done   chan struct{}
+	wg     sync.WaitGroup
 }
 
 type hostPool struct {
@@ -66,6 +72,7 @@ func NewPool(opts PoolOptions) *Pool {
 		hosts: make(map[string]*hostPool),
 		done:  make(chan struct{}),
 	}
+	pool.wg.Add(1)
 	go pool.cleanupLoop()
 	return pool
 }
@@ -159,6 +166,17 @@ func (p *Pool) IdleCount(target Target) int {
 }
 
 // Close closes all idle and active clients and stops the cleanup loop.
+//
+// The shutdown order is intentional:
+//  1. set `closed` + `close(done)` under the mutex so no new Acquire /
+//     keepalive ticker tick observes the pool as live.
+//  2. close every underlying `*ssh.Client` outside the mutex — this
+//     makes any in-flight `client.SendRequest` from a keepalive
+//     goroutine fail immediately instead of completing on the wire and
+//     bumping the server-side counter past the close point.
+//  3. wait for the keepalive + cleanup goroutines to actually return
+//     so the pool is fully quiescent on Close's return; callers (and
+//     tests) can assume no more SSH traffic is generated.
 func (p *Pool) Close() {
 	var clients []*cryptossh.Client
 
@@ -188,6 +206,8 @@ func (p *Pool) Close() {
 	for _, client := range clients {
 		_ = client.Close()
 	}
+
+	p.wg.Wait()
 }
 
 func (p *Pool) reserveOrWait(target Target) (client *cryptossh.Client, wait <-chan struct{}, shouldDial bool, err error) {
@@ -272,6 +292,7 @@ func (p *Pool) getHostLocked(key string) *hostPool {
 }
 
 func (p *Pool) cleanupLoop() {
+	defer p.wg.Done()
 	ticker := time.NewTicker(p.opts.CleanupInterval)
 	defer ticker.Stop()
 	for {
@@ -359,7 +380,11 @@ func (p *Pool) startKeepalive(client *cryptossh.Client) {
 	if p.opts.KeepaliveInterval < 0 {
 		return
 	}
-	go keepaliveLoop(p.done, client, p.opts.KeepaliveInterval)
+	p.wg.Add(1)
+	go func() {
+		defer p.wg.Done()
+		keepaliveLoop(p.done, client, p.opts.KeepaliveInterval)
+	}()
 }
 
 func closeClients(clients []*cryptossh.Client) {
