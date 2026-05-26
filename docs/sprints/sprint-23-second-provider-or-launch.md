@@ -128,14 +128,14 @@ Po Sprincie 23:
 | Login-key leak risk during initial setup. | Token reads/writes go through keyring (`webox-api-<alias>`); doctor CLI accepts `--loginkey=...` but **NEVER** logs it. Live capture script (Sprint 24) follows the cpanel pattern: keyring-only, never plaintext. |
 | Coverage drift jeśli adapter w Sprint 24 zostanie odkryty jako wymagający 2nd-pass refactoru transportu. | Sprint 23 acceptance includes `make ci` zielony z ≥ 70% project coverage; jeśli transport requires rewrite w Sprint 24, refactor lands jako separate PR przed mutating client. |
 
-## Outcome (wypełnij po sprincie)
+## Outcome (zamknięto 2026-05-27)
 
-- 📌 Path selected: **A — DirectAdmin Adapter** (read-only foundation).
-- ✅ Done: <fill as tasks close>
-- ⏭️ Carry-over: live fixture capture → Sprint 24; mutating client → Sprint 24; adapter implementation → Sprint 24; wizard integration → Sprint 24; `v0.2.1` tag → Sprint 24.
-- 📌 Decyzje: Path A wybrane na podstawie decision matrix (§ Path selection decision); Path B (CyberPanel) deferred to v0.4+; Path C (Public Launch) deferred until `v0.2.0` GA.
-- 🧠 Surprises: <co się okazało inne niż w docs>
-- 📊 Metrics: DirectAdmin read-only client coverage, doctor directadmin pass-rate na docs-fixture base.
+- 📌 **Path selected:** A — DirectAdmin Adapter (read-only foundation).
+- ✅ **Done (6/6 tasks):** TASK-23.0 (decision-doc rewrite), TASK-23.1 (Live API client + transport, 88.7% coverage), TASK-23.2 (SSH fallback via loopback curl + Composite, generic dispatcher), TASK-23.3 (`webox doctor directadmin` CLI with 5-section taxonomy), TASK-23.4 (`directadmin-generic` preset graduate research → candidate), TASK-23.5 (`docs/providers/directadmin.md` flipped to "READ-ONLY CLIENT SHIPPED"), TASK-23.6 (retro + Sprint 24 draft).
+- ⏭️ **Carry-over (Sprint 24):** live fixture capture (TASK-24.0, operator-gated mirror of TASK-22.0), mutating client behind `WEBOX_DIRECTADMIN_MUTATIONS=1` (TASK-24.1), adapter implementation (TASK-24.2), wizard integration (TASK-24.3), GHA workflow helper (TASK-24.4), E2E suite (TASK-24.5), `internal/sshcmd` extraction (TASK-24.6), `v0.2.1` tag.
+- 📌 **Decyzje:** Path A wybrane na podstawie decision matrix (§Path selection decision, decyzja z 2026-05-27 z trzema napisanymi uzasadnieniami); Path B (CyberPanel) deferred to v0.4+ (root + threat-model RFC); Path C (Public Launch) deferred until `v0.2.0` GA (gated on operator-side cpanel rotation).
+- 🧠 **Surprises (z retro):** 3 wire shapes for DA Live API responses (research-derived decoder safety net), MySQL user prefix 8-char hard cap (Sprint 24 validator must enforce), `--no-api` vs `--no-uapi` terminology drift across panels.
+- 📊 **Metrics:** package coverage 85.2% (≥ 80% target), total project coverage 79.3% (≥ 70% gate), `make ci` zielony pierwsze podejście, lint clean (2× `//nolint:dupl` udokumentowane), 33 nowe unit testy + 6 parser testów.
 
 ## Outcome (wypełnij po sprincie)
 
