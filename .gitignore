@@ -74,6 +74,7 @@ id_*
 ### Mock testing artifacts (kept locally only)
 testing/fixtures/**/.captured
 testing/cassettes/**.recorded
+providers/cpanel/uapi/testdata/live/
 
 ### Go workspace files (avoid leaking dev paths)
 go.work
