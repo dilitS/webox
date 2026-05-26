@@ -156,7 +156,7 @@ smoke-test: ## Drive ./bin/webox --mock through Sprint 20 scenarios via tuistory
 		printf "$(COLOR_RED)✗ scripts/manual-test/node_modules missing.$(COLOR_RESET) Run: npm --prefix scripts/manual-test install\n"; \
 		exit 1; \
 	fi
-	@node --version | awk -F'.' '{ if ($$1 < "v24") { print "✗ Node "$$0" too old; need v24+"; exit 1 } }'
+	@node --version | awk -F'.' '{ if ($$1 < "v22") { print "✗ Node "$$0" too old; need v22+"; exit 1 } }'
 	@# Pin VERSION via sub-make so the manual/*.txt snapshots stay deterministic
 	@# across commits (LDFLAGS uses := and would otherwise capture the live
 	@# `git describe --dirty` value at parse time, churning every line of every

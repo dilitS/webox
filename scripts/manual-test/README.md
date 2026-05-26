@@ -17,7 +17,7 @@ All 34 assertions must pass for a green smoke run (~80s wall-clock).
 
 ## Prerequisites
 
-- Node.js **24+** (uses `--experimental-strip-types` for inline TypeScript)
+- Node.js **22+** (uses `--experimental-strip-types` for inline TypeScript)
 - `tuistory` and its deps (installed via `npm install`)
 - `./bin/webox` built (`make build`)
 - macOS / Linux / Windows host with a usable PTY backend (`tuistory`
