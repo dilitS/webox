@@ -107,16 +107,49 @@ func TestKeepaliveLoopStopsOnPoolClose(t *testing.T) {
 	// its counter after we read `before` but before Close had a chance
 	// to tear down the underlying client. Instead, rely on the pool
 	// contract that Close blocks until every keepalive goroutine has
-	// returned (and its underlying client is closed). After Close,
-	// the counter is frozen: snapshot it, sleep well past several
-	// keepalive intervals, and assert the snapshot is identical.
+	// returned (and its underlying client is closed). After Close
+	// returns, the keepalive goroutine has exited, but the cryptossh
+	// server-side internal goroutine may still drain one already-parsed
+	// keepalive request from its requests channel into handleGlobalRequests
+	// (which increments the counter under the mutex BEFORE replying).
+	// That drain is async w.r.t. pool.Close and was observed bumping the
+	// server-side count after Close returned on slow CI runners. To
+	// remove that flake without weakening the assertion, first wait for
+	// the server-side counter to stabilize (two consecutive snapshots
+	// 50 ms apart that agree), then assert the count remains frozen
+	// across a further window that spans many keepalive intervals.
 	pool.Close()
-	afterClose := server.GlobalRequestCount(keepaliveRequest)
+	afterClose := waitForStableCount(t, server, keepaliveRequest, 50*time.Millisecond, 2*time.Second)
 	time.Sleep(50 * time.Millisecond)
 	finalCount := server.GlobalRequestCount(keepaliveRequest)
 	if finalCount != afterClose {
-		t.Fatalf("keepalive count changed after pool close: just-after=%d final=%d", afterClose, finalCount)
+		t.Fatalf("keepalive count changed after pool close: stable=%d final=%d", afterClose, finalCount)
 	}
+}
+
+// waitForStableCount polls the server-side request counter until two
+// consecutive samples taken `quiet` apart agree, or `timeout` elapses.
+// It returns the last sample observed.
+//
+// Used by tests that assert "no further keepalive traffic after
+// pool.Close()": the cryptossh server-side connection teardown is
+// asynchronous, so even after pool.Close returns the server may still
+// process one already-received request before its channel is closed.
+// Waiting for stability eliminates that drain race.
+func waitForStableCount(t *testing.T, s *sshmock.Server, requestType string, quiet, timeout time.Duration) int {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	prev := s.GlobalRequestCount(requestType)
+	for time.Now().Before(deadline) {
+		time.Sleep(quiet)
+		cur := s.GlobalRequestCount(requestType)
+		if cur == prev {
+			return cur
+		}
+		prev = cur
+	}
+	return prev
 }
 
 func TestReconnect_SucceedsAfterTransientDialFailure(t *testing.T) {
