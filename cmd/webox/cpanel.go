@@ -382,6 +382,11 @@ func emitCpanelReport(asJSON bool, report cpanelReport, stdout, stderr io.Writer
 }
 
 // writeCpanelText renders the human-friendly report.
+//
+// See directadmin.go for the design rationale (per-provider
+// report types share shape but not type).
+//
+//nolint:dupl // Duplicates writeDirectadminText (directadmin.go).
 func writeCpanelText(stdout io.Writer, report cpanelReport) {
 	fmt.Fprintf(stdout, "Webox doctor cpanel — %s\n", report.Host)
 	fmt.Fprintf(stdout, "  user            %s\n", report.User)

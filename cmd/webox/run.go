@@ -45,6 +45,7 @@ Usage:
   webox doctor preset                    list all embedded provider presets
   webox doctor preset --id=ID            show preset details (use --json for machine output)
   webox doctor cpanel --host=H --user=U  read-only cPanel diagnostics (UAPI + SSH fallback)
+  webox doctor directadmin --host=H --user=U  read-only DirectAdmin diagnostics (Live API + SSH curl)
   webox provider new <name> [--preset=PRESET] scaffold a new hosting provider adapter
   webox --version                        print build metadata and exit
   webox --help                           print this help and exit
@@ -73,24 +74,33 @@ Flags:
                        --host=HOST and --user=USER. Without those flags it
                        falls back to a documentation dump of the declarative
                        metadata and explains how to enable live execution.
-  --host=HOST          (with ` + "`doctor preset --probe`" + ` or ` + "`doctor cpanel`" + `) target
-                       host (e.g. --host=panel.example.com).
-  --user=USER          (with ` + "`doctor preset --probe`" + ` or ` + "`doctor cpanel`" + `) login
-                       user (e.g. --user=operator).
+  --host=HOST          (with ` + "`doctor preset --probe`" + `, ` + "`doctor cpanel`" + `, or ` + "`doctor directadmin`" + `)
+                       target host (e.g. --host=panel.example.com).
+  --user=USER          (with ` + "`doctor preset --probe`" + `, ` + "`doctor cpanel`" + `, or ` + "`doctor directadmin`" + `)
+                       login user (e.g. --user=operator).
   --port=N             (with ` + "`doctor preset --probe`" + `) SSH port. Defaults to the
                        value in ~/.ssh/config when omitted (typically 22).
-  --timeout=DUR        (with ` + "`doctor preset --probe`" + ` or ` + "`doctor cpanel`" + `) per-call
-                       timeout in Go duration form (default 30s).
+  --timeout=DUR        (with ` + "`doctor preset --probe`" + `, ` + "`doctor cpanel`" + `, or ` + "`doctor directadmin`" + `)
+                       per-call timeout in Go duration form (default 30s).
   --token=TOKEN        (only with ` + "`doctor cpanel`" + `) cPanel UAPI access token
                        (https://manage2.cpanel.net/account/api_token). When
                        absent the HTTPS UAPI path is disabled and ` + "`doctor cpanel`" + `
                        runs SSH-only.
-  --api-port=N         (only with ` + "`doctor cpanel`" + `) HTTPS UAPI port (default 2083).
-  --ssh-port=N         (only with ` + "`doctor cpanel`" + `) SSH port (default 22).
-  --no-ssh             (only with ` + "`doctor cpanel`" + `) disable the SSH fallback.
-                       Requires --token. Useful for verifying UAPI-only setups.
+  --loginkey=KEY       (only with ` + "`doctor directadmin`" + `) DirectAdmin login key
+                       (Manage Login Keys in the panel). When absent the
+                       HTTPS Live API path is disabled and ` + "`doctor directadmin`" + `
+                       runs SSH-only (also requires the key for loopback curl).
+  --api-port=N         (with ` + "`doctor cpanel`" + ` or ` + "`doctor directadmin`" + `) HTTPS API port.
+                       Defaults to 2083 (cpanel) or 2222 (directadmin).
+  --ssh-port=N         (with ` + "`doctor cpanel`" + ` or ` + "`doctor directadmin`" + `) SSH port (default 22).
+  --no-ssh             (with ` + "`doctor cpanel`" + ` or ` + "`doctor directadmin`" + `) disable the SSH
+                       fallback. Requires the matching bearer credential
+                       (--token / --loginkey) so the HTTPS transport can work
+                       on its own.
   --no-uapi            (only with ` + "`doctor cpanel`" + `) disable the HTTPS UAPI path.
                        Forces every check through SSH.
+  --no-api             (only with ` + "`doctor directadmin`" + `) disable the HTTPS Live API
+                       path. Forces every check through SSH+curl on loopback.
 
 Documentation:
   https://github.com/dilitS/webox/tree/main/docs
@@ -107,7 +117,7 @@ type opts struct {
 	mock         bool
 	doctor       bool
 	doctorJSON   bool
-	doctorTarget string // "" | "github" | "preset" | "cpanel"
+	doctorTarget string // "" | "github" | "preset" | "cpanel" | "directadmin"
 	// debugTracePath, when non-empty, instructs the launcher to open
 	// a [telemetry.FileSink] at the given path and route cockpit /
 	// SSH / doctor events into it. Empty value keeps the default
@@ -141,6 +151,16 @@ type opts struct {
 	cpanelSSHPort int
 	cpanelNoSSH   bool
 	cpanelNoUAPI  bool
+	// directadmin* fields scope to `webox doctor directadmin`.
+	// loginKey feeds the Live API HTTPS path; apiPort defaults
+	// to 2222, sshPort to 22. noSSH / noAPI let operators force
+	// a single transport (cpanel mirror; the no-uapi → no-api
+	// rename matches DA's "Live API" terminology).
+	directadminLoginKey string
+	directadminAPIPort  int
+	directadminSSHPort  int
+	directadminNoSSH    bool
+	directadminNoAPI    bool
 }
 
 // doctorDispatcher is the seam that lets tests run the CLI router
@@ -152,13 +172,15 @@ type presetDispatcher func(opts presetOpts, stdout, stderr io.Writer) int
 
 type cpanelDispatcher func(opts cpanelOpts, stdout, stderr io.Writer) int
 
+type directadminDispatcher func(opts directadminOpts, stdout, stderr io.Writer) int
+
 type tuiDispatcher func(stdout, stderr io.Writer) int
 
 // Run dispatches the command implied by args (without the program name)
 // and returns the process exit code. Output is written to the supplied
 // writers so tests can capture it without touching os.Stdout/os.Stderr.
 func Run(args []string, stdout, stderr io.Writer) int {
-	return runWithFullDeps(args, stdout, stderr, runDoctor, runDoctorGitHub, defaultPresetDispatcher, runDoctorCpanel, runTUI)
+	return runWithFullDeps(args, stdout, stderr, runDoctor, runDoctorGitHub, defaultPresetDispatcher, runDoctorCpanel, runDoctorDirectadmin, runTUI)
 }
 
 // runWithDeps preserves the legacy two-dispatcher seam used by existing
@@ -171,7 +193,7 @@ func runWithDeps(
 	dispatch doctorDispatcher,
 	startTUI tuiDispatcher,
 ) int {
-	return runWithFullDeps(args, stdout, stderr, dispatch, runDoctorGitHub, defaultPresetDispatcher, runDoctorCpanel, startTUI)
+	return runWithFullDeps(args, stdout, stderr, dispatch, runDoctorGitHub, defaultPresetDispatcher, runDoctorCpanel, runDoctorDirectadmin, startTUI)
 }
 
 func runWithFullDeps(
@@ -182,6 +204,7 @@ func runWithFullDeps(
 	dispatchGitHub doctorDispatcher,
 	dispatchPreset presetDispatcher,
 	dispatchCpanel cpanelDispatcher,
+	dispatchDirectadmin directadminDispatcher,
 	startTUI tuiDispatcher,
 ) int {
 	parsed, errMsg := parseArgs(args)
@@ -222,6 +245,18 @@ func runWithFullDeps(
 				json:    parsed.doctorJSON,
 				noSSH:   parsed.cpanelNoSSH,
 				noUAPI:  parsed.cpanelNoUAPI,
+			}, stdout, stderr)
+		case "directadmin":
+			return dispatchDirectadmin(directadminOpts{
+				host:     parsed.presetHost,
+				user:     parsed.presetUser,
+				loginKey: parsed.directadminLoginKey,
+				apiPort:  parsed.directadminAPIPort,
+				sshPort:  parsed.directadminSSHPort,
+				timeout:  parsed.presetTimeout,
+				json:     parsed.doctorJSON,
+				noSSH:    parsed.directadminNoSSH,
+				noAPI:    parsed.directadminNoAPI,
 			}, stdout, stderr)
 		default:
 			return dispatchCore(parsed.doctorJSON, stdout, stderr)
@@ -525,7 +560,7 @@ func applySimpleFlag(parsed *opts, arg string) string {
 	switch arg {
 	case "doctor":
 		parsed.doctor = true
-	case "github", "preset", "cpanel", "new":
+	case "github", "preset", "cpanel", "directadmin", "new":
 		return applyContextualToken(parsed, arg)
 	case "provider":
 		parsed.providerNew = true
@@ -544,10 +579,41 @@ func applySimpleFlag(parsed *opts, arg string) string {
 	case "--dry-run":
 		return applyDryRunFlag(parsed)
 	case "--no-ssh":
-		return applyCpanelToggle(parsed, "--no-ssh", &parsed.cpanelNoSSH)
+		return applyNoSSHToggle(parsed)
 	case "--no-uapi":
 		return applyCpanelToggle(parsed, "--no-uapi", &parsed.cpanelNoUAPI)
+	case "--no-api":
+		return applyDirectadminToggle(parsed, "--no-api", &parsed.directadminNoAPI)
 	}
+	return ""
+}
+
+// applyNoSSHToggle is the shared --no-ssh handler. Both
+// `doctor cpanel` and `doctor directadmin` accept --no-ssh as
+// "use the HTTPS transport only". The doctor-target gate
+// disambiguates which struct field to flip; outside either
+// context the flag is rejected with a focused error.
+func applyNoSSHToggle(parsed *opts) string {
+	switch parsed.doctorTarget {
+	case "cpanel":
+		parsed.cpanelNoSSH = true
+		return ""
+	case "directadmin":
+		parsed.directadminNoSSH = true
+		return ""
+	default:
+		return "webox: --no-ssh is only valid with `webox doctor cpanel` or `webox doctor directadmin`."
+	}
+}
+
+// applyDirectadminToggle is the directadmin sibling of
+// [applyCpanelToggle]. Kept symmetrical so reviewers see the same
+// shape twice rather than a clever-but-confusing shared helper.
+func applyDirectadminToggle(parsed *opts, name string, target *bool) string {
+	if parsed.doctorTarget != "directadmin" {
+		return fmt.Sprintf("webox: %s is only valid with `webox doctor directadmin`.", name)
+	}
+	*target = true
 	return ""
 }
 
@@ -577,6 +643,11 @@ func applyContextualToken(parsed *opts, arg string) string {
 			return ""
 		}
 		return setDoctorTarget(parsed, "cpanel", "`cpanel` is only valid after `doctor` (usage: webox doctor cpanel --host=... --user=...).")
+	case "directadmin":
+		if isPendingProviderNameSlot(parsed) {
+			return ""
+		}
+		return setDoctorTarget(parsed, "directadmin", "`directadmin` is only valid after `doctor` (usage: webox doctor directadmin --host=... --user=...).")
 	case "new":
 		if !parsed.providerNew {
 			return "webox: `new` is only valid after `provider` (usage: webox provider new <name>)."
@@ -641,12 +712,12 @@ func applyDryRunFlag(parsed *opts) string {
 // the operator's intent of `webox provider new cpanel`.
 func simpleFlagHandled(parsed *opts, arg string) bool {
 	switch arg {
-	case "github", "preset", "cpanel":
+	case "github", "preset", "cpanel", "directadmin":
 		return !isPendingProviderNameSlot(parsed)
 	case "doctor", "provider", "new",
 		"--version", "--help", "-h", "--debug",
 		"--mock", "--json", "--probe", "--dry-run",
-		"--no-ssh", "--no-uapi":
+		"--no-ssh", "--no-uapi", "--no-api":
 		return true
 	}
 	return false
@@ -710,7 +781,7 @@ func applyPresetIDFlag(parsed *opts, arg string) (string, bool) {
 func applyPresetProbeFlag(parsed *opts, arg string) (string, bool) {
 	if host, ok := strings.CutPrefix(arg, "--host="); ok {
 		if !isPresetOrCpanelContext(parsed) {
-			return "webox: --host is only valid with `webox doctor preset --probe` or `webox doctor cpanel`.", true
+			return "webox: --host is only valid with `webox doctor preset --probe`, `webox doctor cpanel`, or `webox doctor directadmin`.", true
 		}
 		if host == "" {
 			return "webox: --host requires a value (e.g. --host=panel.example.com).", true
@@ -720,7 +791,7 @@ func applyPresetProbeFlag(parsed *opts, arg string) (string, bool) {
 	}
 	if user, ok := strings.CutPrefix(arg, "--user="); ok {
 		if !isPresetOrCpanelContext(parsed) {
-			return "webox: --user is only valid with `webox doctor preset --probe` or `webox doctor cpanel`.", true
+			return "webox: --user is only valid with `webox doctor preset --probe`, `webox doctor cpanel`, or `webox doctor directadmin`.", true
 		}
 		if user == "" {
 			return "webox: --user requires a value (e.g. --user=operator).", true
@@ -730,7 +801,7 @@ func applyPresetProbeFlag(parsed *opts, arg string) (string, bool) {
 	}
 	if portStr, ok := strings.CutPrefix(arg, "--port="); ok {
 		if parsed.doctorTarget != "preset" {
-			return "webox: --port is only valid with `webox doctor preset --probe`. Use --ssh-port / --api-port with `doctor cpanel`.", true
+			return "webox: --port is only valid with `webox doctor preset --probe`. Use --ssh-port / --api-port with `doctor cpanel` or `doctor directadmin`.", true
 		}
 		port, err := strconv.Atoi(portStr)
 		if err != nil || port <= 0 || port > maxTCPPort {
@@ -741,7 +812,7 @@ func applyPresetProbeFlag(parsed *opts, arg string) (string, bool) {
 	}
 	if timeoutStr, ok := strings.CutPrefix(arg, "--timeout="); ok {
 		if !isPresetOrCpanelContext(parsed) {
-			return "webox: --timeout is only valid with `webox doctor preset --probe` or `webox doctor cpanel`.", true
+			return "webox: --timeout is only valid with `webox doctor preset --probe`, `webox doctor cpanel`, or `webox doctor directadmin`.", true
 		}
 		dur, err := time.ParseDuration(timeoutStr)
 		if err != nil || dur <= 0 {
@@ -753,14 +824,15 @@ func applyPresetProbeFlag(parsed *opts, arg string) (string, bool) {
 	return applyCpanelPrefixFlag(parsed, arg)
 }
 
-// applyCpanelPrefixFlag handles --token, --api-port, --ssh-port —
-// the three cPanel-only prefixed flags. Kept separate from
-// applyPresetProbeFlag so each parent function stays under the
-// gocyclo budget.
+// applyCpanelPrefixFlag handles --token plus the shared
+// --api-port / --ssh-port pair that both `doctor cpanel` and
+// `doctor directadmin` accept. The doctor-target gate
+// disambiguates which struct field gets the value; directadmin
+// also accepts --loginkey (its bearer-credential name).
 func applyCpanelPrefixFlag(parsed *opts, arg string) (string, bool) {
 	if tok, ok := strings.CutPrefix(arg, "--token="); ok {
 		if parsed.doctorTarget != "cpanel" {
-			return "webox: --token is only valid with `webox doctor cpanel`.", true
+			return "webox: --token is only valid with `webox doctor cpanel`. Use --loginkey with `webox doctor directadmin`.", true
 		}
 		if tok == "" {
 			return "webox: --token requires a value (cPanel UAPI access token).", true
@@ -768,37 +840,78 @@ func applyCpanelPrefixFlag(parsed *opts, arg string) (string, bool) {
 		parsed.cpanelToken = tok
 		return "", true
 	}
-	if portStr, ok := strings.CutPrefix(arg, "--api-port="); ok {
-		if parsed.doctorTarget != "cpanel" {
-			return "webox: --api-port is only valid with `webox doctor cpanel`.", true
+	if key, ok := strings.CutPrefix(arg, "--loginkey="); ok {
+		if parsed.doctorTarget != "directadmin" {
+			return "webox: --loginkey is only valid with `webox doctor directadmin`. Use --token with `webox doctor cpanel`.", true
 		}
+		if key == "" {
+			return "webox: --loginkey requires a value (DirectAdmin login key).", true
+		}
+		parsed.directadminLoginKey = key
+		return "", true
+	}
+	if portStr, ok := strings.CutPrefix(arg, "--api-port="); ok {
+		return applyAPIPortFlag(parsed, portStr)
+	}
+	if portStr, ok := strings.CutPrefix(arg, "--ssh-port="); ok {
+		return applySSHPortFlag(parsed, portStr)
+	}
+	return "", false
+}
+
+// applyAPIPortFlag routes --api-port into either the cpanel or
+// directadmin slot based on the active doctor target. Pulled out
+// so applyCpanelPrefixFlag stays under the gocyclo budget after
+// gaining the directadmin parallel path.
+func applyAPIPortFlag(parsed *opts, portStr string) (string, bool) {
+	switch parsed.doctorTarget {
+	case "cpanel":
 		port, err := strconv.Atoi(portStr)
 		if err != nil || port <= 0 || port > maxTCPPort {
 			return fmt.Sprintf("webox: --api-port=%q must be a positive integer <= %d.", portStr, maxTCPPort), true
 		}
 		parsed.cpanelAPIPort = port
 		return "", true
-	}
-	if portStr, ok := strings.CutPrefix(arg, "--ssh-port="); ok {
-		if parsed.doctorTarget != "cpanel" {
-			return "webox: --ssh-port is only valid with `webox doctor cpanel`.", true
+	case "directadmin":
+		port, err := strconv.Atoi(portStr)
+		if err != nil || port <= 0 || port > maxTCPPort {
+			return fmt.Sprintf("webox: --api-port=%q must be a positive integer <= %d.", portStr, maxTCPPort), true
 		}
+		parsed.directadminAPIPort = port
+		return "", true
+	default:
+		return "webox: --api-port is only valid with `webox doctor cpanel` or `webox doctor directadmin`.", true
+	}
+}
+
+// applySSHPortFlag is the SSH-port sibling of [applyAPIPortFlag].
+func applySSHPortFlag(parsed *opts, portStr string) (string, bool) {
+	switch parsed.doctorTarget {
+	case "cpanel":
 		port, err := strconv.Atoi(portStr)
 		if err != nil || port <= 0 || port > maxTCPPort {
 			return fmt.Sprintf("webox: --ssh-port=%q must be a positive integer <= %d.", portStr, maxTCPPort), true
 		}
 		parsed.cpanelSSHPort = port
 		return "", true
+	case "directadmin":
+		port, err := strconv.Atoi(portStr)
+		if err != nil || port <= 0 || port > maxTCPPort {
+			return fmt.Sprintf("webox: --ssh-port=%q must be a positive integer <= %d.", portStr, maxTCPPort), true
+		}
+		parsed.directadminSSHPort = port
+		return "", true
+	default:
+		return "webox: --ssh-port is only valid with `webox doctor cpanel` or `webox doctor directadmin`.", true
 	}
-	return "", false
 }
 
 // isPresetOrCpanelContext consolidates the gate that --host /
 // --user / --timeout share. They're valid in either
-// `doctor preset --probe` or `doctor cpanel`; centralising the
-// check keeps the error messages consistent.
+// `doctor preset --probe`, `doctor cpanel`, or `doctor directadmin`;
+// centralising the check keeps the error messages consistent.
 func isPresetOrCpanelContext(parsed *opts) bool {
-	return parsed.doctorTarget == "preset" || parsed.doctorTarget == "cpanel"
+	return parsed.doctorTarget == "preset" || parsed.doctorTarget == "cpanel" || parsed.doctorTarget == "directadmin"
 }
 
 func prefixedFlagHandled(arg string) bool {
@@ -810,6 +923,7 @@ func prefixedFlagHandled(arg string) bool {
 		strings.HasPrefix(arg, "--port=") ||
 		strings.HasPrefix(arg, "--timeout=") ||
 		strings.HasPrefix(arg, "--token=") ||
+		strings.HasPrefix(arg, "--loginkey=") ||
 		strings.HasPrefix(arg, "--api-port=") ||
 		strings.HasPrefix(arg, "--ssh-port=")
 }

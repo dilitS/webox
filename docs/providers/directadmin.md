@@ -1,12 +1,24 @@
 # Provider: directadmin
 
-> Status: **RESEARCH / PLANNED POST-MVP (v0.3)** · Ostatnia aktualizacja: 2026-05-22 · Właściciel: @maintainer
+> Status: **READ-ONLY CLIENT SHIPPED (Sprint 23, v0.2 path)** · Ostatnia aktualizacja: 2026-05-27 · Właściciel: @maintainer
 >
-> Pokrewne dokumenty: [providers/smallhost.md](./smallhost.md) (wzorzec), [providers/cpanel.md](./cpanel.md) (drugi research), [CONTRIBUTING §3](../CONTRIBUTING.md#3-jak-doda%C4%87-nowy-provider).
+> Pokrewne dokumenty: [providers/smallhost.md](./smallhost.md) (wzorzec), [providers/cpanel.md](./cpanel.md) (siblingsprintów 21+22), [CONTRIBUTING §3](../CONTRIBUTING.md#3-jak-doda%C4%87-nowy-provider).
 
 ## STATUS
 
-**RESEARCH — implementacja zaplanowana na v0.3** (po cPanel w v0.2, jeśli ROADMAP §4 nie zostanie zmieniony). Ten dokument zawiera **wyłącznie notatki badawcze** i otwarte pytania. Wszystkie hipotezy `[TO BE VERIFIED]` wymagają potwierdzenia.
+**READ-ONLY CLIENT + DIAGNOSTIC CLI SHIPPED** w Sprincie 23 ([plan](../sprints/sprint-23-second-provider-or-launch.md), [retro](../retros/2026-05-27-sprint-23.md)). Aktualnie:
+
+| Komponent | Status | Lokalizacja |
+|---|---|---|
+| Read-only Live API client | ✅ ✅ | [`providers/directadmin/api/client.go`](../../providers/directadmin/api/client.go) |
+| SSH fallback (loopback curl) | ✅ | [`providers/directadmin/api/ssh.go`](../../providers/directadmin/api/ssh.go) |
+| Composite (HTTPS-first, SSH fallover) | ✅ | [`providers/directadmin/api/composite.go`](../../providers/directadmin/api/composite.go) |
+| `webox doctor directadmin` CLI | ✅ | [`cmd/webox/directadmin.go`](../../cmd/webox/directadmin.go) |
+| `directadmin-generic` preset graduate research → candidate | ✅ | [`assets/provider-presets/directadmin-generic.json`](../../assets/provider-presets/directadmin-generic.json) |
+| `providers.HostingProvider` adapter | ⏭️ Sprint 24 | — |
+| Mutating client + env-var guard | ⏭️ Sprint 24 | — |
+| Live test account + live fixture capture | ⏭️ Sprint 24 (operator-gated) | — |
+| Wizard integration | ⏭️ Sprint 24 | — |
 
 > Oryginalny PRD zawierał implementację `directadmin.go` napisaną z głowy, z `DA_API_KEY` jako **string literal w kodzie** — to było jednocześnie błędem implementacyjnym (sekret w pliku źródłowym!) i nieweryfikowalną propozycją API. Usunięte. Patrz [CHANGES.md poprawki 6.8 + 6.9](../../CHANGES.md#1-poprawki-merytoryczne-z-tabeli-6-briefu).
 
@@ -139,12 +151,30 @@ API key można rotować w `/settings → Provider → Rotate API key`.
 
 ## 9. Plan testów przed implementacją
 
-1. Pozyskać dostęp do testowego konta DirectAdmin (sandbox / trial / partner program).
-2. Sciągnąć `swagger.json` z testowego serwera — zbadać kompletność nowego API.
-3. Manualnie wykonać każdą z planowanych operacji (§5) zarówno w API legacy jak i nowym.
-4. Zapisać responses jako fixture'y w `testing/fixtures/directadmin/` (sanityzowane).
-5. Każdy fixture ma `*.fixture.md` z opisem pochodzenia.
-6. Iteracja §4 → coroczna aktualizacja.
-7. Po weryfikacji wszystkich punktów §4 — promocja statusu z **RESEARCH** na **PLANNED**.
+> Status: **częściowo wykonany w Sprincie 23.** Read-only ścieżka pokryta przez research-derived fixture'y; pełna weryfikacja Live API + Legacy mapping czeka na live test account (Sprint 24, mirror TASK-22.0 z cpanela).
 
-Bez kompletu fixture'ów — adapter nie wchodzi do `main`. Patrz [CONTRIBUTING §3.4](../CONTRIBUTING.md#34-krok-4--testy).
+1. ✅ **Public Swagger spec wykorzystany jako fixture base** — `providers/directadmin/api/testdata/` zawiera 9 golden fixture'ów z DA Live API docs + Swagger spec, plus 3 wire-shape warianty wrapper'a (`{"domains":[...]}`, `{"data":[...]}`, bare array).
+2. ⏭️ **Sprint 24:** pozyskać live DA test account. Następnie:
+   - Ściągnąć `swagger.json` z testowego serwera — porównać kompletność z założeniami Sprintu 23.
+   - Wykonać każdą z planowanych operacji (§5) zarówno w Live API jak i legacy `CMD_API_*`.
+   - Zapisać sanitised responses w `providers/directadmin/api/testdata/live/` (gitignored) za pomocą `scripts/smoke-directadmin.sh` (mirror `smoke-cpanel.sh`).
+   - Po manualnej redacji promować wybrane payloady do `providers/directadmin/api/testdata/` jako live-captured fixture'y; status preset'u flip z `candidate` na `verified`.
+3. ⏭️ **Sprint 24+:** mutating client (`Mutator` interface) + adapter implementation (`providers/directadmin/directadmin.go`) + wizard integration.
+
+Bez kompletu fixture'ów + mutating client + adapter — `webox` nie zaproponuje DirectAdmin w Provider Catalog wizard'a. Patrz [CONTRIBUTING §3.4](../CONTRIBUTING.md#34-krok-4--testy).
+
+## 10. Implementation notes (Sprint 23)
+
+### 10.1 Co zostało zaimplementowane
+
+- **Live API client (`providers/directadmin/api/`)** — HTTPS-only transport z Basic-auth nagłówkiem `Authorization: Basic <user:loginkey>`, retry policy (500 ms × 2ⁿ × 3 attempts), 4 MiB body cap, 30s default timeout. 9 typed error sentinels (`ErrAuthenticationFailed`, `ErrRateLimited`, `ErrAPIDisabled`, etc.); decoder akceptuje 3 wire shape'y (wrapper key, `{"data":[...]}`, bare array).
+- **SSH fallback** — shells out to `curl -sk --user <user>:<key> https://localhost:<port>/api/<path> --write-out '\n%{http_code}'` na zdalnym boxie. Rozwiązuje case: operator może zassh-ować się do hosta, ale jego machine nie ma dostępu do panelu :2222 (restrictive firewall, NAT, IP allowlist).
+- **Composite** — generic `Composite{Primary, Secondary}` z fall-over WYŁĄCZNIE na `ErrTransportUnavailable`. Auth / rate-limit / API-disabled surface verbatim, bo SSH fallback uderza w ten sam endpoint z tym samym kluczem.
+- **`webox doctor directadmin`** — 5-sekcyjny doctor (Whoami / Domains / Subdomains / Databases / SSLCertificates), JSON + text output, exit codes 0/1/2 (OK-DEGRADED / BLOCKED / misuse). Status taxonomy: OK / DISABLED / AUTH_FAILED / UNREACHABLE / FAILED.
+
+### 10.2 Otwarte decyzje (do Sprint 24)
+
+- **Legacy `/CMD_API_*` adapter** — Sprint 23 nie zaimplementował. `ErrAPIDisabled` surface'uje 404/503 z Live API, ale legacy CMD ciągle działa na starszych installach. Decision pending: czy adapter na legacy CMD wchodzi w v0.4+ (potencjalny ADR), czy odsuwamy do v1.0.
+- **Mutating endpoints** — Sprint 24 (TASK-24.1+). Planowane: `CreateAddonDomain` (`/api/users/<u>/domains`), `CreateSubdomain` (`/api/users/<u>/subdomains`), `InstallSSL` (`/api/ssl/letsencrypt`), `CreateDatabase` (`/api/users/<u>/databases`). Wszystkie pod env-var guardem `WEBOX_DIRECTADMIN_MUTATIONS=1` (mirror cpanel pattern).
+- **Database user prefix limit (8 chars)** — DA caps MySQL user prefix at 8 chars, co psuje "verylongusername_db" naming policy. Adapter (Sprint 24) musi enforce'ować w validatorze: `dbUserName := truncate(username, 8) + "_" + suffix`.
+- **Nginx Unit vs Passenger detection** — niektóre DA installs używają Nginx Unit zamiast Passenger. Adapter musi runtime-detect (Sprint 24); probe `command -v passenger-config` versus `systemctl status unit` na hoście.

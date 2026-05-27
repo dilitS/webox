@@ -1,0 +1,5 @@
+{
+  "username": "alice",
+  "user_type": "user",
+  "scopes": ["read:domains", "read:subdomains", "read:databases", "read:ssl"]
+}

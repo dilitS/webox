@@ -1,0 +1,17 @@
+{
+  "success": true,
+  "subdomains": [
+    {
+      "subdomain": "api.shop.example.com",
+      "parent_domain": "shop.example.com",
+      "ssl": true,
+      "suspended": false
+    },
+    {
+      "subdomain": "staging.shop.example.com",
+      "parent_domain": "shop.example.com",
+      "ssl": false,
+      "suspended": false
+    }
+  ]
+}
