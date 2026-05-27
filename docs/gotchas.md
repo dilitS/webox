@@ -1,6 +1,6 @@
 # Webox — Top Gotchas & Anti-patterns
 
-> Status: Living document · Ostatnia aktualizacja: 2026-05-25 · Właściciel: @maintainer
+> Status: Living document · Ostatnia aktualizacja: 2026-05-27 · Właściciel: @maintainer
 >
 > Pokrewne dokumenty: [AUDIT.md](./AUDIT.md), [SECURITY.md](./SECURITY.md), [DESIGN.md](./DESIGN.md), [conventions.md](./conventions.md).
 >
@@ -298,6 +298,66 @@ Patrz [DESIGN §15.2](./DESIGN.md#152-redacted-logger--wzorce).
 
 ---
 
+## 14a. `t.Parallel()` + `t.Setenv()` to combo niedopuszczalne
+
+**Anti-pattern:**
+
+```go
+func TestThing(t *testing.T) {
+    t.Parallel()
+    t.Setenv("WEBOX_CPANEL_MUTATIONS", "1")
+    // ...
+}
+```
+
+**Problem:** `t.Setenv` panicuje przy `t.Parallel()` — pakiet `testing` celowo wyłącza tę kombinację, bo zmienne środowiskowe procesu są globalne i równoległe testy modyfikujące różne wartości tej samej zmiennej będą się ścigać. Pomyłka kosztuje: testy padają dopiero przy `-race` lub na CI gdzie scheduler ujawnia kolejność, a lokalnie bywa zielono.
+
+**Fix:** Wybierz jedno:
+
+- **opcja A — `t.Parallel()` tak, `t.Setenv` nie.** Wstrzyknij wartość env vara przez seam (parametr funkcji, pole struktury, opcjonalna konfiguracja). Pakiet `cmd/webox` korzysta z tego wzorca — opcje doctora dostają `cpanelOpts.httpsTransport`, nie globalnego env vara.
+- **opcja B — `t.Setenv` tak, `t.Parallel()` nie.** Niech test biegnie sekwencyjnie. Bezpieczne tylko gdy test jest szybki (< 200 ms) i nie wstrzymuje całego pakietu.
+
+Każdy nowy test stosujący `t.Setenv` musi mieć komentarz wyjaśniający dlaczego nie da się odpuścić globalnej zmiennej.
+
+**Wystąpienia:** Sprint 22 `internal/e2e/cpanel_test.go` (przepisany na seam), Sprint 23 — flagowane w retro jako recurring class. Patrz `docs/retros/2026-05-27-sprint-23.md`.
+
+---
+
+## 14b. Contextual-token parser bez stanowej maszyny
+
+**Anti-pattern:** parser CLI rozpoznaje token (`github`, `preset`, `cpanel`, `directadmin`) globalnie — `simpleFlagHandled` widzi `cpanel` w `webox doctor cpanel` i w `webox provider new cpanel <X>` jako tę samą rzecz.
+
+**Problem:** kolizja parsera w wielu kontekstach. `webox doctor cpanel --token=…` chce konsumować token w trybie diagnostyki, `webox provider new cpanel jakas-nazwa` chce konsumować ten sam string jako provider name. Bez state-aware logiki jeden z dwóch przypadków cicho znika lub łapie zły fragment komendy.
+
+**Fix:** Parser w `cmd/webox/run.go` przed dotknięciem tokena pyta:
+
+```go
+if isProviderNewContext(parsed) && parsed.needsProviderName() {
+    return consumeAsProviderName(parsed, tok)
+}
+if isPresetOrCpanelOrDirectadminContext(parsed) {
+    return applyContextualToken(parsed, tok)
+}
+```
+
+Każdy contextual handler (`applyContextualToken`, `simpleFlagHandled`, `prefixedFlagHandled`, `applyAPIPortFlag`, `applySSHPortFlag`) musi pierwsze sprawdzić w jakim kontekście jest parser, dopiero potem zinterpretować token. Negative tests są obowiązkowe: każdy flag z prefiksem (`--token`, `--loginkey`, `--api-port`, `--no-api`) musi mieć test rejekcji poza kontekstem.
+
+**Wystąpienia:** Sprint 21 (cpanel + preset), Sprint 23 (directadmin dorzucony). Patrz `cmd/webox/cpanel_parser_test.go`, `cmd/webox/directadmin_parser_test.go`, `cmd/webox/preset_test.go`.
+
+---
+
+## 14c. `Pool.Close` ≠ "server-side counter frozen"
+
+**Anti-pattern:** test SSH keepalive zakłada że po `pool.Close()` returns immediately `server.GlobalRequestCount(...)` jest finalne.
+
+**Problem:** `pool.Close` honoruje kontrakt _client-side_ (`wg.Wait()` blokuje dopóki goroutine keepalive nie zwróci), ale po stronie serwera istnieje druga warstwa async: wewnętrzna goroutine `crypto/ssh.Server` czyta SSH-packets z drutu, parsuje globalne requesty i wkłada je do channela `requests`. `sshmock.handleGlobalRequests` zwiększa licznik **przed** `reply(req)`. Jeśli klient zamknął połączenie gdy jeden już-sparowany request siedział w channelu, server-side increment ląduje **po** powrocie `pool.Close()`.
+
+**Fix:** Każdy assert oparty o server-side counter po `pool.Close()` musi czekać aż licznik się ustabilizuje (dwa kolejne snapshoty oddzielone interwałem ≥ 1 keepalive period zwracają tę samą wartość). Helper w `ssh/exec_test.go::waitForStableCount` — szablon dla nowych testów.
+
+**Wystąpienia:** Sprint 22 (PR-17 macOS flake `just-after=1 final=2`), Sprint 23 (PR-18 to samo). Naprawione w 2026-05-27.
+
+---
+
 ## 15. Polish-only docs / mixed PL/EN w contributor surface
 
 **Anti-pattern:** README po polsku, CONTRIBUTING po polsku, ADR-y po polsku → contributor z UK się nie zaangażuje.
@@ -316,4 +376,4 @@ PL community ma `docs/CONTRIBUTING.md` (legacy detailed) jako reference, ale ent
 
 ---
 
-> _Last reviewed: 2026-05-25. Wydzielone z `AGENTS.md §7` jako część Sprint 15 docs refactor._
+> _Last reviewed: 2026-05-27. Sprint 23 retro dorzucił sekcje 14a-14c (t.Parallel+t.Setenv, contextual-token parser, server-side drain race). Wydzielone z `AGENTS.md §7` jako część Sprint 15 docs refactor._

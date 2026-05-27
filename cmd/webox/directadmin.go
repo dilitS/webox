@@ -334,21 +334,14 @@ func rollupDirectadminVerdict(sections []directadminSectionResult) directadminVe
 	}
 }
 
-// directadminTransportLabel renders the transport hint next to
-// each section. Composite shows "HTTPS+SSH"; bare Reader shows
-// "HTTPS" or "SSH" depending on the type assertion.
-func directadminTransportLabel(r daapi.Reader) string {
-	if _, ok := r.(*daapi.Composite); ok {
-		return "HTTPS+SSH"
-	}
-	if _, ok := r.(*daapi.Client); ok {
-		return "HTTPS"
-	}
-	if _, ok := r.(*daapi.SSHFallback); ok {
-		return "SSH"
-	}
-	return "?"
-}
+// directadminTransportLabel renders the transport hint next to each
+// section. Sprint 23 used a three-arm type-switch against the known
+// daapi Reader implementations; that approach silently broke whenever
+// a new implementation landed (the default "?" branch swallowed it).
+// The post-Sprint-23 polish moved the label onto the [daapi.Reader]
+// interface itself ([daapi.Reader.Transport]), so any future
+// implementation is forced to declare its label at compile time.
+func directadminTransportLabel(r daapi.Reader) string { return r.Transport() }
 
 // capDirectadminSample mirrors capSample; pulled out to keep this
 // file self-contained.

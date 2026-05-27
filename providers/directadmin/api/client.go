@@ -29,6 +29,14 @@ type Reader interface {
 	ListSubdomains(ctx context.Context) ([]Subdomain, error)
 	ListDatabases(ctx context.Context) ([]Database, error)
 	ListSSLCertificates(ctx context.Context) ([]SSLCertificate, error)
+
+	// Transport returns a short, stable label for the transport
+	// powering this Reader. Used by `webox doctor directadmin` to
+	// render the transport hint next to each section without a
+	// runtime type-switch in the caller. Stable values: "HTTPS",
+	// "SSH", "HTTPS+SSH" (composite with both legs wired), "?"
+	// (composite with neither wired — a programmer error).
+	Transport() string
 }
 
 // Client is the HTTPS implementation of Reader. Constructed via
@@ -154,6 +162,13 @@ func (c *Client) ListSSLCertificates(ctx context.Context) ([]SSLCertificate, err
 	sort.Slice(out, func(i, j int) bool { return out[i].Domain < out[j].Domain })
 	return out, nil
 }
+
+// Transport satisfies [Reader] and returns the constant "HTTPS"
+// (this client only ever issues HTTPS requests against the Live
+// API surface). The constant lives on the implementation, not the
+// caller, so transport identity stays owned by the type that
+// implements it.
+func (*Client) Transport() string { return "HTTPS" }
 
 // decodeList is the generic shape-tolerant decoder DA's responses
 // need. Three shapes seen in the wild:

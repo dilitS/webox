@@ -95,6 +95,46 @@ func TestRedactCorpus_SecretFamilies(t *testing.T) {
 			secrets: []string{base64Random(64)},
 		},
 		{
+			// cPanel UAPI emits this header shape verbatim from
+			// providers/cpanel/uapi/transport.go. We want the
+			// username preserved (for post-incident triage) but
+			// the token after the colon scrubbed.
+			name:    "authorization cpanel user:token preserves user",
+			line:    "Authorization: cpanel operator:t0k3nABC123-deadbeef-cafebabe",
+			secrets: []string{"t0k3nABC123-deadbeef-cafebabe"},
+			safe:    []string{"Authorization: cpanel operator:"},
+		},
+		{
+			// DirectAdmin's Authorization is Basic-encoded; the
+			// base64 blob carries user+key together so we redact
+			// the whole opaque value.
+			name:    "authorization basic redacts whole base64 blob",
+			line:    "Authorization: Basic " + base64Random(64),
+			secrets: []string{base64Random(64)},
+		},
+		{
+			// `webox doctor directadmin --loginkey=...` round-trips
+			// through the generic key=value rule via the new
+			// `login[_-]?key` alternation arm. Deterministic literal
+			// here so the assertion actually proves the bytes are
+			// scrubbed (vs. the older `base64Random(N)` cases which
+			// pass trivially because the regenerated random differs
+			// from the original).
+			name:    "directadmin loginkey CLI flag",
+			line:    "webox doctor directadmin --host=panel.example.com --user=op --loginkey=lkAaBbCcDdEe1234567890_FGHIJ-deadbeefcafe",
+			secrets: []string{"lkAaBbCcDdEe1234567890_FGHIJ-deadbeefcafe"},
+			safe:    []string{"--host=panel.example.com", "--user=op"},
+		},
+		{
+			// `DA_LOGIN_KEY=...` env line is already covered by
+			// the upper-case env-line rule (`*KEY*=` suffix-match),
+			// but exercising it here documents the redactor's
+			// guarantee for the second adapter explicitly.
+			name:    "directadmin login_key env line",
+			line:    "DA_LOGIN_KEY=lkSecretValue1234567890_abcdef-ghijkl",
+			secrets: []string{"lkSecretValue1234567890_abcdef-ghijkl"},
+		},
+		{
 			name:    "ssh-rsa public key (treat as sensitive identifier)",
 			line:    "ssh-rsa " + strings.Repeat("A", 60) + " admin@host",
 			secrets: []string{strings.Repeat("A", 60)},
