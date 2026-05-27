@@ -1,0 +1,10 @@
+{
+  "result": {
+    "status": 0,
+    "errors": ["The domain client.example.com does not exist on this account."],
+    "warnings": null,
+    "messages": null,
+    "data": null,
+    "metadata": {}
+  }
+}

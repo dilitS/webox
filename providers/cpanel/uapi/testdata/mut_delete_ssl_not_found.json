@@ -1,0 +1,10 @@
+{
+  "result": {
+    "status": 0,
+    "errors": ["There is no SSL certificate installed for shop.example.com."],
+    "warnings": null,
+    "messages": null,
+    "data": null,
+    "metadata": {}
+  }
+}

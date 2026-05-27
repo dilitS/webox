@@ -1,0 +1,12 @@
+{
+  "result": {
+    "status": 1,
+    "errors": null,
+    "warnings": ["AutoSSL has been triggered. Certificate provisioning continues in the background."],
+    "messages": null,
+    "data": {
+      "result": 1
+    },
+    "metadata": {}
+  }
+}
