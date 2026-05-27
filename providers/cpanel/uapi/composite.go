@@ -18,6 +18,14 @@ type Reader interface {
 	ListPassengerApps(ctx context.Context) (*PassengerAppsListResponse, error)
 	ListMysqlDatabases(ctx context.Context) (*MysqlListDatabasesResponse, error)
 	ListSSLKeys(ctx context.Context) (*SSLListKeysResponse, error)
+
+	// Transport returns a short, stable label for the transport
+	// powering this Reader. Used by `webox doctor cpanel` to render
+	// the transport hint next to each section without resorting to
+	// a runtime type-switch in the caller. Stable label values:
+	// "HTTPS", "SSH", "HTTPS+SSH" (composite with both wired), "?"
+	// (composite with neither wired — a programmer error).
+	Transport() string
 }
 
 // Composite tries Primary first; on
@@ -54,6 +62,29 @@ func (c *Composite) ListMysqlDatabases(ctx context.Context) (*MysqlListDatabases
 // ListSSLKeys satisfies [Reader].
 func (c *Composite) ListSSLKeys(ctx context.Context) (*SSLListKeysResponse, error) {
 	return tryComposite(c, func(r Reader) (*SSLListKeysResponse, error) { return r.ListSSLKeys(ctx) })
+}
+
+// Transport satisfies [Reader]. Renders the wiring snapshot:
+//   - both legs configured → "HTTPS+SSH"
+//   - only Primary → whatever Primary reports (typically "HTTPS")
+//   - only Secondary → whatever Secondary reports (typically "SSH")
+//   - neither → "?" (matches the programmer-error path in tryComposite)
+//
+// Delegating to the underlying Reader's Transport instead of
+// hardcoding strings means a future read-only adapter that surfaces
+// a third transport (e.g. CLI plugin) will plug in without touching
+// this composite.
+func (c *Composite) Transport() string {
+	switch {
+	case c.Primary != nil && c.Secondary != nil:
+		return c.Primary.Transport() + "+" + c.Secondary.Transport()
+	case c.Primary != nil:
+		return c.Primary.Transport()
+	case c.Secondary != nil:
+		return c.Secondary.Transport()
+	default:
+		return "?"
+	}
 }
 
 // tryComposite runs `op` against c.Primary; on

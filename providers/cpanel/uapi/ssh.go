@@ -107,6 +107,10 @@ func (s *SSHFallback) ListSSLKeys(ctx context.Context) (*SSLListKeysResponse, er
 	return &SSLListKeysResponse{Keys: keys}, nil
 }
 
+// Transport satisfies [Reader] and returns the constant "SSH".
+// See [Client.Transport] for the rationale.
+func (*SSHFallback) Transport() string { return "SSH" }
+
 // call runs a UAPI invocation over SSH and decodes the standard
 // envelope. exit-code 1 + "Sorry, the feature you are using is
 // disabled" stderr is the canonical "module disabled" path; we map

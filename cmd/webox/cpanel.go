@@ -313,25 +313,14 @@ func rollupCpanelVerdict(sections []cpanelSectionResult) cpanelVerdict {
 	}
 }
 
-// transportLabel returns "HTTPS+SSH" for a fully wired composite,
-// "HTTPS" or "SSH" for single-transport, and "?" otherwise.
-// Surface-only; rendered next to every section.
-func transportLabel(r uapi.Reader) string {
-	c, ok := r.(*uapi.Composite)
-	if !ok {
-		return "?"
-	}
-	switch {
-	case c.Primary != nil && c.Secondary != nil:
-		return "HTTPS+SSH"
-	case c.Primary != nil:
-		return "HTTPS"
-	case c.Secondary != nil:
-		return "SSH"
-	default:
-		return "?"
-	}
-}
+// transportLabel renders the transport hint next to every section.
+// Sprint 22 used a runtime type-switch against the three known Reader
+// implementations; that approach silently broke whenever a new
+// implementation landed (the default "?" branch swallowed it). The
+// post-Sprint-23 polish moved the label onto the [uapi.Reader]
+// interface itself ([uapi.Reader.Transport]), so any future
+// implementation is forced to declare its label at compile time.
+func transportLabel(r uapi.Reader) string { return r.Transport() }
 
 // appendCapped appends src to dst and returns the sample list,
 // capped at cpanelPreviewLineCap entries total. Used to keep the

@@ -148,6 +148,10 @@ func (s *SSHFallback) ListSSLCertificates(ctx context.Context) ([]SSLCertificate
 	return out, nil
 }
 
+// Transport satisfies [Reader] and returns the constant "SSH".
+// See [Client.Transport] for the rationale.
+func (*SSHFallback) Transport() string { return "SSH" }
+
 // fetch builds a loopback curl invocation, runs it via the SSH
 // runner, and classifies the result. The command shape:
 //

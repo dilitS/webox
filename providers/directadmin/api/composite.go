@@ -107,3 +107,22 @@ func (c *Composite) ListDatabases(ctx context.Context) ([]Database, error) {
 func (c *Composite) ListSSLCertificates(ctx context.Context) ([]SSLCertificate, error) {
 	return tryComposite(c, func(r Reader) ([]SSLCertificate, error) { return r.ListSSLCertificates(ctx) })
 }
+
+// Transport satisfies Reader. Delegates to the underlying legs so a
+// future third transport (e.g. CLI plugin) plugs in without touching
+// this method. With both legs wired the canonical "HTTPS+SSH" string
+// drops out naturally; with one leg nil the surviving leg's label is
+// returned; with neither (a construction-time programmer error
+// already guarded by [NewComposite]) the conservative "?" surfaces.
+func (c *Composite) Transport() string {
+	switch {
+	case c.Primary != nil && c.Secondary != nil:
+		return c.Primary.Transport() + "+" + c.Secondary.Transport()
+	case c.Primary != nil:
+		return c.Primary.Transport()
+	case c.Secondary != nil:
+		return c.Secondary.Transport()
+	default:
+		return "?"
+	}
+}

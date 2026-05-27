@@ -21,6 +21,7 @@ type fakeReader struct {
 	databases     []Database
 	sslErr        error
 	ssl           []SSLCertificate
+	transport     string
 	hits          atomic.Int32
 }
 
@@ -47,6 +48,18 @@ func (f *fakeReader) ListDatabases(_ context.Context) ([]Database, error) {
 func (f *fakeReader) ListSSLCertificates(_ context.Context) ([]SSLCertificate, error) {
 	f.hits.Add(1)
 	return f.ssl, f.sslErr
+}
+
+// Transport satisfies Reader. Composite tests label each leg
+// distinctly via the `transport` field so the delegation path
+// (composite.Transport → primary.Transport + "+" + secondary.Transport)
+// can be asserted directly; defaults to "fake" when unset so the
+// many existing tests that don't care about the label still compile.
+func (f *fakeReader) Transport() string {
+	if f.transport == "" {
+		return "fake"
+	}
+	return f.transport
 }
 
 func TestNewComposite_RejectsNilReaders(t *testing.T) {
@@ -194,5 +207,43 @@ func TestShouldFailover_OnlyForTransportUnavailable(t *testing.T) {
 		if shouldFailover(err) {
 			t.Errorf("expected no fail-over for %v", err)
 		}
+	}
+}
+
+func TestComposite_TransportDelegatesToLegs(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name      string
+		primary   Reader
+		secondary Reader
+		want      string
+	}{
+		{"both-wired", &fakeReader{transport: "HTTPS"}, &fakeReader{transport: "SSH"}, "HTTPS+SSH"},
+		{"primary-only", &fakeReader{transport: "HTTPS"}, nil, "HTTPS"},
+		{"secondary-only", nil, &fakeReader{transport: "SSH"}, "SSH"},
+		{"neither-wired", nil, nil, "?"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c := &Composite{Primary: tc.primary, Secondary: tc.secondary}
+			if got := c.Transport(); got != tc.want {
+				t.Errorf("Transport() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestClient_TransportReturnsHTTPS(t *testing.T) {
+	t.Parallel()
+	// Constructor needs valid args; nil http.Client is fine
+	// because Transport() doesn't touch the network.
+	c, err := NewClient("https://panel.example.com:2222", "operator", "k3y", nil)
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	if got := c.Transport(); got != "HTTPS" {
+		t.Errorf("Transport() = %q, want HTTPS", got)
 	}
 }
