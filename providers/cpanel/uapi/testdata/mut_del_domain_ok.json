@@ -1,0 +1,12 @@
+{
+  "result": {
+    "status": 1,
+    "errors": null,
+    "warnings": null,
+    "messages": ["The system removed the domain client.example.com."],
+    "data": {
+      "result": 1
+    },
+    "metadata": {}
+  }
+}

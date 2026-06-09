@@ -1,0 +1,12 @@
+{
+  "result": {
+    "status": 1,
+    "errors": null,
+    "warnings": null,
+    "messages": ["MySQL database operator_shopdb has been created."],
+    "data": {
+      "name": "operator_shopdb"
+    },
+    "metadata": {}
+  }
+}
