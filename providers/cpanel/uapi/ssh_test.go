@@ -272,12 +272,13 @@ func TestClient_HTTPSConnectionRefusedMapsToTransportUnavailable(t *testing.T) {
 // fixtures. The withX builders make table-driven tests read like
 // English.
 type fakeReader struct {
-	calls   int32
-	err     error
-	domains *DomainInfoListResponse
-	apps    *PassengerAppsListResponse
-	dbs     *MysqlListDatabasesResponse
-	keys    *SSLListKeysResponse
+	calls     int32
+	err       error
+	domains   *DomainInfoListResponse
+	apps      *PassengerAppsListResponse
+	dbs       *MysqlListDatabasesResponse
+	keys      *SSLListKeysResponse
+	transport string
 }
 
 func newFakeReader() *fakeReader { return &fakeReader{} }
@@ -321,4 +322,15 @@ func (f *fakeReader) ListMysqlDatabases(_ context.Context) (*MysqlListDatabasesR
 func (f *fakeReader) ListSSLKeys(_ context.Context) (*SSLListKeysResponse, error) {
 	atomic.AddInt32(&f.calls, 1)
 	return f.keys, f.err
+}
+
+// Transport satisfies Reader. Per-fake configurable so the composite
+// delegation test (TestComposite_TransportDelegatesToLegs) can label
+// each leg distinctly; defaults to "fake" for the many existing
+// tests that don't care about the value.
+func (f *fakeReader) Transport() string {
+	if f.transport == "" {
+		return "fake"
+	}
+	return f.transport
 }

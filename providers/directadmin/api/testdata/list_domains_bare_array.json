@@ -1,0 +1,4 @@
+[
+  {"domain": "alice.example.com", "is_primary": true},
+  {"domain": "shop.example.com", "is_primary": false}
+]

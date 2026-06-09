@@ -1,0 +1,4 @@
+{
+  "error": "Live API is disabled on this server. Please contact the hosting provider.",
+  "code": "API_DISABLED"
+}

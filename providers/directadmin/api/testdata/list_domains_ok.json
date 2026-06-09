@@ -1,0 +1,27 @@
+{
+  "success": true,
+  "domains": [
+    {
+      "domain": "alice.example.com",
+      "is_primary": true,
+      "ssl": true,
+      "bandwidth_bytes": 1048576,
+      "quota_bytes": 10737418240,
+      "suspended": false
+    },
+    {
+      "domain": "shop.example.com",
+      "is_primary": false,
+      "ssl": true,
+      "bandwidth_bytes": 524288,
+      "quota_bytes": 5368709120,
+      "suspended": false
+    },
+    {
+      "domain": "blog.example.com",
+      "is_primary": false,
+      "ssl": false,
+      "suspended": false
+    }
+  ]
+}

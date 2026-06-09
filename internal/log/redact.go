@@ -18,6 +18,26 @@ var redactionRules = []redactionRule{
 		pattern:     regexp.MustCompile(`(?i)(Authorization:\s*Bearer\s+)\S+`),
 		replacement: `${1}` + replacement,
 	},
+	// cPanel UAPI: `Authorization: cpanel <user>:<token>`. The user
+	// is not sensitive on its own (and being able to see it makes
+	// post-incident triage easier) but the token after the colon
+	// must never reach a log line. Preserve the literal `cpanel `
+	// prefix and the username so the redaction is still legible.
+	// See providers/cpanel/uapi/transport.go where this exact
+	// header shape is emitted.
+	{
+		pattern:     regexp.MustCompile(`(?i)(Authorization:\s*cpanel\s+[^:\s]+:)\S+`),
+		replacement: `${1}` + replacement,
+	},
+	// DirectAdmin Live API: `Authorization: Basic <base64(user:loginkey)>`.
+	// The base64 envelope embeds both username and the login key, so
+	// we redact the whole opaque blob — partial redaction would still
+	// leak the username when an operator runs `echo <b64> | base64 -d`
+	// on a copy-pasted log fragment.
+	{
+		pattern:     regexp.MustCompile(`(?i)(Authorization:\s*Basic\s+)\S+`),
+		replacement: `${1}` + replacement,
+	},
 	{
 		pattern:     regexp.MustCompile(`://([^:\s/@]+):([^@\s/]+)@`),
 		replacement: `://$1:` + replacement + `@`,
@@ -60,9 +80,13 @@ var redactionRules = []redactionRule{
 	// Generic key=value / key: value style secrets in CLI args, JSON
 	// payloads, env lines, and config dumps. The value capture stops
 	// at whitespace, ampersand, comma, or quote so we don't bleed the
-	// surrounding sentence into the redaction marker.
+	// surrounding sentence into the redaction marker. The alternation
+	// also includes `login[_-]?key` (DirectAdmin's bearer credential
+	// name — distinct from cPanel's "token") and `loginkey` styled
+	// as `loginkey=…` from `webox doctor directadmin --loginkey=` CLI
+	// arg or `DA_LOGIN_KEY=…` env dumps.
 	{
-		pattern:     regexp.MustCompile(`(?i)\b(password|passwd|token|secret|api[_-]?key|access[_-]?key)\s*[:=]\s*([^\s&"',]{4,})`),
+		pattern:     regexp.MustCompile(`(?i)\b(password|passwd|token|secret|api[_-]?key|access[_-]?key|login[_-]?key)\s*[:=]\s*([^\s&"',]{4,})`),
 		replacement: `${1}=` + replacement,
 	},
 	// MySQL / PostgreSQL `-p<password>` form (no space between flag
@@ -71,6 +95,18 @@ var redactionRules = []redactionRule{
 	{
 		pattern:     regexp.MustCompile(`(?i)\b(mysql|mysqldump|psql)\b([^\n]*?)\s-p([^\s\-]\S*)`),
 		replacement: `${1}${2} -p` + replacement,
+	},
+	// `curl --user <user>:<secret>` (and the shell-quoted
+	// `--user '<user>:<secret>'`). DirectAdmin's SSH loopback
+	// fallback emits exactly this shape via shellQuote in
+	// providers/directadmin/api/ssh.go. The token after the colon
+	// is the login key and must never reach a log line; the
+	// username is preserved for post-incident triage. The value
+	// capture stops at a single quote or whitespace so the closing
+	// shell quote and the rest of the argv survive intact.
+	{
+		pattern:     regexp.MustCompile(`(?i)(--user\s+'?[^':\s]+:)[^'\s]+`),
+		replacement: `${1}` + replacement,
 	},
 }
 

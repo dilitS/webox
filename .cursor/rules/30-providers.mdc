@@ -78,6 +78,13 @@ provider, err := registry.New(cfg)
 if err := provider.CreateSubdomain(ctx, domain, nodeVersion); err != nil { ... }
 ```
 
-## MVP scope
+## Scope per wersja
 
-W MVP **tylko** `smallhost`. `cpanel`, `directadmin`, `cyberpanel` są research-only w `docs/providers/`. Wszelka implementacja tych adapterów w MVP PR = automatic reject.
+| Provider | Status | Od |
+|---|---|---|
+| `smallhost` | ✅ Pełny adapter (MVP `v0.1`) | Sprint 03 |
+| `cpanel` | 🔵 Read-only client + `doctor cpanel` (`v0.2`); mutating ops za `WEBOX_CPANEL_MUTATIONS=1` | Sprint 21–22 |
+| `directadmin` | 🔵 Read-only client + `doctor directadmin` (`v0.2`); mutating ops Sprint 24+ | Sprint 23 |
+| `cyberpanel` | 🔬 Research-only (`docs/providers/`), root-required, wymaga threat-model RFC | deferred `v0.4+` |
+
+**Guardrail wciąż obowiązuje:** logika biznesowa nigdy nie zna providera po nazwie (patrz wyżej) — adaptery wchodzą przez `providers.HostingProvider` / `Reader`, nie przez `if profile.Type == ...`. Implementacja `cyberpanel` (lub dowolnego nowego panelu) przed sprintem, który go obejmuje, = automatic reject bez ADR + sign-off maintainera.
