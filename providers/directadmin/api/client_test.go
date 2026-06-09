@@ -381,6 +381,8 @@ func TestEndpointURL_AppliesAPIPrefix(t *testing.T) {
 		{EndpointWhoami, nil, "https://da.example.com:2222/api/whoami"},
 		{EndpointListDomains, []any{"alice"}, "https://da.example.com:2222/api/users/alice/domains"},
 		{EndpointListSubdomains, []any{"alice"}, "https://da.example.com:2222/api/users/alice/subdomains"},
+		{EndpointListDatabases, []any{"alice"}, "https://da.example.com:2222/api/users/alice/databases"},
+		{EndpointListSSLCertificates, []any{"alice"}, "https://da.example.com:2222/api/users/alice/ssl/certificates"},
 	}
 	for _, tc := range tests {
 		got := c.t.endpointURL(tc.ep, tc.args...)

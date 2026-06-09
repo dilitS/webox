@@ -38,13 +38,16 @@ const (
 	// EndpointListDatabases lists the MySQL / MariaDB databases
 	// owned by the authenticated user. DA Live API exposes a
 	// flat list; SSH fallback (TASK-23.2) parses the legacy
-	// `CMD_API_DATABASES` text format for older installs.
-	EndpointListDatabases Endpoint = "users/{user}/databases"
+	// `CMD_API_DATABASES` text format for older installs. The
+	// `%s` verb takes the username (DA docs render it as
+	// `{user}`; we substitute via fmt, not a template engine).
+	EndpointListDatabases Endpoint = "users/%s/databases"
 
 	// EndpointListSSLCertificates lists installed SSL certs
 	// (manual + Let's Encrypt). Useful for `webox doctor
 	// directadmin` to surface expiring certs in the status feed.
-	EndpointListSSLCertificates Endpoint = "users/{user}/ssl/certificates"
+	// `%s` verb = username (see EndpointListDatabases).
+	EndpointListSSLCertificates Endpoint = "users/%s/ssl/certificates"
 
 	// EndpointWhoami is a cheap auth-only probe. The doctor CLI
 	// calls this first to surface auth failures with `AUTH_FAILED`

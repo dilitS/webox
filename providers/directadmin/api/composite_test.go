@@ -183,6 +183,28 @@ func TestComposite_AllMethodsForwardToBothReaders(t *testing.T) {
 	}
 }
 
+func TestComposite_FailoverWithNilSecondaryDoesNotPanic(t *testing.T) {
+	t.Parallel()
+	// A Composite built directly (bypassing NewComposite) with a nil
+	// Secondary must surface the Primary's transport error instead of
+	// dereferencing nil when the Primary asks to fail over. Mirrors the
+	// cpanel/uapi composite's nil-leg robustness; the exported fields
+	// make the bypass reachable, so the guard is not dead code.
+	primary := &fakeReader{whoamiErr: ErrTransportUnavailable}
+	c := &Composite{Primary: primary, Secondary: nil}
+	if _, err := c.Whoami(context.Background()); !errors.Is(err, ErrTransportUnavailable) {
+		t.Fatalf("expected ErrTransportUnavailable to surface, got %v", err)
+	}
+}
+
+func TestComposite_BothLegsNilReturnsTransportUnavailable(t *testing.T) {
+	t.Parallel()
+	c := &Composite{}
+	if _, err := c.ListDomains(context.Background()); !errors.Is(err, ErrTransportUnavailable) {
+		t.Fatalf("expected ErrTransportUnavailable for empty composite, got %v", err)
+	}
+}
+
 func TestShouldFailover_OnlyForTransportUnavailable(t *testing.T) {
 	t.Parallel()
 	transport := []error{

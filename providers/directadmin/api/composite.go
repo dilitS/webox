@@ -72,13 +72,26 @@ func shouldFailover(err error) bool {
 // Reader method stays a one-line forward without runtime type
 // assertions. The two captured ops are typed `func(Reader) (T, error)`
 // so the compiler enforces the same signature on every call site.
+//
+// Nil-leg robustness mirrors cpanel/uapi: although [NewComposite]
+// rejects nil legs, the exported Primary/Secondary fields let a
+// caller bypass the constructor, so we guard against dereferencing
+// a nil Reader instead of panicking. On a terminal error (or a
+// fail-over with no Secondary wired) we return the zero value so a
+// partial Primary result never leaks alongside a non-nil error.
 func tryComposite[T any](c *Composite, op func(Reader) (T, error)) (T, error) {
-	v, err := op(c.Primary)
-	if err == nil {
-		return v, nil
+	var zero T
+	if c.Primary == nil && c.Secondary == nil {
+		return zero, ErrTransportUnavailable
 	}
-	if !shouldFailover(err) {
-		return v, err
+	if c.Primary != nil {
+		v, err := op(c.Primary)
+		if err == nil {
+			return v, nil
+		}
+		if !shouldFailover(err) || c.Secondary == nil {
+			return zero, err
+		}
 	}
 	return op(c.Secondary)
 }

@@ -130,12 +130,7 @@ func (c *Client) ListSubdomains(ctx context.Context) ([]Subdomain, error) {
 // accepts both bare arrays and wrapper objects in case a future
 // DA version changes the response shape.
 func (c *Client) ListDatabases(ctx context.Context) ([]Database, error) {
-	// DA's documented endpoint actually uses literal `{user}`
-	// substitution in some installs, but the canonical path is
-	// `/api/users/<user>/databases`. We hand the username
-	// through %s and ignore the documented placeholder.
-	const databasesPath Endpoint = "users/%s/databases"
-	body, err := c.t.call(ctx, c.t.endpointURL(databasesPath, c.t.user))
+	body, err := c.t.call(ctx, c.t.endpointURL(EndpointListDatabases, c.t.user))
 	if err != nil {
 		return nil, err
 	}
@@ -150,8 +145,7 @@ func (c *Client) ListDatabases(ctx context.Context) ([]Database, error) {
 // ListSSLCertificates returns the SSL certs installed for the
 // user's domains.
 func (c *Client) ListSSLCertificates(ctx context.Context) ([]SSLCertificate, error) {
-	const sslPath Endpoint = "users/%s/ssl/certificates"
-	body, err := c.t.call(ctx, c.t.endpointURL(sslPath, c.t.user))
+	body, err := c.t.call(ctx, c.t.endpointURL(EndpointListSSLCertificates, c.t.user))
 	if err != nil {
 		return nil, err
 	}
