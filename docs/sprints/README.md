@@ -251,7 +251,7 @@ Wszystkie powtarzalne kroki są skryptowane. Główne komendy z `Makefile`:
 | 20 | **TUI Polish & Provider Catalog** — click hit-testing, Provider Catalog screen (carry-over of TASK-19.4), Standard mode redesign, Project Detail tabs 2/3 unstub, Help screen overhaul, chrome-hint cleanup (post-Sprint-19 operator feedback) | ✅ Done (2026-05-25) | [sprint-20-tui-polish-and-catalog.md](sprint-20-tui-polish-and-catalog.md) | [retros/2026-05-25-sprint-20.md](../retros/2026-05-25-sprint-20.md) |
 | 21 | **cPanel Adapter (part 1) + Public Launch Prep** — UAPI client (TASK-21.1), SSH fallback (TASK-21.2), `webox doctor cpanel` (TASK-21.3), `webox doctor preset --probe` (TASK-21.4), README EN (TASK-21.5), asciinema cast (TASK-21.6), cPanel test account (TASK-21.7 → deferred). | ✅ Done (2026-05-25, 6/8 tasks; TASK-21.7 → Sprint 22) | [sprint-21-cpanel-adapter-prep.md](sprint-21-cpanel-adapter-prep.md) | [retros/2026-05-25-sprint-21.md](../retros/2026-05-25-sprint-21.md) |
 | 22 | **cPanel Adapter (part 2) + v0.2.0-rc1** — mutating ops (`createProject`, `restartApp`, `addSSLDomain`), wizard integration, GHA template, E2E, fixtures from live test account (TASK-21.7 carry-over), release. | 📝 Planned | [sprint-22-cpanel-adapter-mutations.md](sprint-22-cpanel-adapter-mutations.md) | — |
-| 23 | **Second Provider OR Public Launch (decision sprint)** — Path A (DirectAdmin adapter), Path B (CyberPanel adapter MVP), or Path C (Public Launch Redux). Decision matrix at Sprint 22 retro. | 📝 Decision doc | [sprint-23-second-provider-or-launch.md](sprint-23-second-provider-or-launch.md) | — |
+| 23 | **Second Provider — DirectAdmin read-only adapter (Path A chosen)** — Live API client + SSH loopback fallback + Composite, `webox doctor directadmin`, preset graduated research → candidate. Path B (CyberPanel) deferred to v0.4+, Path C (Public Launch) deferred until v0.2.0 GA. | ✅ Done (2026-05-27, 6/6) | [sprint-23-second-provider-or-launch.md](sprint-23-second-provider-or-launch.md) | [2026-05-27-sprint-23.md](../retros/2026-05-27-sprint-23.md) |
 
 **Etapy projektu:**
 - **Sprints 00-12** — MVP delivery (v0.1).
@@ -262,7 +262,7 @@ Wszystkie powtarzalne kroki są skryptowane. Główne komendy z `Makefile`:
 - **Sprint 20** — TUI Polish & Provider Catalog (carry-over 19.4 + post-Sprint-19 operator feedback fixes).
 - **Sprint 21** — cPanel Adapter MVP part 1 + Public Launch Prep (parallel tracks; closed 2026-05-25, 6/8 tasks; TASK-21.7 → Sprint 22).
 - **Sprint 22** — cPanel Adapter part 2 + v0.2.0-rc1 (mutating ops, wizard, GHA template, E2E, live-account fixtures, release).
-- **Sprint 23** — Decision sprint: Path A (DirectAdmin) / Path B (CyberPanel MVP) / Path C (Public Launch redux). Plan finalizes after Sprint 22 retro.
+- **Sprint 23** — Path A chosen: DirectAdmin read-only adapter shipped (Live API + SSH loopback + Composite + `doctor directadmin`). Closed 2026-05-27 (6/6); Path B (CyberPanel) deferred v0.4+, Path C (Public Launch) deferred to v0.2.0 GA. Mutating adapter → Sprint 24 (needs live test account).
 
 Sprinty 08–11 dodane do MVP po [ADR-0007](../adr/0007-bento-ultra-eskalacja-mvp.md) (2026-05-23) — eskalacja Bento Ultra + live logs + GHA panel + topology z STRETCH (v0.2+) do MVP (v0.1).
 Sprinty 15-20+ dodane 2026-05-25 — launch readiness + cPanel adapter + preset registry, na podstawie strategicznej decyzji post-Sprint 14 review.
