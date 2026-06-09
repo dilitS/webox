@@ -18,6 +18,15 @@ import (
 func TestRedactCorpus_SecretFamilies(t *testing.T) {
 	t.Parallel()
 
+	// Capture each random opaque value ONCE so the "secret removed"
+	// assertion checks the exact bytes embedded in `line`. Calling
+	// base64Random twice (once for `line`, once for `secrets`) would
+	// compare the output against a *different* random string and pass
+	// trivially regardless of whether redaction actually fired.
+	secretOpaque := base64Random(48)
+	bearerOpaque := base64Random(64)
+	basicBlob := base64Random(64)
+
 	cases := []struct {
 		name    string
 		line    string
@@ -86,13 +95,13 @@ func TestRedactCorpus_SecretFamilies(t *testing.T) {
 		},
 		{
 			name:    "long base64-shaped value after secret=",
-			line:    "secret=" + base64Random(48),
-			secrets: []string{base64Random(48)},
+			line:    "secret=" + secretOpaque,
+			secrets: []string{secretOpaque},
 		},
 		{
 			name:    "authorization bearer with random opaque",
-			line:    "Authorization: Bearer " + base64Random(64),
-			secrets: []string{base64Random(64)},
+			line:    "Authorization: Bearer " + bearerOpaque,
+			secrets: []string{bearerOpaque},
 		},
 		{
 			// cPanel UAPI emits this header shape verbatim from
@@ -109,8 +118,8 @@ func TestRedactCorpus_SecretFamilies(t *testing.T) {
 			// base64 blob carries user+key together so we redact
 			// the whole opaque value.
 			name:    "authorization basic redacts whole base64 blob",
-			line:    "Authorization: Basic " + base64Random(64),
-			secrets: []string{base64Random(64)},
+			line:    "Authorization: Basic " + basicBlob,
+			secrets: []string{basicBlob},
 		},
 		{
 			// `webox doctor directadmin --loginkey=...` round-trips
@@ -124,6 +133,17 @@ func TestRedactCorpus_SecretFamilies(t *testing.T) {
 			line:    "webox doctor directadmin --host=panel.example.com --user=op --loginkey=lkAaBbCcDdEe1234567890_FGHIJ-deadbeefcafe",
 			secrets: []string{"lkAaBbCcDdEe1234567890_FGHIJ-deadbeefcafe"},
 			safe:    []string{"--host=panel.example.com", "--user=op"},
+		},
+		{
+			// DirectAdmin SSH fallback shells out to
+			// `curl -sk --user '<user>:<loginkey>' …` on loopback
+			// (providers/directadmin/api/ssh.go). If that command
+			// ever reaches a trace/log sink the key after the colon
+			// must be scrubbed while the username stays for triage.
+			name:    "directadmin loopback curl --user redacts key",
+			line:    `curl -sk --max-time 30 --user 'operator:lkSecretKey1234567890abcdef' --write-out '\n%{http_code}' https://localhost:2222/api/whoami`,
+			secrets: []string{"lkSecretKey1234567890abcdef"},
+			safe:    []string{"--user 'operator:", "https://localhost:2222/api/whoami"},
 		},
 		{
 			// `DA_LOGIN_KEY=...` env line is already covered by

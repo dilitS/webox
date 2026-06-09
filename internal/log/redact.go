@@ -96,6 +96,18 @@ var redactionRules = []redactionRule{
 		pattern:     regexp.MustCompile(`(?i)\b(mysql|mysqldump|psql)\b([^\n]*?)\s-p([^\s\-]\S*)`),
 		replacement: `${1}${2} -p` + replacement,
 	},
+	// `curl --user <user>:<secret>` (and the shell-quoted
+	// `--user '<user>:<secret>'`). DirectAdmin's SSH loopback
+	// fallback emits exactly this shape via shellQuote in
+	// providers/directadmin/api/ssh.go. The token after the colon
+	// is the login key and must never reach a log line; the
+	// username is preserved for post-incident triage. The value
+	// capture stops at a single quote or whitespace so the closing
+	// shell quote and the rest of the argv survive intact.
+	{
+		pattern:     regexp.MustCompile(`(?i)(--user\s+'?[^':\s]+:)[^'\s]+`),
+		replacement: `${1}` + replacement,
+	},
 }
 
 // Redact replaces known secret-shaped substrings with "[REDACTED]".
