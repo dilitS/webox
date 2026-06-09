@@ -62,6 +62,10 @@ func (f *fakeReader) ListSSLKeys(_ context.Context) (*uapi.SSLListKeysResponse, 
 	return f.ssl, nil
 }
 
+// Transport satisfies the post-Sprint-23 uapi.Reader.Transport()
+// addition; the in-memory fake has no real transport.
+func (f *fakeReader) Transport() string { return "fake" }
+
 // fakeMutator is the in-memory stand-in for [uapi.Mutator]. Each
 // method records the call and returns the scripted error.
 type fakeMutator struct {

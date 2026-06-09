@@ -140,6 +140,10 @@ func (f *fakeCpanelReader) ListSSLKeys(_ context.Context) (*uapi.SSLListKeysResp
 	return &uapi.SSLListKeysResponse{}, nil
 }
 
+// Transport satisfies the post-Sprint-23 uapi.Reader.Transport()
+// addition; the in-memory fake has no real transport.
+func (f *fakeCpanelReader) Transport() string { return "fake" }
+
 // newCpanelProvider mirrors the cloudlinux-selector preset's
 // capability layout: addon domains, AutoSSL, MySQL.
 func newCpanelProvider(t *testing.T, r uapi.Reader, m uapi.Mutator) providers.HostingProvider {
