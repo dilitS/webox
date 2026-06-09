@@ -1,84 +1,141 @@
-# Sprint 23 — Second Provider OR Public Launch (Decision Sprint)
+# Sprint 23 — DirectAdmin Adapter (Path A selected)
 
-> **Daty:** 2026-07-07 → 2026-07-20 (2 tygodnie) · **Cel:** Po zamknięciu cPanel adaptera (Sprint 22), wybór między drugim adapterem (DirectAdmin / CyberPanel) a pełnym Public Launch'em (Sprint 16 redux). Decyzja podejmowana na retro Sprintu 22.
+> **Daty:** 2026-05-27 → 2026-06-09 (2 tygodnie) · **Cel:** Drugi hosting provider — DirectAdmin Live API adapter (read-only + diagnostic CLI). Powtarzamy wzorzec Sprint 21 dla DirectAdmin. Skupienie na **code-only**: 0 zależności od operatora-side credential rotation / live account procurement w pierwszych 3 taskach.
 >
-> **Status:** 📝 Decision-pending · **Predecessor:** [Sprint 22](sprint-22-cpanel-adapter-mutations.md) (cPanel adapter part 2 + v0.2.0-rc1).
+> **Status:** 🚧 In progress · **Predecessor:** [Sprint 22](sprint-22-cpanel-adapter-mutations.md) (cPanel adapter mutations) · **Decision:** [§Path selection](#path-selection-decision-2026-05-27).
 
 ## Kontekst
 
 Po Sprincie 22 Webox ma:
-- Pełny cPanel adapter (read + mutate ops).
-- `v0.2.0-rc1` jako pre-release na GitHub.
-- Preset registry z 6 entries (smallhost-devil + cpanel-generic verified, reszta candidate / research).
+- Pełny cPanel adapter (read + mutate ops, env-var guarded).
+- Wizard × cpanel integration tests + E2E suite (real HTTPS transport).
+- Workflow integration via `providers/cpanel/workflow.go`.
+- **`v0.2.0-rc1` BLOCKED** — TASK-22.0 (live cPanel fixture capture) deferred bo operator opóźnił credential rotation. Nie znamy daty unblock'a.
+- Preset registry z 6 entries: smallhost-devil + cpanel-generic verified (po fixturach), reszta candidate / research.
 
-Co dalej? **Trzy drogi, jeden sprint na każdą.**
+**Trzy drogi rozpatrywane na decision gate:**
 
-Sprint 23 to **decision sprint**: pierwszy dzień to ocena rzeczywistości po `v0.2.0-rc1`, wybór ścieżki, dopiero potem implementacja. Plan tutaj jest *opcjonalny per-ścieżka* — szczegółowy plan ostatecznej ścieżki powstaje na retro Sprintu 22.
-
-## Ścieżka A — DirectAdmin Adapter (rozszerza catalog providerów)
-
-**Kiedy wybrać:** Sprint 22 zamknął się czysto, cPanel adapter działa stabilnie, operatorzy proszą o DirectAdmin (drugi co do wielkości panel w PL po cPanel).
-
-**Cel:** Powtarzamy wzorzec z Sprintu 21+22 dla DirectAdmin: Live API client + SSH fallback + `webox doctor directadmin` + wizard integration + GHA template.
-
-**Skrócony backlog (full plan after path selection):**
-
-- **TASK-23.A.1** — `providers/directadmin/liveapi/` read-only client (Live API: JSON endpoint, basic auth). [L]
-- **TASK-23.A.2** — SSH fallback (`directadmin` szuka `da-ssl-install` / `da-create-user` CLI binarki). [M]
-- **TASK-23.A.3** — `webox doctor directadmin` CLI. [M]
-- **TASK-23.A.4** — `directadmin-generic` preset graduates from `research` → `verified` after live account validation. [S]
-- **TASK-23.A.5** — Adapter implementation + wizard integration + GHA template. [L]
-- **TASK-23.A.6** — E2E + release notes + `v0.2.1` bump (DirectAdmin add). [S]
-
-**Gating:** wymaga DirectAdmin test account. Same problem class as Sprint 22 TASK-22.0; jeśli nie ma test accountu do startu, fallback do Ścieżki C (Public Launch).
-
-**Ryzyko:** DirectAdmin Live API ma 2 inkarnacje (Legacy text + Live JSON); preset musi wybierać per-host.
-
-## Ścieżka B — CyberPanel Adapter (ekosystem alternatywa)
-
-**Kiedy wybrać:** Sprint 22 ujawnił, że cPanel ekosystem ma większe długi techniczne niż się spodziewaliśmy (np. UAPI permission model jest cięższy niż docs sugerują), a CyberPanel oferuje czystszy API surface (open-source, REST, dokumentacja w GitHubie).
-
-**Cel:** Pierwsza wersja CyberPanel adaptera (read-only) + decyzja czy continue w v0.3 czy zostaje na półce do v0.4+.
-
-**Skrócony backlog:**
-
-- **TASK-23.B.1** — `providers/cyberpanel/api/` REST client (basic auth + token endpoint). [L]
-- **TASK-23.B.2** — `webox doctor cyberpanel` CLI. [M]
-- **TASK-23.B.3** — `cyberpanel-generic` preset live validation. [M]
-- **TASK-23.B.4** — Spike: szacujemy effort dla pełnego adaptera + mutating ops; jeśli > 1.5 sprintu, zostawiamy na v0.4. [S]
-- **TASK-23.B.5** — Sprint review + carry-over decision. [S]
-
-**Ryzyko:** CyberPanel wymaga `root` na hoście (vs cPanel z unprivileged token). Threat model się rozszerza — security review z maintainerem przed merge.
-
-## Ścieżka C — Public Launch Redux (Sprint 16 reborn)
-
-**Kiedy wybrać:** Sprint 22 zamknął `v0.2.0-rc1`, ale operator audience jest priorytetem nad kolejnym adapterem. Cel: dostać pierwszych 100 GitHub stars i 10 użytkowników nie-maintainerów.
-
-**Cel:** Pełny launch motion: Reddit / Show HN / r/golang / r/selfhosted / r/programowanie + 2 partner outreach (małe hostery PL) + landing page polish + Webox PRO landing teaser.
-
-**Skrócony backlog:**
-
-- **TASK-23.C.1** — Reddit launch posts (4 subreddits, tailored copy). [M]
-- **TASK-23.C.2** — Show HN submission (timing + comment plan). [M]
-- **TASK-23.C.3** — Partner outreach (H88, mydevil, small.pl — sponsor / co-marketing). [M]
-- **TASK-23.C.4** — Landing page redesign (EN-first; PL link side-by-side). [L]
-- **TASK-23.C.5** — Webox PRO teaser landing (paid plan + early bird waitlist). [M]
-- **TASK-23.C.6** — Issue triage cadence — 4h/dzień zarezerwowane na community Q&A. [—]
-- **TASK-23.C.7** — Launch retro + v0.2.0 GA decision (tag z RC1 jeśli launch poszedł czysto). [S]
-
-**Ryzyko:** Launch wymaga TUI confidence na "obcych" terminalach (iTerm, Windows Terminal, gnome-terminal); Sprint 22 musi domknąć cPanel TUI smoke test w `make smoke-test`. Bez tego launch ryzykuje negatywnym fidbekiem.
-
-## Decision matrix (do wypełnienia na retro Sprintu 22)
+## Path selection decision (2026-05-27)
 
 | Kryterium | A. DirectAdmin | B. CyberPanel | C. Public Launch |
 |---|---|---|---|
-| Test account ready? | … | … | n/a |
-| cPanel adapter stable? | wymaga ✅ | wymaga ✅ | wymaga ✅ |
-| Operator demand signal | … | … | … |
-| Effort estimate (zaufanie 1-5) | … | … | … |
-| Risk to v0.2.0 GA timeline | … | … | … |
+| Test account ready? | ❌ (later) | ❌ | n/a |
+| **Bloker startu sprintu?** | ❌ (3 taski code-only) | ❌ (research only) | ✅ (v0.2.0 GA) |
+| cPanel adapter stable? | ✅ (Sprint 22) | ✅ | ✅ |
+| Operator demand signal | 🟢 2nd-biggest panel PL (VPS/dedi) | 🟡 niche, open-source | 🟡 audience-first, OK ale po GA |
+| Effort confidence (1-5) | 4/5 (wzorzec z Sprint 21) | 3/5 (root + threat model unknown) | 3/5 (timing-dependent) |
+| Risk to v0.2.0 GA timeline | 🟢 niski (równoległy track) | 🟡 średni (threat model RFC) | 🔴 GATED |
+| Decyzja matchowa | ✅ wybór | ❌ defer to v0.4+ | ❌ defer until v0.2.0 GA |
 
-**Decyzja:** wybrana ścieżka + uzasadnienie. Pełny plan Sprintu 23 powstaje *po* tej decyzji (na podstawie szkieletu powyżej).
+**Decision: Path A — DirectAdmin Adapter.**
+
+Uzasadnienie:
+1. **Path C odpada bez warunków** — `v0.2.0-rc1` jest dziś blocked. Launch przed GA tag z research-derived fixtures = chłodne pierwsze wrażenie + niska wiarygodność preset registry. Launch po GA, nie wcześniej.
+2. **Path B odkładamy do v0.4+** — CyberPanel wymaga roota na hoście, threat model rośnie, ADR-grade decision wymagany. Plus brak signalu demand od operatorów.
+3. **Path A jest poprawnym następnym ruchem** — wzorzec dokładnie copy-paste z Sprint 21, `directadmin-generic` preset już w registry (`research`), DA Live API ma publiczny Swagger spec (`https://<host>:2222/static/swagger.json` — bundled with every install), pierwsze 3 taski NIE wymagają live accountu. Można jechać równolegle do operator-side rotation cPanela.
+
+**Out-of-sprint:** TASK-22.0 (live cPanel fixtures) + TASK-22.6 (`v0.2.0-rc1` tag) — operator-side; gdy operator zrotuje credentials, wracam i domknę te dwa taski w izolacji.
+
+## Cel sprintu
+
+Po Sprincie 23:
+
+1. **`providers/directadmin/api/`** ma read-only client dla DirectAdmin Live API (`/api/*` Swagger-defined endpoints), z mirror'em z Sprintu 21 cpanel/uapi: `Reader` interface, HTTPS transport, retry policy, typed sentinels, table-driven shape decoders, golden fixtures z research.
+2. **`providers/directadmin/api/`** ma SSH fallback dla `da-cli` / `directadmin` binary (na każdej DA installce w `/usr/local/directadmin/`), z `SSHRunner` + `SSHFallback` w identycznym shape jak cpanel.
+3. **`providers/directadmin/api/`** ma `Composite{Primary, Secondary}` z preferencją HTTPS, fall-over na `ErrTransportUnavailable`.
+4. **`webox doctor directadmin`** CLI ([`cmd/webox/directadmin.go`](../../cmd/webox/directadmin.go)) — diagnostic command analogiczny do `doctor cpanel`: per-section status taxonomy, JSON output, exit-code policy.
+5. **`directadmin-generic` preset graduate z `research` → `candidate`** w [`assets/provider-presets/directadmin-generic.json`](../../assets/provider-presets/directadmin-generic.json) — `verified` audit trail czeka na live account (jak cpanel-generic).
+6. **`docs/providers/directadmin.md`** aktualizowany z mapping decyzjami: które endpoints used z Live API, które z SSH fallback, status hipotez przed implementacją.
+
+**Out of scope (carry-over do Sprint 24+):**
+- Live test account procurement + fixture replacement (operator-side; mirrors TASK-22.0 dla cpanel).
+- Mutating client + `MutatingClient` interface (Sprint 24).
+- Adapter implementation (`providers/directadmin/directadmin.go` — Sprint 24).
+- TUI wizard integration z `directadmin-generic` preset (Sprint 24).
+- `v0.2.1` tag (po live fixture replacement).
+
+## Taski
+
+### TASK-23.1 — DirectAdmin Live API read-only client + transport
+
+- **Estymata:** L (1.5-2 dni) · **Zależności:** Sprint 22 zakończony, `docs/providers/directadmin.md` research baseline.
+- **Acceptance Criteria:**
+  - [ ] `providers/directadmin/api/transport.go` — HTTPS transport z `Authorization: Basic <user:loginkey>` headerem (loginKey, NOT password), `User-Agent: webox/<v>`, retry policy (500 ms × 2ⁿ × 3 attempts), 4 MiB body cap, 30s default timeout.
+  - [ ] `providers/directadmin/api/client.go` — typed methods: `ListDomains`, `ListSubdomains`, `ListDatabases`, `ListSSLCertificates`. Każda mapuje do dokumentowanego endpointu z Swagger spec.
+  - [ ] `providers/directadmin/api/errors.go` — typed sentinels: `ErrInvalidEndpoint`, `ErrMissingCredentials`, `ErrAuthenticationFailed`, `ErrRateLimited`, `ErrServerError`, `ErrMalformedResponse`, `ErrTransportUnavailable`, `ErrAPIDisabled` (some legacy installs).
+  - [ ] **HTTPS-only constructor** — rejects `http://` (DA loginkey travels here, TLS mandatory).
+  - [ ] **Legacy API graceful detection** — jeśli `/api/v1/...` zwraca 404, `client.go` zwraca `ErrAPIDisabled` (operator wie że musi włączyć Live API lub przejść na legacy adapter w v0.4+).
+  - [ ] Test coverage ≥ 80%, fixtures w `providers/directadmin/api/testdata/` (research-derived z Swagger spec do live account exchange).
+
+### TASK-23.2 — SSH fallback + Composite layer
+
+- **Estymata:** M (1 dzień) · **Zależności:** TASK-23.1.
+- **Acceptance Criteria:**
+  - [ ] `providers/directadmin/api/ssh.go` — `SSHFallback` shells out to `da-cli` binary (path: `/usr/local/directadmin/scripts/da-cli` na każdej DA installce). Args quoted via `shellQuote` z Sprint 21.
+  - [ ] `providers/directadmin/api/sshpool.go` — `SSHPoolRunner` adapter integruje z projektowym `ssh.Pool`.
+  - [ ] `providers/directadmin/api/composite.go` — generic `Composite[T]` z preferencją HTTPS, fall-over na `errors.Is(err, ErrTransportUnavailable)`. Surfaces auth / rate-limit / API-disabled verbatim.
+  - [ ] Closed `Reader` interface satysfakcjonowana przez wszystkie trzy: `Client`, `SSHFallback`, `Composite`.
+  - [ ] Compile-time assertions: `var _ Reader = (*Client)(nil)` × 3.
+  - [ ] Tests: composite fall-over scenarios, no fall-over on auth errors (RFC 5737 unreachable IP for transport-unavailable mapping).
+
+### TASK-23.3 — `webox doctor directadmin` CLI
+
+- **Estymata:** M (1 dzień) · **Zależności:** TASK-23.2.
+- **Acceptance Criteria:**
+  - [ ] `cmd/webox/directadmin.go` — pure validation + rollup logic. Funkcje: `validateDirectAdminOptions`, `runDirectAdminDoctor`, `directAdminRollup`, `formatDirectAdminText`, `formatDirectAdminJSON`.
+  - [ ] `cmd/webox/directadmin_runner.go` — shells out to native `ssh` binary z `BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10` profile (same as `doctor preset --probe`).
+  - [ ] CLI surface: `webox doctor directadmin --host=<host> --user=<user> [--loginkey=<key>] [--api-port=2222] [--ssh-port=22] [--timeout=30s] [--no-ssh] [--no-api] [--json]`.
+  - [ ] Section status taxonomy: `OK`, `DISABLED` (legacy install / endpoint not supported), `AUTH_FAILED`, `UNREACHABLE`, `FAILED`.
+  - [ ] Rollup verdict: `OK` / `BLOCKED` / `DEGRADED` — same shape as `doctor cpanel`.
+  - [ ] Exit codes: 0 (OK / DEGRADED), 1 (BLOCKED), 2 (flag misuse).
+  - [ ] Parser integration: new flags scoped to `doctor directadmin` context (state-aware `simpleFlagHandled`, like cpanel).
+  - [ ] Help text in `cmd/webox/run.go` documents every flag z przykładem.
+
+### TASK-23.4 — `directadmin-generic` preset graduate `research` → `candidate`
+
+- **Estymata:** S (< 4h) · **Zależności:** TASK-23.3.
+- **Acceptance Criteria:**
+  - [ ] [`assets/provider-presets/directadmin-generic.json`](../../assets/provider-presets/directadmin-generic.json) — status field changes from `research` to `candidate`.
+  - [ ] `verified` block left empty/null (czeka na live fixture capture; mirrors cpanel-generic post-Sprint-21).
+  - [ ] `probes[]` filled with read-only DA Live API calls plus SSH-based `da-cli` invocations — every probe passes schema regex (no shell metacharacters).
+  - [ ] `paths.app_root_template`, `paths.deploy_path_template`, `paths.log_path_template` populated for DA's standard `/home/<user>/domains/<domain>/` layout.
+  - [ ] Loader test (`presets/loader_test.go`) confirms the preset loads without `LoadErrors`.
+
+### TASK-23.5 — docs/providers/directadmin.md research → implementation status
+
+- **Estymata:** S (< 2h) · **Zależności:** TASK-23.1 + TASK-23.4.
+- **Acceptance Criteria:**
+  - [ ] Status field changes from "RESEARCH / PLANNED POST-MVP (v0.3)" to "READ-ONLY CLIENT SHIPPED (v0.2 path)".
+  - [ ] §5 mapping table updated: which endpoint resolved to Live API, which to SSH fallback, which still `[TO BE VERIFIED]`.
+  - [ ] §9 plan-testów section linked to TASK-23.4 preset graduation + Sprint 24 live capture.
+  - [ ] New §10 "Implementation notes" — what landed, what didn't, why.
+
+### TASK-23.6 — Sprint review + retro
+
+- **Estymata:** S (< 2h) · **Zależności:** All above.
+- **Acceptance Criteria:**
+  - [ ] Retro in `docs/retros/YYYY-MM-DD-sprint-23.md`.
+  - [ ] Sprint outcome filled.
+  - [ ] Sprint 24 path drafted: full DirectAdmin adapter + mutating client + wizard integration + live fixture capture (mirror of Sprint 22 dla cpanel).
+
+## Risk watch
+
+| Ryzyko | Mitygacja |
+|---|---|
+| DA Live API ma 2 inkarnacje (Legacy text + Live JSON); preset musi wybierać per-host. | TASK-23.1 implements `ErrAPIDisabled` so the client surfaces "this install needs legacy" at first call; Sprint 24+ decides whether to ship a legacy adapter or leave operators on a cpanel-style SSH-only path. |
+| Operators ask for mutating ops w tym samym sprincie. | Hard reject — sprint scope is read-only client + diagnostic CLI; mutating + adapter ship in Sprint 24. Mirrors Sprint 21/22 split that worked for cpanel. |
+| DA `/api/*` endpoints hidden behind feature flag na ekonomicznych hosterach. | `ErrAPIDisabled` surfaced via `doctor directadmin` z BLOCKED verdict + actionable note ("contact host to enable Live API or use SSH-only profile"). |
+| Login-key leak risk during initial setup. | Token reads/writes go through keyring (`webox-api-<alias>`); doctor CLI accepts `--loginkey=...` but **NEVER** logs it. Live capture script (Sprint 24) follows the cpanel pattern: keyring-only, never plaintext. |
+| Coverage drift jeśli adapter w Sprint 24 zostanie odkryty jako wymagający 2nd-pass refactoru transportu. | Sprint 23 acceptance includes `make ci` zielony z ≥ 70% project coverage; jeśli transport requires rewrite w Sprint 24, refactor lands jako separate PR przed mutating client. |
+
+## Outcome (zamknięto 2026-05-27)
+
+- 📌 **Path selected:** A — DirectAdmin Adapter (read-only foundation).
+- ✅ **Done (6/6 tasks):** TASK-23.0 (decision-doc rewrite), TASK-23.1 (Live API client + transport, 88.7% coverage), TASK-23.2 (SSH fallback via loopback curl + Composite, generic dispatcher), TASK-23.3 (`webox doctor directadmin` CLI with 5-section taxonomy), TASK-23.4 (`directadmin-generic` preset graduate research → candidate), TASK-23.5 (`docs/providers/directadmin.md` flipped to "READ-ONLY CLIENT SHIPPED"), TASK-23.6 (retro + Sprint 24 draft).
+- ⏭️ **Carry-over (Sprint 24):** live fixture capture (TASK-24.0, operator-gated mirror of TASK-22.0), mutating client behind `WEBOX_DIRECTADMIN_MUTATIONS=1` (TASK-24.1), adapter implementation (TASK-24.2), wizard integration (TASK-24.3), GHA workflow helper (TASK-24.4), E2E suite (TASK-24.5), `internal/sshcmd` extraction (TASK-24.6), `v0.2.1` tag.
+- 📌 **Decyzje:** Path A wybrane na podstawie decision matrix (§Path selection decision, decyzja z 2026-05-27 z trzema napisanymi uzasadnieniami); Path B (CyberPanel) deferred to v0.4+ (root + threat-model RFC); Path C (Public Launch) deferred until `v0.2.0` GA (gated on operator-side cpanel rotation).
+- 🧠 **Surprises (z retro):** 3 wire shapes for DA Live API responses (research-derived decoder safety net), MySQL user prefix 8-char hard cap (Sprint 24 validator must enforce), `--no-api` vs `--no-uapi` terminology drift across panels.
+- 📊 **Metrics:** package coverage 85.2% (≥ 80% target), total project coverage 79.3% (≥ 70% gate), `make ci` zielony pierwsze podejście, lint clean (2× `//nolint:dupl` udokumentowane), 33 nowe unit testy + 6 parser testów.
 
 ## Outcome (wypełnij po sprincie)
 

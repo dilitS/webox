@@ -18,6 +18,15 @@ import (
 func TestRedactCorpus_SecretFamilies(t *testing.T) {
 	t.Parallel()
 
+	// Capture each random opaque value ONCE so the "secret removed"
+	// assertion checks the exact bytes embedded in `line`. Calling
+	// base64Random twice (once for `line`, once for `secrets`) would
+	// compare the output against a *different* random string and pass
+	// trivially regardless of whether redaction actually fired.
+	secretOpaque := base64Random(48)
+	bearerOpaque := base64Random(64)
+	basicBlob := base64Random(64)
+
 	cases := []struct {
 		name    string
 		line    string
@@ -86,13 +95,64 @@ func TestRedactCorpus_SecretFamilies(t *testing.T) {
 		},
 		{
 			name:    "long base64-shaped value after secret=",
-			line:    "secret=" + base64Random(48),
-			secrets: []string{base64Random(48)},
+			line:    "secret=" + secretOpaque,
+			secrets: []string{secretOpaque},
 		},
 		{
 			name:    "authorization bearer with random opaque",
-			line:    "Authorization: Bearer " + base64Random(64),
-			secrets: []string{base64Random(64)},
+			line:    "Authorization: Bearer " + bearerOpaque,
+			secrets: []string{bearerOpaque},
+		},
+		{
+			// cPanel UAPI emits this header shape verbatim from
+			// providers/cpanel/uapi/transport.go. We want the
+			// username preserved (for post-incident triage) but
+			// the token after the colon scrubbed.
+			name:    "authorization cpanel user:token preserves user",
+			line:    "Authorization: cpanel operator:t0k3nABC123-deadbeef-cafebabe",
+			secrets: []string{"t0k3nABC123-deadbeef-cafebabe"},
+			safe:    []string{"Authorization: cpanel operator:"},
+		},
+		{
+			// DirectAdmin's Authorization is Basic-encoded; the
+			// base64 blob carries user+key together so we redact
+			// the whole opaque value.
+			name:    "authorization basic redacts whole base64 blob",
+			line:    "Authorization: Basic " + basicBlob,
+			secrets: []string{basicBlob},
+		},
+		{
+			// `webox doctor directadmin --loginkey=...` round-trips
+			// through the generic key=value rule via the new
+			// `login[_-]?key` alternation arm. Deterministic literal
+			// here so the assertion actually proves the bytes are
+			// scrubbed (vs. the older `base64Random(N)` cases which
+			// pass trivially because the regenerated random differs
+			// from the original).
+			name:    "directadmin loginkey CLI flag",
+			line:    "webox doctor directadmin --host=panel.example.com --user=op --loginkey=lkAaBbCcDdEe1234567890_FGHIJ-deadbeefcafe",
+			secrets: []string{"lkAaBbCcDdEe1234567890_FGHIJ-deadbeefcafe"},
+			safe:    []string{"--host=panel.example.com", "--user=op"},
+		},
+		{
+			// DirectAdmin SSH fallback shells out to
+			// `curl -sk --user '<user>:<loginkey>' …` on loopback
+			// (providers/directadmin/api/ssh.go). If that command
+			// ever reaches a trace/log sink the key after the colon
+			// must be scrubbed while the username stays for triage.
+			name:    "directadmin loopback curl --user redacts key",
+			line:    `curl -sk --max-time 30 --user 'operator:lkSecretKey1234567890abcdef' --write-out '\n%{http_code}' https://localhost:2222/api/whoami`,
+			secrets: []string{"lkSecretKey1234567890abcdef"},
+			safe:    []string{"--user 'operator:", "https://localhost:2222/api/whoami"},
+		},
+		{
+			// `DA_LOGIN_KEY=...` env line is already covered by
+			// the upper-case env-line rule (`*KEY*=` suffix-match),
+			// but exercising it here documents the redactor's
+			// guarantee for the second adapter explicitly.
+			name:    "directadmin login_key env line",
+			line:    "DA_LOGIN_KEY=lkSecretValue1234567890_abcdef-ghijkl",
+			secrets: []string{"lkSecretValue1234567890_abcdef-ghijkl"},
 		},
 		{
 			name:    "ssh-rsa public key (treat as sensitive identifier)",

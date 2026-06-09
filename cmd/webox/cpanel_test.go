@@ -46,6 +46,14 @@ func (f *fakeReader) ListSSLKeys(_ context.Context) (*uapi.SSLListKeysResponse, 
 	return f.keys, f.keysErr
 }
 
+// Transport identifies this fake as an HTTPS Reader. All cpanel_test
+// happy/sad paths wrap `fakeReader` in `uapi.Composite{Primary: ...}`
+// (no Secondary), so the composite delegates Transport() back to the
+// Primary's label, and "HTTPS" is what the doctor CLI prints. If a
+// future test needs to assert an SSH-only composite, declare a second
+// fake that returns "SSH" from Transport().
+func (*fakeReader) Transport() string { return "HTTPS" }
+
 func TestValidateCpanelOpts_RequiresHostAndUser(t *testing.T) {
 	cases := []struct {
 		name string

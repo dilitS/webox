@@ -1,0 +1,17 @@
+{
+  "success": true,
+  "certificates": [
+    {
+      "domain": "alice.example.com",
+      "issuer": "Let's Encrypt Authority X3",
+      "not_after": "2026-08-25T00:00:00Z",
+      "letsencrypt": true
+    },
+    {
+      "domain": "shop.example.com",
+      "issuer": "Sectigo RSA Domain Validation Secure Server CA",
+      "not_after": "2027-01-15T00:00:00Z",
+      "letsencrypt": false
+    }
+  ]
+}

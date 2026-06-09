@@ -1,0 +1,7 @@
+{
+  "success": true,
+  "databases": [
+    {"name": "alice_shopdb", "user": "alice_shopadm", "size_mb": 42},
+    {"name": "alice_blogdb", "user": "alice_blogadm", "size_mb": 8}
+  ]
+}

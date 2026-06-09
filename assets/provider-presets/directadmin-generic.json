@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "id": "directadmin-generic",
-  "display_name": "Generic DirectAdmin (Live API + Legacy fallback)",
+  "display_name": "Generic DirectAdmin (Live API + SSH loopback fallback)",
   "provider_type": "directadmin",
-  "status": "research",
+  "status": "candidate",
   "markets": ["global"],
   "panel": {
     "name": "DirectAdmin",
@@ -24,17 +24,20 @@
   "paths": {
     "deploy_path_template": "/home/{{user}}/domains/{{domain}}/public_html",
     "log_path_template": "/home/{{user}}/domains/{{domain}}/logs",
-    "env_path_template": "/home/{{user}}/domains/{{domain}}/.env"
+    "env_path_template": "/home/{{user}}/domains/{{domain}}/.env",
+    "node_versions_path": "/opt/alt/alt-nodejs"
   },
   "probes": [
     "command -v nodejs_selector",
     "command -v cloudlinux-selector",
-    "command -v passenger-config"
+    "command -v passenger-config",
+    "test -x /usr/local/directadmin/directadmin"
   ],
   "known_risks": [
-    "Live API endpoint coverage varies by DirectAdmin version; Legacy API fallback is often required.",
-    "Login Key system mandatory for unattended automation; main password must never be stored.",
-    "Some hosters expose Nginx Unit instead of Passenger; runtime detection critical."
+    "Live API endpoint coverage varies by DirectAdmin version; some installs require enabling /api/* explicitly via panel config.",
+    "Login Key system mandatory for unattended automation; main account password must never be stored.",
+    "Some hosters expose Nginx Unit instead of Passenger; runtime detection critical before any restart attempt.",
+    "Database user prefix is capped at 8 chars on stock DA — long usernames need a separate naming policy."
   ],
   "sources": [
     "https://docs.directadmin.com/developer/api/",

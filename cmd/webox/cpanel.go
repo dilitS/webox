@@ -313,25 +313,14 @@ func rollupCpanelVerdict(sections []cpanelSectionResult) cpanelVerdict {
 	}
 }
 
-// transportLabel returns "HTTPS+SSH" for a fully wired composite,
-// "HTTPS" or "SSH" for single-transport, and "?" otherwise.
-// Surface-only; rendered next to every section.
-func transportLabel(r uapi.Reader) string {
-	c, ok := r.(*uapi.Composite)
-	if !ok {
-		return "?"
-	}
-	switch {
-	case c.Primary != nil && c.Secondary != nil:
-		return "HTTPS+SSH"
-	case c.Primary != nil:
-		return "HTTPS"
-	case c.Secondary != nil:
-		return "SSH"
-	default:
-		return "?"
-	}
-}
+// transportLabel renders the transport hint next to every section.
+// Sprint 22 used a runtime type-switch against the three known Reader
+// implementations; that approach silently broke whenever a new
+// implementation landed (the default "?" branch swallowed it). The
+// post-Sprint-23 polish moved the label onto the [uapi.Reader]
+// interface itself ([uapi.Reader.Transport]), so any future
+// implementation is forced to declare its label at compile time.
+func transportLabel(r uapi.Reader) string { return r.Transport() }
 
 // appendCapped appends src to dst and returns the sample list,
 // capped at cpanelPreviewLineCap entries total. Used to keep the
@@ -382,6 +371,11 @@ func emitCpanelReport(asJSON bool, report cpanelReport, stdout, stderr io.Writer
 }
 
 // writeCpanelText renders the human-friendly report.
+//
+// See directadmin.go for the design rationale (per-provider
+// report types share shape but not type).
+//
+//nolint:dupl // Duplicates writeDirectadminText (directadmin.go).
 func writeCpanelText(stdout io.Writer, report cpanelReport) {
 	fmt.Fprintf(stdout, "Webox doctor cpanel — %s\n", report.Host)
 	fmt.Fprintf(stdout, "  user            %s\n", report.User)

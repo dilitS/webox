@@ -92,6 +92,12 @@ func (c *Client) ListSSLKeys(ctx context.Context) (*SSLListKeysResponse, error) 
 	return &SSLListKeysResponse{Keys: keys}, nil
 }
 
+// Transport satisfies [Reader] and returns the constant "HTTPS"
+// (this client only ever issues HTTPS requests against the UAPI
+// surface). The constant lives here rather than in callers to keep
+// transport identity owned by the implementation, not the consumer.
+func (*Client) Transport() string { return "HTTPS" }
+
 // MutatingClient is the placeholder interface for the eventually
 // mutating UAPI surface (account, email, cron, etc.). Sprint 21
 // deliberately leaves the method body returning
